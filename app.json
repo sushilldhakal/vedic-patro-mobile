@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Vedic Patro",
+    "slug": "vedic-patro-mobile",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "vedicpatro",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f8f6f2"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vedicpatro.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f8f6f2"
+      },
+      "package": "com.vedicpatro.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "https://vedicpatro.com/api",
+      "apiVersion": "v1"
+    }
+  }
+}
