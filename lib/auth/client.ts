@@ -1,0 +1,166 @@
+/**
+ * Auth API client + token storage — the mobile twin of the web
+ * `src/lib/auth/client.ts`. Same bearer-token flow against the same API, so a
+ * user's account works identically on web and mobile.
+ *
+ * Tokens live in an in-memory cache for synchronous access, backed by
+ * SecureStore (native) / localStorage (web). `authFetch` transparently
+ * refreshes an expired access token once on a 401, then retries.
+ */
+import { API_BASE } from "@/lib/api";
+import { storageGet, storageRemove, storageSet } from "./storage";
+
+const ACCESS_KEY = "dhakalPatroAccessToken";
+const REFRESH_KEY = "dhakalPatroRefreshToken";
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  is_verified: boolean;
+  created_at: string;
+}
+
+// ─── Token store (in-memory cache + durable backing) ────────────────────────
+
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+
+export const tokenStore = {
+  get access() {
+    return accessToken;
+  },
+  get refresh() {
+    return refreshToken;
+  },
+  /** Read persisted tokens into the in-memory cache. Call once at app boot. */
+  async load() {
+    [accessToken, refreshToken] = await Promise.all([
+      storageGet(ACCESS_KEY),
+      storageGet(REFRESH_KEY),
+    ]);
+  },
+  set(tokens: TokenPair) {
+    accessToken = tokens.access_token;
+    refreshToken = tokens.refresh_token;
+    void storageSet(ACCESS_KEY, tokens.access_token);
+    void storageSet(REFRESH_KEY, tokens.refresh_token);
+  },
+  clear() {
+    accessToken = null;
+    refreshToken = null;
+    void storageRemove(ACCESS_KEY);
+    void storageRemove(REFRESH_KEY);
+  },
+};
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function parseError(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    if (typeof body?.detail === "string") return body.detail;
+    if (Array.isArray(body?.detail) && body.detail[0]?.msg) return body.detail[0].msg;
+  } catch {
+    /* fall through */
+  }
+  return `Request failed (${res.status})`;
+}
+
+async function raw(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
+  });
+}
+
+async function tryRefresh(): Promise<boolean> {
+  if (!refreshToken) return false;
+  const res = await raw("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!res.ok) {
+    tokenStore.clear();
+    return false;
+  }
+  tokenStore.set((await res.json()) as TokenPair);
+  return true;
+}
+
+/** Authenticated fetch with one-shot refresh-on-401 retry. Returns parsed JSON. */
+export async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const withAuth = (): RequestInit => ({
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+
+  let res = await raw(path, withAuth());
+  if (res.status === 401 && (await tryRefresh())) {
+    res = await raw(path, withAuth());
+  }
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+// ─── Auth endpoints ─────────────────────────────────────────────────────────
+
+export async function apiSignup(email: string, password: string): Promise<TokenPair> {
+  const res = await raw("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  return res.json();
+}
+
+export async function apiLogin(email: string, password: string): Promise<TokenPair> {
+  const res = await raw("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  return res.json();
+}
+
+export async function apiLogout(): Promise<void> {
+  const token = refreshToken;
+  // Clear locally first so the UI and in-flight requests see a signed-out session.
+  tokenStore.clear();
+  if (token) {
+    await raw("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: token }),
+    }).catch(() => undefined);
+  }
+}
+
+export const apiMe = () => authFetch<AuthUser>("/auth/me");
+
+export async function apiForgotPassword(email: string): Promise<string> {
+  const res = await raw("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  const body = await res.json().catch(() => ({}));
+  return body.message ?? "If that email exists, a reset link has been sent";
+}
+
+export const apiResendVerification = () =>
+  authFetch<{ message: string }>("/auth/resend-verification", { method: "POST" });

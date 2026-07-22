@@ -15,7 +15,7 @@ import { useLocale } from "@/lib/i18n";
 import { resolveSamvatsaraForBsYear } from "@/lib/samvatsara";
 import { cn } from "@/lib/utils";
 import { colors } from "@/lib/theme";
-import { PatroViewToggle, type HomePatroView } from "./PatroViewToggle";
+import { type HomePatroView } from "./PatroViewToggle";
 
 const BS_YEAR_OPTIONS = Array.from(
   { length: BS_SUPPORTED_END_YEAR - BS_SUPPORTED_START_YEAR + 1 },
@@ -35,6 +35,7 @@ type Props = {
   nextDisabled?: boolean;
   patroView: HomePatroView;
   onPatroViewChange: (view: HomePatroView) => void;
+  locationLabel?: string;
 };
 
 function chipMonthLabel(month: number, lang: string): string {
@@ -55,16 +56,17 @@ export function BsMonthHeaderTitle({
   nextDisabled,
   patroView,
   onPatroViewChange,
+  locationLabel,
 }: Props) {
   const { pick, digits, lang } = useLocale();
   const todayBs = adToBS(new Date(`${todayAd}T12:00:00`));
-  const [picker, setPicker] = useState<"month" | "year" | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const monthTitle = pick(BS_MONTHS_NE[month - 1], BS_MONTH_NAMES[month - 1]);
   const samvatsara = resolveSamvatsaraForBsYear(year);
   const samvatsaraLabel = samvatsara ? pick(samvatsara.name_ne, samvatsara.name_en) : undefined;
 
-  const adSubtitle = useMemo(() => {
+  const adRange = useMemo(() => {
     const adLocale = lang === "en" ? "en-US" : "ne-NP";
     const start = bsToAD(year, month, 1);
     const end = bsToAD(year, month, getBSMonthLength(year, month));
@@ -72,97 +74,95 @@ export function BsMonthHeaderTitle({
     const endMonth = end.toLocaleDateString(adLocale, { month: "short" });
     const startYear = start.getFullYear();
     const endYear = end.getFullYear();
-    const yearLabel = (y: number) => (lang === "en" ? String(y) : digits(y));
-    if (startMonth === endMonth && startYear === endYear) return `${startMonth} ${yearLabel(startYear)}`;
-    if (startYear === endYear) return `${startMonth}/${endMonth} ${yearLabel(startYear)}`;
-    return `${startMonth} ${yearLabel(startYear)}/${endMonth} ${yearLabel(endYear)}`;
+    const yl = (y: number) => (lang === "en" ? String(y) : digits(y));
+    if (startMonth === endMonth && startYear === endYear) return `${startMonth} ${yl(startYear)}`;
+    if (startYear === endYear) return `${startMonth}/${endMonth} ${yl(startYear)}`;
+    return `${startMonth} ${yl(startYear)}/${endMonth} ${yl(endYear)}`;
   }, [year, month, lang, digits]);
 
-  const chipDay = todayBs.day;
-  const chipMonth = todayBs.month;
+  const nextView: HomePatroView = patroView === "calendar" ? "panchanga" : "calendar";
+  const nextViewLabel = nextView === "panchanga" ? pick("पञ्चाङ्ग", "Panchanga") : pick("वि.सं.", "B.S.");
 
-  const monthOptions = BS_MONTH_NAMES.map((_, i) => ({
-    value: i + 1,
-    label: bsMonthLabel(i + 1, lang),
-  }));
+  const cityLabel = locationLabel ?? pick("काठमाडौं", "Kathmandu");
 
   return (
-    <View className="mb-4 gap-3">
-      <View className="flex-row items-start justify-between gap-2">
-        <View className="min-w-0 flex-1 flex-row items-start gap-2.5">
-          <Pressable
-            onPress={onToday}
-            accessibilityLabel={pick("आज", "Today")}
-            className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm active:opacity-90"
-          >
-            <View className="bg-secondary px-2 py-1">
-              <Text className="text-center text-[11px] font-bold tracking-wide text-secondary-foreground">
-                {chipMonthLabel(chipMonth, lang)}
-              </Text>
-            </View>
-            <View className="min-w-[2.75rem] items-center justify-center px-2 py-1">
-              <Text className="font-num text-base font-bold text-foreground">{digits(chipDay)}</Text>
-            </View>
-          </Pressable>
+    <View className="mb-4 flex-row items-start gap-2.5">
+      {/* Today chip — tap to jump to today */}
+      <Pressable
+        onPress={onToday}
+        accessibilityLabel={pick("आज", "Today")}
+        className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm active:opacity-90"
+      >
+        <View className="bg-secondary px-2 py-1">
+          <Text className="text-center text-[11px] font-bold tracking-wide text-secondary-foreground">
+            {chipMonthLabel(todayBs.month, lang)}
+          </Text>
+        </View>
+        <View className="min-w-[2.75rem] items-center justify-center px-2 py-1">
+          <Text className="font-num text-base font-bold text-foreground">{digits(todayBs.day)}</Text>
+        </View>
+      </Pressable>
 
-          <View className="min-w-0 flex-1">
-            <Text className="flex-wrap text-lg font-bold leading-tight text-foreground">
-              {monthTitle}{" "}
-              <Text className="font-num font-bold text-secondary">{digits(year)}</Text>
-            </Text>
+      <View className="min-w-0 flex-1 gap-1">
+        {/* Row 1 — inline title + view toggle */}
+        <View className="flex-row items-start justify-between gap-2">
+          <Text className="min-w-0 flex-1 text-sm font-bold leading-tight text-foreground">
+            {monthTitle}{" "}
+            <Text className="font-num font-bold text-secondary">{digits(year)}</Text>
             {samvatsaraLabel ? (
-              <Text className="text-sm font-semibold text-foreground/90">{samvatsaraLabel}</Text>
+              <Text className="font-semibold text-foreground/90">{"  " + samvatsaraLabel}</Text>
             ) : null}
-            <Text className="text-sm text-muted-foreground">{adSubtitle}</Text>
-          </View>
+            <Text className="font-normal text-muted-foreground">{"  " + adRange}</Text>
+          </Text>
+
+          <Pressable
+            onPress={() => onPatroViewChange(nextView)}
+            accessibilityLabel={pick("पात्रो प्रकार बदल्नुहोस्", "Switch patro type")}
+            className="h-[30px] shrink-0 flex-row items-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted"
+          >
+            <Ionicons name="swap-horizontal" size={14} color={colors.foreground} />
+            <Text className="text-sm font-semibold text-foreground">{nextViewLabel}</Text>
+          </Pressable>
         </View>
 
-        <Pressable
-          onPress={onToday}
-          className="rounded-lg bg-primary px-3 py-2 shadow-sm active:opacity-90"
-        >
-          <Text className="text-sm font-semibold text-primary-foreground">{pick("आज", "Today")}</Text>
-        </Pressable>
+        {/* Row 2 — prev / date picker / next  +  location */}
+        <View className="flex-row items-center justify-between gap-2">
+          <View className="flex-row items-center gap-1">
+            <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" />
+            <Pressable
+              onPress={() => setPickerOpen(true)}
+              className="h-[30px] min-w-0 flex-row items-center gap-1 rounded-lg border border-border bg-card px-2.5 active:bg-muted"
+            >
+              <Text className="font-num text-sm font-semibold text-foreground">
+                {bsMonthLabel(month, lang)}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color={colors.mutedForeground} />
+            </Pressable>
+            <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" />
+          </View>
+
+          <View className="h-[30px] max-w-[7.5rem] shrink flex-row items-center gap-1 rounded-lg border border-border bg-card px-2">
+            <Ionicons name="location-outline" size={13} color={colors.secondary} />
+            <Text numberOfLines={1} className="text-sm font-medium text-foreground">
+              {cityLabel}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <View className="flex-row flex-wrap items-center gap-1.5">
-        <NavBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" />
-        <SelectChip label={bsMonthLabel(month, lang)} onPress={() => setPicker("month")} />
-        <SelectChip label={digits(year)} onPress={() => setPicker("year")} />
-        <NavBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" />
-      </View>
-
-      <View className="flex-row items-center justify-end">
-        <PatroViewToggle value={patroView} onChange={onPatroViewChange} />
-      </View>
-
-      <PickerModal
-        visible={picker === "month"}
-        title={pick("महिना छान्नुहोस्", "Select month")}
-        options={monthOptions.map((o) => ({ value: o.value, label: o.label }))}
-        selected={month}
-        onClose={() => setPicker(null)}
-        onSelect={(v) => {
-          onMonthChange(v);
-          setPicker(null);
-        }}
-      />
-      <PickerModal
-        visible={picker === "year"}
-        title={pick("वर्ष छान्नुहोस्", "Select year")}
-        options={BS_YEAR_OPTIONS.map((y) => ({ value: y, label: digits(y) }))}
-        selected={year}
-        onClose={() => setPicker(null)}
-        onSelect={(v) => {
-          onYearChange(v);
-          setPicker(null);
-        }}
+      <DateSheet
+        visible={pickerOpen}
+        year={year}
+        month={month}
+        onClose={() => setPickerOpen(false)}
+        onMonthChange={onMonthChange}
+        onYearChange={onYearChange}
       />
     </View>
   );
 }
 
-function NavBtn({
+function StepBtn({
   onPress,
   disabled,
   icon,
@@ -176,69 +176,104 @@ function NavBtn({
       disabled={disabled}
       onPress={onPress}
       className={cn(
-        "h-9 w-9 items-center justify-center rounded-lg border border-border bg-card",
+        "h-[30px] w-[30px] items-center justify-center rounded-lg border border-border bg-card active:bg-muted",
         disabled && "opacity-40",
       )}
     >
-      <Ionicons name={icon} size={18} color={colors.foreground} />
+      <Ionicons name={icon} size={16} color={colors.foreground} />
     </Pressable>
   );
 }
 
-function SelectChip({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="min-h-9 flex-row items-center gap-1 rounded-lg border border-border bg-card px-3 py-2 active:bg-muted"
-    >
-      <Text className="font-num text-sm font-semibold text-foreground">{label}</Text>
-      <Ionicons name="chevron-down" size={14} color={colors.mutedForeground} />
-    </Pressable>
-  );
-}
-
-function PickerModal({
+/** Bottom-sheet date picker — month + year, mirroring the web mobile date drawer. */
+function DateSheet({
   visible,
-  title,
-  options,
-  selected,
+  year,
+  month,
   onClose,
-  onSelect,
+  onMonthChange,
+  onYearChange,
 }: {
   visible: boolean;
-  title: string;
-  options: { value: number; label: string }[];
-  selected: number;
+  year: number;
+  month: number;
   onClose: () => void;
-  onSelect: (value: number) => void;
+  onMonthChange: (m: number) => void;
+  onYearChange: (y: number) => void;
 }) {
+  const { pick, digits, lang } = useLocale();
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black/40" onPress={onClose} />
-      <View className="max-h-[60%] rounded-t-2xl bg-card pb-6">
-        <Text className="border-b border-border px-4 py-3 text-base font-bold text-foreground">
-          {title}
-        </Text>
-        <ScrollView className="px-2 pt-2">
-          {options.map((opt) => (
-            <Pressable
-              key={opt.value}
-              onPress={() => onSelect(opt.value)}
-              className={cn(
-                "mb-1 rounded-xl px-4 py-3",
-                opt.value === selected ? "bg-primary/10" : "active:bg-muted",
-              )}
-            >
-              <Text
-                className={cn(
-                  "text-base",
-                  opt.value === selected ? "font-bold text-primary" : "text-foreground",
-                )}
-              >
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
+      <View className="max-h-[70%] rounded-t-2xl border-t border-border bg-card pb-8">
+        <View className="items-center pt-2.5">
+          <View className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+        </View>
+        <View className="flex-row items-center justify-between px-4 py-3">
+          <Text className="text-base font-bold text-foreground">{pick("मिति", "Date")}</Text>
+          <Pressable
+            onPress={onClose}
+            className="h-9 flex-row items-center rounded-lg bg-primary px-4 active:opacity-90"
+          >
+            <Text className="text-sm font-semibold text-primary-foreground">{pick("भयो", "Done")}</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView contentContainerClassName="px-4 pb-2">
+          <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {pick("महिना", "Month")}
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {BS_MONTH_NAMES.map((_, i) => {
+              const m = i + 1;
+              const active = m === month;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => onMonthChange(m)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2",
+                    active ? "border-primary bg-primary/10" : "border-border bg-card active:bg-muted",
+                  )}
+                >
+                  <Text
+                    className={cn("text-sm", active ? "font-bold text-primary" : "text-foreground")}
+                  >
+                    {bsMonthLabel(m, lang)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {pick("वर्ष", "Year")}
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {BS_YEAR_OPTIONS.map((y) => {
+              const active = y === year;
+              return (
+                <Pressable
+                  key={y}
+                  onPress={() => onYearChange(y)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2",
+                    active ? "border-primary bg-primary/10" : "border-border bg-card active:bg-muted",
+                  )}
+                >
+                  <Text
+                    className={cn(
+                      "font-num text-sm",
+                      active ? "font-bold text-primary" : "text-foreground",
+                    )}
+                  >
+                    {digits(y)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
       </View>
     </Modal>

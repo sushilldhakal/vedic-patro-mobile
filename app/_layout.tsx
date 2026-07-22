@@ -10,8 +10,8 @@ import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LocaleProvider } from "@/lib/i18n";
+import { AuthProvider } from "@/lib/auth/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
-import { BottomTabBar } from "@/components/AppShell";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 
 SplashScreen.preventAutoHideAsync();
@@ -48,18 +48,19 @@ export default function RootLayout() {
             </View>
           ) : (
             <QueryClientProvider client={queryClient}>
-              <View className="flex-1 bg-background">
-                <AppHeader />
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen
-                    name="day/[ad]"
-                    options={{ presentation: "modal", animation: "slide_from_bottom" }}
-                  />
-                </Stack>
-                <BottomTabBar />
-              </View>
-              <StatusBar style="dark" />
+              <AuthProvider>
+                <View className="flex-1 bg-background">
+                  <AppHeader />
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen
+                      name="day/[ad]"
+                      options={{ presentation: "modal", animation: "slide_from_bottom" }}
+                    />
+                  </Stack>
+                </View>
+                <StatusBar style="dark" />
+              </AuthProvider>
             </QueryClientProvider>
           )}
         </LocaleProvider>

@@ -183,7 +183,7 @@ export default function HomeScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-4 md:px-6"
+      contentContainerClassName="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-4 md:px-6"
     >
       <View className={splitAside ? "flex-row items-start gap-5" : "gap-5"}>
         {calendarBlock}
