@@ -60,9 +60,9 @@ function AbhijitVivaranBlock({
   bsYear: number;
   bsMonth: number;
 }) {
-  const { pick, lang } = useLocale();
+  const { pick } = useLocale();
   const router = useRouter();
-  const abhijit = getAbhijitMuhurta(p, lang);
+  const abhijit = getAbhijitMuhurta(p);
 
   return (
     <View className="mt-2.5 border-t border-border/60 pt-2.5">

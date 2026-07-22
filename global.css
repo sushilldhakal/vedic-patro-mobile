@@ -19,6 +19,21 @@
     --tw-surface-inset: 245 240 232;
     --tw-surface-muted: 243 238 230;
     --tw-tab-active: 217 119 6;
+
+    /* Semantic tokens used by panchanga SVG (timeline + wheel) */
+    --off-white: #f8f6f2;
+    --ink: #1a1410;
+    --ink-muted: #5c4a3a;
+    --parchment-card: #ffffff;
+    --background: var(--off-white);
+    --foreground: var(--ink);
+    --card: var(--parchment-card);
+    --muted-foreground: var(--ink-muted);
+    --secondary: #0b565a;
+    --color-success: #2e7d32;
+    --color-warning: #e67e22;
+    --color-danger: #c62828;
+    --brand-teal: #2e7d32;
   }
 
   .dark {
@@ -37,6 +52,16 @@
     --tw-surface-inset: 10 53 56;
     --tw-surface-muted: 9 48 50;
     --tw-tab-active: 230 126 34;
+
+    --background: #082628;
+    --foreground: #f8f6f2;
+    --card: #0b3d40;
+    --muted-foreground: color-mix(in srgb, #f8f6f2 72%, transparent);
+    --secondary: #d4a017;
+    --color-success: #2e7d32;
+    --color-warning: #e67e22;
+    --color-danger: #c62828;
+    --brand-teal: #2e7d32;
   }
 }
 

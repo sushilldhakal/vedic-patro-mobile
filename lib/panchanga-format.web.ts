@@ -612,6 +612,82 @@ export function getMoonsetDisplay(p: PanchangaDay, lang?: string): string | unde
   return formatMoonEventDisplay(p, "moonset", lang);
 }
 
+export type PanchangaDetailCell = {
+  label: string;
+  value?: string;
+  hint?: string;
+  wide?: boolean;
+  mono?: boolean;
+};
+
+export function buildPanchangaDetailCells(
+  p: PanchangaDay,
+  lang: string,
+  selectedDay?: CalendarDay | null,
+  labels?: {
+    sunriseSunset: string;
+    moonrise: string;
+    ritu: string;
+    nakshatra: string;
+    yoga: string;
+    karana: string;
+    dash: string;
+  },
+): PanchangaDetailCell[] {
+  const detail = getPanchangaDetail(p);
+  const nakshatra = detail?.nakshatra ?? p.nakshatra;
+  const yoga = detail?.yoga ?? p.yoga;
+  const karana = detail?.karana ?? p.karana;
+
+  const angaName = (anga?: AngaPatro | null) =>
+    pickLocale(lang, anga?.name_ne ?? anga?.name, anga?.name ?? anga?.name_ne);
+
+  const sunrise =
+    getSunriseDisplay(p) ??
+    (selectedDay?.sunrise ? formatClockNepali(selectedDay.sunrise) : undefined);
+  const sunset =
+    getSunsetDisplay(p) ??
+    (selectedDay?.sunset ? formatClockNepali(selectedDay.sunset) : undefined);
+  const moonrise =
+    getMoonriseDisplay(p, lang) ??
+    (selectedDay ? formatMonthMoonEventDisplay(selectedDay, "moonrise", lang) : undefined);
+
+  const L = labels ?? {
+    sunriseSunset: "सूर्योदय / सूर्यास्त",
+    moonrise: "चन्द्रोदय",
+    ritu: "ऋतु",
+    nakshatra: "नक्षत्र",
+    yoga: "योग",
+    karana: "करण",
+    dash: "—",
+  };
+
+  return [
+    {
+      label: L.sunriseSunset,
+      value: sunrise && sunset ? `${sunrise} / ${sunset}` : undefined,
+      mono: true,
+    },
+    { label: L.moonrise, value: moonrise ?? L.dash, mono: true },
+    { label: L.ritu, value: getRituDisplay(p, lang), hint: getRituSeason(p, lang) },
+    {
+      label: L.nakshatra,
+      value: angaName(nakshatra),
+      hint: formatAngaPatroTransitionHint(nakshatra, lang),
+    },
+    {
+      label: L.yoga,
+      value: angaName(yoga),
+      hint: formatAngaPatroTransitionHint(yoga, lang),
+    },
+    {
+      label: L.karana,
+      value: angaName(karana),
+      hint: formatAngaPatroTransitionHint(karana, lang),
+    },
+  ];
+}
+
 export function getVaaraNe(p: PanchangaDay, fallback?: string): string | undefined {
   const detail = getPanchangaDetail(p);
   return (
