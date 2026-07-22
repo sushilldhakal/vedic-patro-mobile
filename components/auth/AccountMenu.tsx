@@ -3,11 +3,12 @@ import { Modal, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useLocale } from "@/lib/i18n";
-import { colors } from "@/lib/theme";
+import { useThemeColors } from "@/lib/theme-context";
 import { AuthDialog } from "./AuthDialog";
 
 /** Signed-out → लग-इन button; signed-in → avatar + account sheet. Mirrors web AccountMenu. */
 export function AccountMenu() {
+  const colors = useThemeColors();
   const { pick } = useLocale();
   const { user, loading, logout } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);

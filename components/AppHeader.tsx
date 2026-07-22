@@ -5,17 +5,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VedicPatroMark } from "@/components/branding/VedicPatroMark";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useLocale } from "@/lib/i18n";
+import { useThemeColors } from "@/lib/theme-context";
+import { DRAWER_NAV_EXTRA, FLOATING_NAV, isNavActive } from "@/lib/mobile-nav";
 import { cn } from "@/lib/utils";
-import { colors } from "@/lib/theme";
 
-const NAV = [
-  { href: "/", ne: "गृहपृष्ठ", en: "Home", icon: "calendar-outline" as const },
-  { href: "/panchanga", ne: "सूर्य पञ्चाङ्ग", en: "Daily Panchanga", icon: "sunny-outline" as const },
-  { href: "/holidays", ne: "बिदा तथा पर्व", en: "Holidays", icon: "flag-outline" as const },
-  { href: "/converter", ne: "रूपान्तरण", en: "Converter", icon: "swap-horizontal-outline" as const },
-  { href: "/more", ne: "थप", en: "More", icon: "ellipsis-horizontal-outline" as const },
-];
+const NAV = [...FLOATING_NAV, ...DRAWER_NAV_EXTRA];
 
 function BrandMark({ onPress, centered }: { onPress: () => void; centered?: boolean }) {
   const { pick } = useLocale();
@@ -34,7 +31,8 @@ function BrandMark({ onPress, centered }: { onPress: () => void; centered?: bool
 }
 
 export function AppHeader() {
-  const { pick, lang, setLang } = useLocale();
+  const { pick } = useLocale();
+  const colors = useThemeColors();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -70,8 +68,10 @@ export function AppHeader() {
           <BrandMark onPress={() => go("/")} centered />
         </View>
 
-        {/* Right — account / login */}
-        <View className="flex-1 flex-row items-center justify-end">
+        {/* Right — theme + language + account */}
+        <View className="flex-1 flex-row items-center justify-end gap-2">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
           <AccountMenu />
         </View>
       </View>
@@ -81,8 +81,6 @@ export function AppHeader() {
         onClose={() => setMenuOpen(false)}
         onNavigate={go}
         pathname={pathname}
-        lang={lang}
-        setLang={setLang}
       />
     </View>
   );
@@ -93,17 +91,14 @@ function NavDrawer({
   onClose,
   onNavigate,
   pathname,
-  lang,
-  setLang,
 }: {
   open: boolean;
   onClose: () => void;
   onNavigate: (href: string) => void;
   pathname: string;
-  lang: "ne" | "en";
-  setLang: (l: "ne" | "en") => void;
 }) {
   const { pick } = useLocale();
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(open);
   const slide = useRef(new Animated.Value(0)).current;
@@ -171,8 +166,7 @@ function NavDrawer({
         {/* Nav */}
         <ScrollView className="flex-1" contentContainerClassName="p-3 gap-1">
           {NAV.map((item) => {
-            const active =
-              pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const active = isNavActive(pathname, item.href);
             return (
               <Pressable
                 key={item.href}
@@ -199,22 +193,6 @@ function NavDrawer({
             );
           })}
         </ScrollView>
-
-        {/* Footer — language */}
-        <View className="border-t border-border px-4 py-4" style={{ paddingBottom: insets.bottom + 16 }}>
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-foreground">{pick("भाषा", "Language")}</Text>
-            <Pressable
-              onPress={() => setLang(lang === "ne" ? "en" : "ne")}
-              className="h-9 flex-row items-center gap-2 rounded-lg border border-border bg-card px-3 active:bg-muted"
-            >
-              <Ionicons name="language-outline" size={15} color={colors.foreground} />
-              <Text className="text-xs font-semibold text-foreground">
-                {lang === "ne" ? "नेपाली" : "English"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
       </Animated.View>
     </Modal>
   );

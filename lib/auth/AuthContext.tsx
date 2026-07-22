@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import {
+  apiFacebook,
+  apiGoogle,
   apiLogin,
   apiLogout,
   apiMe,
@@ -23,6 +25,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithFacebook: (accessToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -85,6 +89,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(me);
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    authEpoch.current += 1;
+    const epoch = authEpoch.current;
+    tokenStore.set(await apiGoogle(idToken));
+    const me = await apiMe();
+    if (epoch !== authEpoch.current) return;
+    setUser(me);
+  }, []);
+
+  const loginWithFacebook = useCallback(async (accessToken: string) => {
+    authEpoch.current += 1;
+    const epoch = authEpoch.current;
+    tokenStore.set(await apiFacebook(accessToken));
+    const me = await apiMe();
+    if (epoch !== authEpoch.current) return;
+    setUser(me);
+  }, []);
+
   const logout = useCallback(async () => {
     authEpoch.current += 1;
     setUser(null);
@@ -98,10 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       login,
       signup,
+      loginWithGoogle,
+      loginWithFacebook,
       logout,
       refreshUser,
     }),
-    [user, loading, login, signup, logout, refreshUser],
+    [user, loading, login, signup, loginWithGoogle, loginWithFacebook, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

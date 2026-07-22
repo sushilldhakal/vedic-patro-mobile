@@ -139,6 +139,26 @@ export async function apiLogin(email: string, password: string): Promise<TokenPa
   return res.json();
 }
 
+/** Exchange a Google ID token (from native/web OAuth) for our session tokens. */
+export async function apiGoogle(idToken: string): Promise<TokenPair> {
+  const res = await raw("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ id_token: idToken }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  return res.json();
+}
+
+/** Exchange a Facebook access token (from native/web OAuth) for our session tokens. */
+export async function apiFacebook(accessToken: string): Promise<TokenPair> {
+  const res = await raw("/auth/facebook", {
+    method: "POST",
+    body: JSON.stringify({ access_token: accessToken }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  return res.json();
+}
+
 export async function apiLogout(): Promise<void> {
   const token = refreshToken;
   // Clear locally first so the UI and in-flight requests see a signed-out session.

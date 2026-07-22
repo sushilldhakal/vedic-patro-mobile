@@ -8,9 +8,9 @@
     "scheme": "vedicpatro",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f8f6f2"
+      "backgroundColor": "#073f43"
     },
     "ios": {
       "supportsTablet": true,
@@ -19,26 +19,51 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#f8f6f2"
+        "backgroundColor": "#073f43"
       },
       "package": "com.vedicpatro.mobile"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./public/favicon.ico"
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
       "expo-font",
-      "expo-secure-store"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#073f43"
+        }
+      ],
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Vedic Patro uses your location to show accurate panchanga for your area."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://vedicpatro.com/api",
-      "apiVersion": "v1"
+      "apiBaseUrl": "https://www.vedicpatro.com/api",
+      "apiVersion": "v1",
+      "googleWebClientId": "568648791161-elpu27mjfjhcb3p9rm2vim62kgrqinao.apps.googleusercontent.com",
+      "googleIosClientId": "",
+      "googleAndroidClientId": "",
+      "facebookAppId": "1044570391345268",
+      "router": {},
+      "eas": {
+        "projectId": "875bd091-9544-4881-9b60-7a268c11a7ac"
+      }
     }
   }
 }

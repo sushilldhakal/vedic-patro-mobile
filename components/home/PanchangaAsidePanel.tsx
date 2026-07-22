@@ -3,7 +3,9 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { PanchangaHeroCard } from "./PanchangaHeroCard";
 import { PanchangaVivaranPanel } from "./PanchangaVivaranPanel";
-import type { CalendarDay, PanchangaDay } from "@/lib/api";
+import { MuhurtaAsidePanel } from "./MuhurtaAsidePanel";
+import { SaitAsidePanel } from "./SaitAsidePanel";
+import type { CalendarDay, LocationParams, PanchangaDay, SaitMonthAllResponse } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ErrorState, LoadingState } from "@/components/ui/States";
@@ -22,6 +24,11 @@ type Props = {
   loading: boolean;
   error: boolean;
   onRetry?: () => void;
+  saitData?: SaitMonthAllResponse;
+  saitLoading?: boolean;
+  saitError?: boolean;
+  onSaitRetry?: () => void;
+  location?: LocationParams;
 };
 
 export function PanchangaAsidePanel({
@@ -35,6 +42,11 @@ export function PanchangaAsidePanel({
   loading,
   error,
   onRetry,
+  saitData,
+  saitLoading,
+  saitError,
+  onSaitRetry,
+  location,
 }: Props) {
   const { pick } = useLocale();
   const router = useRouter();
@@ -48,6 +60,7 @@ export function PanchangaAsidePanel({
     null;
 
   const isSelectedToday = selectedAd === todayAd;
+  const highlightDay = contextDay?.day;
 
   return (
     <View className="gap-3">
@@ -96,55 +109,43 @@ export function PanchangaAsidePanel({
         </View>
 
         <View className="min-h-[12rem] p-3">
-          {error && !p ? (
+          {error && !p && tab !== "sait" ? (
             <ErrorState
               message={pick("पञ्चाङ्ग लोड गर्न सकिएन।", "Could not load panchanga.")}
               onRetry={onRetry}
             />
-          ) : loading && !p ? (
+          ) : loading && !p && tab !== "sait" ? (
             <LoadingState />
           ) : tab === "panchanga" ? (
-            <PanchangaVivaranPanel p={p} selectedDay={contextDay} />
+            <PanchangaVivaranPanel
+              p={p}
+              selectedDay={contextDay}
+              bsYear={year}
+              bsMonth={month}
+              loading={loading}
+            />
           ) : tab === "muhurta" ? (
-            <MuhurtaPanel p={p} />
+            p ? (
+              <MuhurtaAsidePanel p={p} />
+            ) : (
+              <Text className="py-6 text-center text-sm text-muted-foreground">
+                {pick("मुहूर्त विवरण उपलब्ध छैन।", "Muhurta details unavailable.")}
+              </Text>
+            )
           ) : (
-            <Text className="py-6 text-center text-sm text-muted-foreground">
-              {pick("साइत विवरण वेबमा उपलब्ध छ।", "Sait details are available on the web app.")}
-            </Text>
+            <SaitAsidePanel
+              year={year}
+              month={month}
+              highlightDay={highlightDay}
+              location={location}
+              data={saitData}
+              loading={saitLoading}
+              error={saitError}
+              onRetry={onSaitRetry}
+            />
           )}
         </View>
       </View>
-    </View>
-  );
-}
-
-function MuhurtaPanel({ p }: { p?: PanchangaDay }) {
-  const { pick } = useLocale();
-  if (!p?.muhurta) {
-    return (
-      <Text className="py-6 text-center text-sm text-muted-foreground">
-        {pick("मुहूर्त विवरण उपलब्ध छैन।", "Muhurta details unavailable.")}
-      </Text>
-    );
-  }
-  const rows = [
-    { ne: "राहु काल", en: "Rahu Kaal", block: p.muhurta.rahu_kalam },
-    { ne: "अभिजित", en: "Abhijit", block: p.muhurta.abhijit },
-    { ne: "यमगण्ड", en: "Yamaganda", block: p.muhurta.yamaganda },
-    { ne: "गुलिक", en: "Gulika", block: p.muhurta.gulika },
-  ];
-  return (
-    <View>
-      {rows.map((row) =>
-        row.block ? (
-          <View key={row.en} className="flex-row items-center justify-between border-b border-border/60 py-2.5">
-            <Text className="text-sm text-muted-foreground">{pick(row.ne, row.en)}</Text>
-            <Text className="font-num text-sm font-semibold text-foreground">
-              {row.block.start_time?.slice(0, 5) ?? "—"} – {row.block.end_time?.slice(0, 5) ?? "—"}
-            </Text>
-          </View>
-        ) : null,
-      )}
     </View>
   );
 }

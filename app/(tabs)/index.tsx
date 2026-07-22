@@ -9,7 +9,7 @@ import { PanchangaMonthGrid } from "@/components/home/PanchangaMonthGrid";
 import { PatroViewToggle, type HomePatroView } from "@/components/home/PatroViewToggle";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 import { ErrorState } from "@/components/ui/States";
-import { apiKeys, fetchMonthCalendar, fetchPanchanga, type CalendarDay } from "@/lib/api";
+import { apiKeys, fetchMonthCalendar, fetchPanchanga, fetchSaitMonthAll, type CalendarDay } from "@/lib/api";
 import {
   BS_SUPPORTED_END_YEAR,
   BS_SUPPORTED_START_YEAR,
@@ -20,9 +20,12 @@ import {
 } from "@/lib/bs-calendar";
 import { buildCalendarGridDays, buildLocalMonthDays } from "@/lib/local-calendar";
 import { useLocale } from "@/lib/i18n";
+import { floatingNavBottomPadding } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
+import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 
 const ASIDE_SPLIT = 1081;
+const ASIDE_MAX_WIDTH = 400;
 
 function monthStartAd(ctx: { year: number; month: number; days: CalendarDay[] }): string {
   const first = ctx.days.find((d) => d.day === 1) ?? ctx.days[0];
@@ -31,8 +34,9 @@ function monthStartAd(ctx: { year: number; month: number; days: CalendarDay[] })
 
 export default function HomeScreen() {
   const { pick } = useLocale();
-  const { width } = useBreakpoint();
+  const { width, isTablet } = useBreakpoint();
   const router = useRouter();
+  const { location, setLocation } = usePanchangaLocation();
   const initial = getCurrentBs();
   const [year, setYear] = useState(initial.year);
   const [month, setMonth] = useState(initial.month);
@@ -42,8 +46,8 @@ export default function HomeScreen() {
   const splitAside = width >= ASIDE_SPLIT;
 
   const monthQuery = useQuery({
-    queryKey: apiKeys.month(year, month),
-    queryFn: () => fetchMonthCalendar(year, month),
+    queryKey: apiKeys.month(year, month, location.params),
+    queryFn: () => fetchMonthCalendar(year, month, location.params),
   });
 
   const monthDays = useMemo(() => {
@@ -70,8 +74,15 @@ export default function HomeScreen() {
   }, [selectedDay, viewingCurrentBsMonth, todayAd, year, month, monthDays]);
 
   const panchangaQ = useQuery({
-    queryKey: apiKeys.panchanga(asideAdDate, "ad"),
-    queryFn: () => fetchPanchanga(asideAdDate, "ad"),
+    queryKey: apiKeys.panchanga(asideAdDate, "ad", location.params),
+    queryFn: () => fetchPanchanga(asideAdDate, "ad", location.params),
+  });
+
+  const saitQ = useQuery({
+    queryKey: apiKeys.saitMonthAll(year, month, location.params),
+    queryFn: () => fetchSaitMonthAll(year, month, location.params),
+    staleTime: 1000 * 60 * 60,
+    retry: 2,
   });
 
   const publicHolidayDates = useMemo(() => {
@@ -123,6 +134,8 @@ export default function HomeScreen() {
           setPatroView(v);
           setSelectedDay(null);
         }}
+        location={location}
+        onLocationChange={setLocation}
       />
 
       {monthQuery.isLoading && !monthQuery.data ? (
@@ -164,7 +177,14 @@ export default function HomeScreen() {
   );
 
   const asideBlock = (
-    <View style={splitAside ? { width: 360, maxWidth: "38%" } : undefined} className="min-w-0 flex-1">
+    <View
+      style={
+        splitAside
+          ? { width: 360, maxWidth: "38%" }
+          : { width: "100%", maxWidth: ASIDE_MAX_WIDTH, alignSelf: "center" }
+      }
+      className={splitAside ? "min-w-0 flex-1" : "min-w-0 w-full self-center"}
+    >
       <PanchangaAsidePanel
         month={month}
         year={year}
@@ -176,6 +196,11 @@ export default function HomeScreen() {
         loading={panchangaQ.isLoading}
         error={panchangaQ.isError}
         onRetry={() => panchangaQ.refetch()}
+        saitData={saitQ.data}
+        saitLoading={saitQ.isPending}
+        saitError={saitQ.isError}
+        onSaitRetry={() => saitQ.refetch()}
+        location={location.params}
       />
     </View>
   );
@@ -183,7 +208,8 @@ export default function HomeScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-4 md:px-6"
+      contentContainerClassName="mx-auto w-full max-w-[1400px] px-4 pt-4 md:px-6"
+      contentContainerStyle={{ paddingBottom: floatingNavBottomPadding(isTablet) }}
     >
       <View className={splitAside ? "flex-row items-start gap-5" : "gap-5"}>
         {calendarBlock}

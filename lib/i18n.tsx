@@ -7,6 +7,7 @@ type LocaleContextValue = {
   setLang: (lang: AppLanguage) => void;
   pick: (ne: string, en: string) => string;
   digits: (value: string | number) => string;
+  isEnglish: boolean;
 };
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -28,6 +29,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         lang === "ne"
           ? String(v).replace(/[0-9]/g, (d) => NEPALI_DIGITS[d] ?? d)
           : String(v),
+      isEnglish: lang === "en",
     }),
     [lang],
   );

@@ -9,7 +9,8 @@ import {
   formatDigits,
 } from "@/lib/bs-calendar";
 import type { CalendarDay, PanchangaDay } from "@/lib/api";
-import { MONTH_HERO_COLORS, colors } from "@/lib/theme";
+import { MONTH_HERO_COLORS } from "@/lib/theme";
+import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -31,6 +32,7 @@ function fmtAdFull(iso: string, lang: "ne" | "en"): string {
 }
 
 export function PanchangaHeroCard({ month, year, selectedAd, todayAd, p, contextDay }: Props) {
+  const colors = useThemeColors();
   const { pick, digits, lang } = useLocale();
   const isToday = selectedAd === todayAd;
 

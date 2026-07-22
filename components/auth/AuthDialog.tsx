@@ -14,7 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { apiForgotPassword } from "@/lib/auth/client";
 import { useLocale } from "@/lib/i18n";
-import { colors } from "@/lib/theme";
+import { useThemeColors } from "@/lib/theme-context";
+import { SocialSignInButtons } from "./SocialSignInButtons";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -27,8 +28,9 @@ export function AuthDialog({
   onOpenChange: (open: boolean) => void;
   initialMode?: Mode;
 }) {
+  const colors = useThemeColors();
   const { pick } = useLocale();
-  const { login, signup } = useAuth();
+  const { login, signup, loginWithGoogle, loginWithFacebook } = useAuth();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -90,6 +92,32 @@ export function AuthDialog({
       }
     } catch {
       setError(pick("केही गडबड भयो। पुनः प्रयास गर्नुहोस्।", "Something went wrong. Try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onGoogle(idToken: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      await loginWithGoogle(idToken);
+      close();
+    } catch {
+      setError(pick("गुगल लग-इन असफल", "Google sign-in failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onFacebook(accessToken: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      await loginWithFacebook(accessToken);
+      close();
+    } catch {
+      setError(pick("फेसबुक लग-इन असफल", "Facebook sign-in failed"));
     } finally {
       setBusy(false);
     }
@@ -157,6 +185,17 @@ export function AuthDialog({
                 <Ionicons name="close" size={22} color={colors.mutedForeground} />
               </Pressable>
             </View>
+
+            {mode !== "forgot" ? (
+              <View className="mb-1">
+                <SocialSignInButtons
+                  onGoogle={onGoogle}
+                  onFacebook={onFacebook}
+                  onError={setError}
+                  disabled={busy}
+                />
+              </View>
+            ) : null}
 
             <Field
               label={pick("इमेल", "Email")}
@@ -251,6 +290,7 @@ function Field({
   label,
   ...props
 }: React.ComponentProps<typeof TextInput> & { label: string }) {
+  const colors = useThemeColors();
   return (
     <View className="mt-3 gap-1.5">
       <Text className="text-sm text-foreground">{label}</Text>

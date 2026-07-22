@@ -1,0 +1,549 @@
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
+import type { PanchangaDay } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { useLocale } from "@/lib/i18n";
+import {
+  buildDayTimelineData,
+  CHOGHADIYA_EN,
+  dualTimeAtGhati,
+  needleGhatiOnVedicChart,
+  type TimelineRowData,
+} from "@/lib/day-timeline-data";
+import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-time";
+import { useTheme } from "@/lib/theme-context";
+
+const W = 1000;
+const X0 = 70;
+const X1 = 994;
+const RULER_H = 58;
+const MOON_BAND_H = 20;
+const SUN_H = 28;
+const MOON_EMOJI_Y = RULER_H + 5;
+const MOON_TIME_Y = RULER_H + 23;
+const T0 = RULER_H + MOON_BAND_H + SUN_H + 6;
+const TRACK = 58;
+const BAND = 34;
+const SUNLINE_Y = RULER_H + MOON_BAND_H + 8;
+const MARKER_TIME_Y = SUNLINE_Y + 13;
+const SUN_R = 6;
+const GHATI_TICKS = Array.from({ length: 16 }, (_, i) => i * 4);
+const FONT = "Mukta_600SemiBold";
+const FONT_SM = "Mukta_500Medium";
+
+const TRACK_CLS: Record<string, string> = {
+  तिथि: "tithi",
+  नक्षत्र: "nak",
+  योग: "yoga",
+  करण: "karana",
+  चौघडिया: "cho",
+  होरा: "hora",
+  लग्न: "lagna",
+  अशुभ: "ashubha",
+};
+
+const C_BASE = {
+  sun: "#f2a81d",
+  danger: "#e74c3c",
+  arrow: "#4ecdc4",
+  tithi: ["#e6d4a840", "#e6d4a824"],
+  nak: ["#2d8a8640", "#2d8a8624"],
+  yoga: ["#9c4e1f40", "#9c4e1f24"],
+  karana: ["#1c5d8040", "#1c5d8024"],
+  lagnaActive: "#2d8a8648",
+  choGood: "rgba(46,160,120,0.13)",
+  choBad: "rgba(231,76,60,0.13)",
+  ashubha: "rgba(231,76,60,0.22)",
+} as const;
+
+function useTimelineColors() {
+  const { colors, isDark } = useTheme();
+  return {
+    ...C_BASE,
+    fg: colors.foreground,
+    muted: colors.mutedForeground,
+    axis: isDark ? "rgba(255,255,255,0.45)" : "rgba(26,20,16,0.45)",
+    tick: isDark ? "rgba(255,255,255,0.4)" : "rgba(26,20,16,0.35)",
+    night: isDark ? "rgba(255,255,255,0.06)" : "rgba(11,86,90,0.06)",
+    sunLine: colors.border,
+    moonLine: isDark ? "rgba(255,255,255,0.25)" : "rgba(26,20,16,0.2)",
+    hair: "rgba(242,168,29,0.55)",
+    grid: isDark ? "rgba(255,255,255,0.12)" : "rgba(26,20,16,0.08)",
+    now: colors.danger,
+    segStroke: isDark ? "rgba(255,255,255,0.1)" : "rgba(26,20,16,0.08)",
+    lagna: [isDark ? "rgba(255,255,255,0.07)" : "rgba(26,20,16,0.06)", isDark ? "rgba(255,255,255,0.03)" : "rgba(26,20,16,0.03)"],
+  };
+}
+
+interface ChartSegment {
+  ne: string;
+  en: string;
+  fromG: number;
+  toG: number;
+  bad?: boolean;
+  cut?: boolean;
+  transitionLocal?: string;
+  lane?: number;
+  laneCount?: number;
+}
+
+function gx(g: number) {
+  return X0 + (Math.max(0, Math.min(60, g)) / 60) * (X1 - X0);
+}
+
+function clampX(x: number, pad: number) {
+  return Math.max(X0 + pad, Math.min(X1 - pad, x));
+}
+
+function assignLanes(segs: ChartSegment[]): ChartSegment[] {
+  const laneEnds: number[] = [];
+  for (const seg of segs) {
+    let lane = laneEnds.findIndex((end) => seg.fromG >= end - 0.001);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(seg.toG);
+    } else {
+      laneEnds[lane] = seg.toG;
+    }
+    seg.lane = lane;
+  }
+  const laneCount = Math.max(1, laneEnds.length);
+  for (const seg of segs) seg.laneCount = laneCount;
+  return segs;
+}
+
+function segmentsFromRow(row: TimelineRowData): ChartSegment[] {
+  let prev = 0;
+  return row.items.map((it) => {
+    const toG = it.endG != null ? Math.min(it.endG, 60) : 60;
+    const seg: ChartSegment = {
+      ne: it.name,
+      en: it.nameEn ?? it.name,
+      fromG: prev,
+      toG,
+      bad: it.bad,
+      cut: it.endG != null && it.endG < 60,
+      transitionLocal: it.transitionLocal,
+    };
+    prev = toG;
+    return seg;
+  });
+}
+
+function segFill(
+  C: ReturnType<typeof useTimelineColors>,
+  cls: string,
+  alt?: boolean,
+  active?: boolean,
+  bad?: boolean,
+): string {
+  if (cls === "cho" || cls === "hora") return bad ? C.choBad : C.choGood;
+  if (cls === "ashubha") return C.ashubha;
+  if (cls === "lagna" && active) return C.lagnaActive;
+  const palette = C[cls as keyof typeof C_BASE];
+  if (Array.isArray(palette)) return alt ? palette[1]! : palette[0]!;
+  if (cls === "lagna") return alt ? C.lagna[1]! : C.lagna[0]!;
+  return C.tithi[0];
+}
+
+type Props = {
+  p?: PanchangaDay;
+  loading?: boolean;
+  dateAd: string;
+  isToday?: boolean;
+  timezone?: string;
+  needleClock?: string;
+  showNeedle?: boolean;
+};
+
+function minutesOnVedicChart(
+  queryInstantLocal: string | undefined,
+  anchorDateAd: string,
+  needleClock: string | undefined,
+): number | null {
+  if (needleClock) {
+    const [hh, mm] = needleClock.split(":").map(Number);
+    if (!Number.isNaN(hh) && !Number.isNaN(mm)) return hh * 60 + mm;
+  }
+  if (queryInstantLocal) {
+    const [datePart, timePart] = queryInstantLocal.split(" ");
+    if (!timePart) return null;
+    const [hh, mm] = timePart.split(":").map(Number);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    const mins = hh * 60 + mm;
+    if (datePart === anchorDateAd) return mins;
+    return 24 * 60 + mins;
+  }
+  return null;
+}
+
+function SunHalfIcon({ x, y, variant, C }: { x: number; y: number; variant: "rise" | "set"; C: ReturnType<typeof useTimelineColors> }) {
+  const arc =
+    variant === "rise"
+      ? `M ${x - SUN_R} ${y} A ${SUN_R} ${SUN_R} 0 0 1 ${x + SUN_R} ${y} Z`
+      : `M ${x - SUN_R} ${y} A ${SUN_R} ${SUN_R} 0 0 0 ${x + SUN_R} ${y} Z`;
+  return (
+    <G>
+      <Line x1={x - SUN_R - 3} y1={y} x2={x + SUN_R + 3} y2={y} stroke={C.sun} strokeWidth={1} />
+      <Path d={arc} fill={C.sun} stroke="#c9a000" strokeWidth={0.75} />
+    </G>
+  );
+}
+
+function EventMarker({
+  g,
+  sunriseMin,
+  kind,
+  anchor,
+  digits,
+  C,
+}: {
+  g: number;
+  sunriseMin: number;
+  kind: "sunrise" | "sunset" | "moonrise" | "moonset" | "next-sunrise";
+  anchor: "start" | "middle" | "end";
+  digits: (v: string | number) => string;
+  C: ReturnType<typeof useTimelineColors>;
+}) {
+  const { clock } = dualTimeAtGhati(g, sunriseMin);
+  const x = gx(g);
+  const isSun = kind === "sunrise" || kind === "sunset" || kind === "next-sunrise";
+  const moonEmoji = kind === "moonset" ? "🌘" : "🌒";
+
+  return (
+    <G>
+      {isSun ? (
+        <SunHalfIcon x={x} y={SUNLINE_Y} variant={kind === "sunset" ? "set" : "rise"} C={C} />
+      ) : (
+        <SvgText x={x} y={MOON_EMOJI_Y} textAnchor="middle" fontSize={14}>
+          {moonEmoji}
+        </SvgText>
+      )}
+      <SvgText
+        x={x}
+        y={isSun ? MARKER_TIME_Y : MOON_TIME_Y}
+        textAnchor={anchor}
+        fill={isSun ? C.sun : C.muted}
+        fontSize={10}
+        fontFamily={FONT}
+      >
+        {digits(clock)}
+      </SvgText>
+    </G>
+  );
+}
+
+function TransitionArrow({ x2, y, C }: { x2: number; y: number; C: ReturnType<typeof useTimelineColors> }) {
+  const rowY = y + BAND;
+  return (
+    <G>
+      <Line x1={x2 - 14} y1={rowY} x2={x2 - 5} y2={rowY} stroke={C.arrow} strokeWidth={1.6} />
+      <Path d={`M ${x2 - 6} ${rowY - 3.6} L ${x2 - 1.5} ${rowY} L ${x2 - 6} ${rowY + 3.6} z`} fill={C.arrow} />
+      <Line x1={x2 + 14} y1={rowY} x2={x2 + 5} y2={rowY} stroke={C.arrow} strokeWidth={1.6} />
+      <Path d={`M ${x2 + 6} ${rowY - 3.6} L ${x2 + 1.5} ${rowY} L ${x2 + 6} ${rowY + 3.6} z`} fill={C.arrow} />
+      <Line x1={x2} y1={rowY - 5} x2={x2} y2={rowY + 5} stroke={C.arrow} strokeWidth={1.3} />
+    </G>
+  );
+}
+
+export function DayTimeline({
+  p,
+  loading = false,
+  dateAd,
+  isToday = false,
+  timezone,
+  needleClock,
+  showNeedle = true,
+}: Props) {
+  const { pick, digits } = useLocale();
+  const C = useTimelineColors();
+  const data = useMemo(() => (p ? buildDayTimelineData(p, dateAd) : null), [p, dateAd]);
+  const timeZone = resolveTimeZone(p?.location?.timezone, timezone);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!isToday) return;
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, [isToday]);
+
+  const busy = loading || !p || !data;
+
+  if (busy) {
+    return (
+      <Card className="overflow-hidden p-0">
+        <View className="border-b border-border px-4 py-2.5">
+          <Text className="text-sm font-bold text-foreground">{pick("दिन-चक्र", "Day cycle")}</Text>
+          <Text className="text-xs text-muted-foreground">
+            {pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
+          </Text>
+        </View>
+        <View className="mx-3 my-3 h-[320px] animate-pulse rounded-lg bg-muted/40" />
+      </Card>
+    );
+  }
+
+  const tracks = data.rows
+    .filter((row) => row.kind !== "graha")
+    .map((row) => {
+      const cls = TRACK_CLS[row.label] ?? "tithi";
+      const segs: ChartSegment[] =
+        row.kind === "choghadiya"
+          ? data.choghadiya.map((c) => ({
+              ne: c.name,
+              en: CHOGHADIYA_EN[c.name] ?? c.name,
+              fromG: c.startG,
+              toG: c.endG,
+              bad: c.bad,
+            }))
+          : row.kind === "hora"
+            ? data.hora.map((h) => ({
+                ne: h.name,
+                en: h.nameEn,
+                fromG: h.startG,
+                toG: h.endG,
+                bad: h.bad,
+              }))
+            : row.kind === "ashubha"
+              ? assignLanes(
+                  data.ashubha.map((a) => ({
+                    ne: a.name,
+                    en: a.nameEn,
+                    fromG: a.startG,
+                    toG: a.endG,
+                    bad: true,
+                    detailNe: a.detailNe,
+                    detailEn: a.detailEn,
+                  })),
+                )
+              : segmentsFromRow(row);
+      return { key: row.label, ne: row.label, en: row.en, cls, segs };
+    });
+
+  const H = T0 + tracks.length * TRACK + 6;
+  const tLabel = (g: number) => dualTimeAtGhati(g, data.sunriseMin).clock;
+
+  let nowG: number | null = null;
+  let nowLabel = pick("अहिले", "Now");
+  const anchorAd = p?.panchanga_date_ad ?? p?.date_ad ?? dateAd;
+  const chartMins = minutesOnVedicChart(p?.query_instant_local, anchorAd ?? "", needleClock);
+
+  if (showNeedle && needleClock && chartMins != null) {
+    nowG = needleGhatiOnVedicChart(chartMins, data.sunriseMin);
+    if (nowG != null) nowLabel = pick(`${digits(needleClock)} बजे`, digits(needleClock));
+  } else if (showNeedle && isToday) {
+    nowG = needleGhatiOnVedicChart(minutesSinceMidnightInTimezone(now, timeZone), data.sunriseMin);
+  } else if (showNeedle && chartMins != null) {
+    nowG = needleGhatiOnVedicChart(chartMins, data.sunriseMin);
+    if (nowG != null) nowLabel = pick("छानिएको समय", "Chosen time");
+  }
+
+  const trackY = (i: number) => T0 + i * TRACK;
+  const nightBands = [[data.dayG, 60]] as Array<[number, number]>;
+  const hairlineGs = [0, data.dayG, 60];
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <View className="border-b border-border px-4 py-2.5">
+        <Text className="text-sm font-bold text-foreground">{pick("दिन-चक्र", "Day cycle")}</Text>
+        <Text className="text-xs text-muted-foreground">
+          {pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
+        </Text>
+        <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
+          <LegendDot color="rgba(46,160,120,0.55)" label={pick("शुभ", "Good")} />
+          <LegendDot color="rgba(231,76,60,0.55)" label={pick("अशुभ", "Bad")} />
+          <LegendDot color="rgba(255,255,255,0.2)" label={pick("रात", "Night")} />
+        </View>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator className="px-1 py-3">
+        <Svg width={Math.max(768, W)} height={H} viewBox={`0 0 ${W} ${H}`}>
+          {nightBands.map(([a, b], i) => (
+            <Rect key={`night-${i}`} x={gx(a)} y={RULER_H - 8} width={Math.max(0, gx(b) - gx(a))} height={H - RULER_H + 2} fill={C.night} />
+          ))}
+
+          <SvgText x={X0 - 10} y={20} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end">
+            {pick("घण्टा", "Hour")}
+          </SvgText>
+          <SvgText x={X0 - 10} y={47} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end" opacity={0.75}>
+            {pick("घडी", "Ghati")}
+          </SvgText>
+          <Line x1={X0} y1={30} x2={X1} y2={30} stroke={C.axis} strokeWidth={1.2} />
+
+          {data.civilHourTicks.map(({ hour, g }) => (
+            <G key={`h-${hour}-${g}`}>
+              <Line x1={gx(g)} y1={30} x2={gx(g)} y2={24} stroke={C.tick} strokeWidth={1} />
+              <SvgText x={gx(g)} y={18} fill={C.fg} fontSize={10} fontFamily={FONT} textAnchor="middle">
+                {digits(hour)}
+              </SvgText>
+            </G>
+          ))}
+
+          {GHATI_TICKS.map((g) => (
+            <G key={`g-${g}`}>
+              <Line x1={gx(g)} y1={30} x2={gx(g)} y2={36} stroke={C.tick} strokeWidth={1} />
+              <SvgText x={gx(g)} y={48} fill={C.muted} fontSize={10} fontFamily={FONT_SM} textAnchor="middle">
+                {digits(g)}
+              </SvgText>
+            </G>
+          ))}
+
+          <Line x1={X0} y1={SUNLINE_Y} x2={X1} y2={SUNLINE_Y} stroke={C.sunLine} strokeWidth={1} />
+          <Line x1={X0} y1={T0 - 1} x2={X1} y2={T0 - 1} stroke={C.moonLine} strokeWidth={1} strokeDasharray="3,5" opacity={0.7} />
+
+          <EventMarker g={0} sunriseMin={data.sunriseMin} kind="sunrise" anchor="start" digits={digits} C={C} />
+          <EventMarker g={data.dayG} sunriseMin={data.sunriseMin} kind="sunset" anchor="middle" digits={digits} C={C} />
+          {data.moonsetG != null && (
+            <EventMarker g={data.moonsetG} sunriseMin={data.sunriseMin} kind="moonset" anchor="middle" digits={digits} C={C} />
+          )}
+          {data.moonriseG != null && (
+            <EventMarker g={data.moonriseG} sunriseMin={data.sunriseMin} kind="moonrise" anchor="middle" digits={digits} C={C} />
+          )}
+          <EventMarker g={60} sunriseMin={data.sunriseMin} kind="next-sunrise" anchor="end" digits={digits} C={C} />
+
+          {hairlineGs.map((g) => (
+            <Line key={`hair-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.hair} strokeWidth={1} strokeDasharray="2,4" opacity={0.55} />
+          ))}
+
+          {tracks.map((tr, ti) => {
+            const y = trackY(ti);
+            return (
+              <G key={tr.key}>
+                <SvgText x={8} y={y + BAND / 2 + 4} fill={C.fg} fontSize={11} fontFamily={FONT} fontWeight="700">
+                  {tr.ne}
+                </SvgText>
+                <Line x1={X0} y1={y + BAND} x2={X1} y2={y + BAND} stroke={C.sunLine} strokeWidth={0.8} opacity={0.35} />
+
+                {tr.segs.map((s, si) => {
+                  const x = gx(s.fromG);
+                  const x2 = gx(s.toG);
+                  const w = x2 - x;
+                  const isActiveLagna = tr.cls === "lagna" && nowG != null && nowG >= s.fromG && nowG < s.toG;
+                  const fill = segFill(C, tr.cls, si % 2 === 1 && tr.cls !== "cho" && tr.cls !== "hora", isActiveLagna, s.bad);
+                  const midX = clampX((x + x2) / 2, 26);
+                  const narrow = w < 64;
+                  const segText = pick(s.ne, s.en);
+                  const [mainName, paksha] = segText.includes(", ")
+                    ? [segText.split(", ")[0]!, segText.split(", ").slice(1).join(", ")]
+                    : [segText, ""];
+                  const laneCount = tr.cls === "ashubha" ? Math.max(1, s.laneCount ?? 1) : 1;
+                  const laneGap = laneCount > 1 ? 1.5 : 0;
+                  const laneH = BAND / laneCount;
+                  const bandY = tr.cls === "ashubha" ? y + (s.lane ?? 0) * laneH : y;
+                  const bandH = tr.cls === "ashubha" ? laneH - laneGap : BAND;
+                  const labelY = bandY + bandH / 2 + 4;
+
+                  return (
+                    <G key={si}>
+                      <Rect
+                        x={x + 1}
+                        y={bandY}
+                        width={Math.max(0, w - 2)}
+                        height={bandH}
+                        rx={4}
+                        fill={fill}
+                        stroke={C.segStroke}
+                        strokeWidth={1}
+                      />
+                      {tr.cls === "cho" || tr.cls === "hora" ? (
+                        w > 20 ? (
+                          <SvgText
+                            x={(x + x2) / 2}
+                            y={y + BAND / 2 + 4}
+                            fill={s.bad ? C.danger : C.fg}
+                            fontSize={10}
+                            fontFamily={FONT}
+                            textAnchor="middle"
+                          >
+                            {segText}
+                          </SvgText>
+                        ) : null
+                      ) : tr.cls === "ashubha" ? (
+                        w >= 9 ? (
+                          <SvgText x={clampX((x + x2) / 2, 8)} y={labelY} fill={C.danger} fontSize={10} fontFamily={FONT} textAnchor="middle">
+                            {digits(si + 1)}
+                          </SvgText>
+                        ) : null
+                      ) : w >= 20 ? (
+                        <SvgText x={midX} y={labelY} fill={C.fg} fontSize={narrow ? 9 : 10} fontFamily={FONT} textAnchor="middle">
+                          {mainName}
+                          {!narrow && paksha ? ` · ${paksha}` : ""}
+                        </SvgText>
+                      ) : null}
+                    </G>
+                  );
+                })}
+              </G>
+            );
+          })}
+
+          {data.civilHourTicks.map(({ hour, g }) => (
+            <Line key={`grid-${hour}-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.grid} strokeWidth={1} strokeDasharray="3,4" />
+          ))}
+
+          {tracks.map((tr, ti) => {
+            const y = trackY(ti);
+            if (tr.cls === "cho" || tr.cls === "hora") return null;
+            return (
+              <G key={`${tr.key}-cuts`}>
+                {tr.segs.map((s, si) => {
+                  if (!s.cut || s.toG >= 59.97) return null;
+                  const x2 = gx(s.toG);
+                  const time =
+                    tr.cls === "lagna" && s.transitionLocal ? digits(s.transitionLocal) : tLabel(s.toG);
+                  const prevTime = si > 0 && tr.segs[si - 1]?.cut ? tLabel(tr.segs[si - 1]!.toG) : null;
+                  if (prevTime === time) return null;
+                  return (
+                    <G key={`cut-${si}`}>
+                      <TransitionArrow x2={x2} y={y} C={C} />
+                      <SvgText x={clampX(x2, 22)} y={y + BAND + 16} fill={C.fg} fontSize={9} fontFamily={FONT_SM} textAnchor="middle" opacity={tr.cls === "lagna" ? 0.9 : 1}>
+                        {time}
+                      </SvgText>
+                    </G>
+                  );
+                })}
+              </G>
+            );
+          })}
+
+          {nowG != null && nowG >= 0 && nowG <= 60 && (
+            <G>
+              <Line x1={gx(nowG)} y1={RULER_H - 6} x2={gx(nowG)} y2={H - 4} stroke={C.now} strokeWidth={1.4} />
+              <Rect x={clampX(gx(nowG), 30) - 48} y={RULER_H - 22} width={100} height={17} rx={9} fill={C.now} />
+              <SvgText x={clampX(gx(nowG), 30)} y={RULER_H - 10} fill="#fff" fontSize={9} fontFamily={FONT} textAnchor="middle">
+                {nowLabel} {tLabel(nowG)}
+              </SvgText>
+            </G>
+          )}
+        </Svg>
+      </ScrollView>
+
+      {data.ashubha.length > 0 && (
+        <View className="gap-1.5 border-t border-border px-4 py-3">
+          <Text className="text-sm font-bold text-destructive">{pick("अशुभ समय", "Inauspicious periods")}</Text>
+          {data.ashubha.map((a, i) => (
+            <View key={`${a.startG}-${i}`} className="flex-row items-baseline gap-1.5">
+              <View className="h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1">
+                <Text className="text-xs font-bold text-white">{digits(i + 1)}</Text>
+              </View>
+              <Text className="flex-1 text-sm font-semibold text-foreground">{pick(a.detailNe, a.detailEn)}</Text>
+              <Text className="shrink-0 text-sm font-semibold text-muted-foreground">
+                {tLabel(a.startG)} – {tLabel(a.endG)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </Card>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <View className="flex-row items-center gap-1">
+      <View className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
+      <Text className="text-xs text-muted-foreground">{label}</Text>
+    </View>
+  );
+}

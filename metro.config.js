@@ -1,3 +1,4 @@
+const https = require("https");
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
 
@@ -11,6 +12,39 @@ config.resolver = {
   ...config.resolver,
   assetExts: config.resolver.assetExts.filter((ext) => ext !== "svg"),
   sourceExts: [...config.resolver.sourceExts, "svg"],
+};
+
+// ── Dev-only API proxy (web) ──────────────────────────────────────────────
+// The production API returns no CORS headers, so the mobile *web* build (served
+// from localhost) can't read it cross-origin. Forward same-origin `/api/*` from
+// the Metro dev server to production — the same trick the web app's Vite dev
+// server uses. Native apps ignore CORS and hit the real host directly, so they
+// never touch this.
+const API_PROXY_HOST = "www.vedicpatro.com";
+config.server = {
+  ...config.server,
+  enhanceMiddleware: (middleware) => (req, res, next) => {
+    if (req.url && req.url.startsWith("/api/")) {
+      const headers = { ...req.headers, host: API_PROXY_HOST };
+      // Strip localhost origin/referer so the upstream/edge doesn't reject them.
+      delete headers.origin;
+      delete headers.referer;
+      const upstream = https.request(
+        { host: API_PROXY_HOST, path: req.url, method: req.method, headers },
+        (upRes) => {
+          res.writeHead(upRes.statusCode || 502, upRes.headers);
+          upRes.pipe(res);
+        },
+      );
+      upstream.on("error", () => {
+        res.writeHead(502, { "content-type": "text/plain" });
+        res.end("api proxy error");
+      });
+      req.pipe(upstream);
+      return;
+    }
+    return middleware(req, res, next);
+  },
 };
 
 module.exports = withNativeWind(config, { input: "./global.css" });
