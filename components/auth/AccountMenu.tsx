@@ -46,10 +46,17 @@ export function AccountMenu() {
       </Pressable>
 
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable className="flex-1 bg-black/40" onPress={() => setMenuOpen(false)} />
-        <View className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-card pb-8">
+        <Pressable
+          className="flex-1"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+          onPress={() => setMenuOpen(false)}
+        />
+        <View
+          className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border pb-8"
+          style={{ backgroundColor: colors.card }}
+        >
           <View className="items-center pt-2.5">
-            <View className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+            <View className="h-1 w-10 rounded-full" style={{ backgroundColor: colors.border }} />
           </View>
           <View className="flex-row items-center gap-3 px-4 py-4">
             <View className="h-11 w-11 items-center justify-center rounded-full bg-secondary/15">

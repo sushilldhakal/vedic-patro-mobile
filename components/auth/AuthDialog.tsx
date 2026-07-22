@@ -127,10 +127,17 @@ export function AuthDialog({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        <Pressable className="flex-1 bg-black/50" onPress={close} />
-        <View className="absolute inset-x-0 bottom-0 max-h-[92%] rounded-t-2xl border-t border-border bg-card">
+        <Pressable
+          className="flex-1"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          onPress={close}
+        />
+        <View
+          className="absolute inset-x-0 bottom-0 max-h-[92%] rounded-t-2xl border-t border-border"
+          style={{ backgroundColor: colors.card }}
+        >
           <View className="items-center pt-2.5">
-            <View className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+            <View className="h-1 w-10 rounded-full" style={{ backgroundColor: colors.border }} />
           </View>
           <ScrollView
             className="px-5"
@@ -249,7 +256,8 @@ function Field({
       <Text className="text-sm text-foreground">{label}</Text>
       <TextInput
         placeholderTextColor={colors.mutedForeground}
-        className="h-12 rounded-lg border border-border bg-background px-3 text-base text-foreground"
+        style={{ backgroundColor: colors.background, borderColor: colors.border }}
+        className="h-12 rounded-lg border px-3 text-base text-foreground"
         {...props}
       />
     </View>

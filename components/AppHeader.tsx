@@ -135,7 +135,10 @@ function NavDrawer({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View className="flex-1 bg-black/40" style={{ opacity: slide }}>
+      <Animated.View
+        className="flex-1"
+        style={{ opacity: slide, backgroundColor: "rgba(0,0,0,0.4)" }}
+      >
         <Pressable className="flex-1" onPress={onClose} />
       </Animated.View>
       <Animated.View
@@ -147,8 +150,9 @@ function NavDrawer({
           width: 300,
           paddingTop: insets.top,
           transform: [{ translateX }],
+          backgroundColor: colors.card,
         }}
-        className="border-r border-border bg-card"
+        className="border-r border-border"
       >
         {/* Brand header */}
         <View className="flex-row items-center gap-2.5 border-b border-border px-4 py-4">

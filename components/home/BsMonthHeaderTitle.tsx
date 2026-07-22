@@ -205,10 +205,17 @@ function DateSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/40" onPress={onClose} />
-      <View className="max-h-[70%] rounded-t-2xl border-t border-border bg-card pb-8">
+      <Pressable
+        className="flex-1"
+        style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        onPress={onClose}
+      />
+      <View
+        className="max-h-[70%] rounded-t-2xl border-t border-border pb-8"
+        style={{ backgroundColor: colors.card }}
+      >
         <View className="items-center pt-2.5">
-          <View className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+          <View className="h-1 w-10 rounded-full" style={{ backgroundColor: colors.border }} />
         </View>
         <View className="flex-row items-center justify-between px-4 py-3">
           <Text className="text-base font-bold text-foreground">{pick("मिति", "Date")}</Text>
