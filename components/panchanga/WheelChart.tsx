@@ -1155,7 +1155,9 @@ function WheelChartImpl({
           cy={py}
           r={planetHitRadius(i)}
           fill="transparent"
-          onPress={() => setLineTarget(i)}
+          onPress={() => {
+            setLineTarget(i);
+          }}
         />
       );
     });

@@ -44,18 +44,15 @@ export default function HomeScreen() {
   const [month, setMonth] = useState(initial.month);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [patroView, setPatroView] = useState<HomePatroView>("calendar");
+  const scrollRef = useRef<ScrollView | null>(null);
   const [asideOffsetY, setAsideOffsetY] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
   const todayAd = todayAdString();
   const splitAside = width >= ASIDE_SPLIT;
 
-  const handleSelectDay = useCallback(
-    (day: CalendarDay) => {
-      if (day.outsideMonth) return;
-      setSelectedDay(day);
-    },
-    [],
-  );
+  const handleSelectDay = useCallback((day: CalendarDay) => {
+    if (day.outsideMonth) return;
+    setSelectedDay(day);
+  }, []);
 
   useEffect(() => {
     if (!selectedDay || splitAside || asideOffsetY <= 0) return;
@@ -240,9 +237,7 @@ export default function HomeScreen() {
     >
       <View className={splitAside ? "flex-row items-start gap-5" : "gap-5"}>
         {calendarBlock}
-        <View onLayout={(e) => setAsideOffsetY(e.nativeEvent.layout.y)}>
-          {asideBlock}
-        </View>
+        <View onLayout={(e) => setAsideOffsetY(e.nativeEvent.layout.y)}>{asideBlock}</View>
       </View>
 
       <Text className="mt-7 text-center text-sm text-muted-foreground">

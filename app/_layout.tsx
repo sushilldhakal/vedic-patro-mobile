@@ -8,6 +8,7 @@ import { FiraCode_400Regular, FiraCode_700Bold } from "@expo-google-fonts/fira-c
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LocaleProvider } from "@/lib/i18n";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth/AuthContext";
@@ -53,15 +54,17 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }} className="flex-1">
-      <ThemeProvider>
-        <LocaleProvider>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <RootShell loaded={loaded} />
-            </AuthProvider>
-          </QueryClientProvider>
-        </LocaleProvider>
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <LocaleProvider>
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                <RootShell loaded={loaded} />
+              </AuthProvider>
+            </QueryClientProvider>
+          </LocaleProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

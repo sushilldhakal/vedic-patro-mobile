@@ -1,5 +1,6 @@
 import { ScrollView, Text, View } from "react-native";
 import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
 
 export function AppShell({
@@ -23,11 +24,21 @@ export function AppShell({
         paddingHorizontal: PAGE_HORIZONTAL_PADDING,
       }}
     >
-      <View className="mb-4 flex-row items-start justify-between gap-3">
+      <View className="mb-4 flex-row items-start justify-between gap-3 py-1">
         <View className="min-w-0 flex-1">
-          <Text className="text-2xl font-bold text-foreground">{title}</Text>
+          <Text
+            className="text-xl font-bold text-foreground"
+            style={[nepaliTextStyle(20), { paddingTop: 2, paddingBottom: 2 }]}
+          >
+            {title}
+          </Text>
           {subtitle ? (
-            <Text className="mt-0.5 text-sm text-muted-foreground">{subtitle}</Text>
+            <Text
+              className="mt-1 text-sm text-muted-foreground"
+              style={[nepaliTextStyle(14), { paddingTop: 1 }]}
+            >
+              {subtitle}
+            </Text>
           ) : null}
         </View>
         {headerRight}

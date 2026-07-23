@@ -7,6 +7,7 @@ import { FLOATING_NAV, isNavActive } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 export function FloatingNavBar() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export function FloatingNavBar() {
               onPress={() => router.push(item.href as never)}
               className={cn(
                 "min-w-0 flex-1 items-center justify-center rounded-[22px]",
-                isTablet ? "px-1 py-2" : "px-0.5 py-1.5",
+                isTablet ? "px-1 py-2.5" : "px-0.5 py-2",
                 active && "bg-tab-active",
               )}
               accessibilityRole="button"
@@ -63,10 +64,11 @@ export function FloatingNavBar() {
               <Text
                 numberOfLines={2}
                 className={cn(
-                  "mt-1 text-center font-medium",
-                  isTablet ? "text-[11px] leading-[13px]" : "text-[9px] leading-[11px]",
+                  "mt-1 min-h-[28px] text-center font-medium",
+                  isTablet ? "text-[11px]" : "text-[10px]",
                   active ? "font-bold text-primary" : "text-muted-foreground",
                 )}
+                style={[nepaliTextStyle(isTablet ? 11 : 10), { paddingTop: 1 }]}
               >
                 {pick(item.ne, item.en)}
               </Text>

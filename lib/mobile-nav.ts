@@ -7,7 +7,7 @@ export type MobileNavIcon = ComponentProps<typeof Ionicons>["name"];
 export const FLOATING_NAV = [
   { href: "/", ne: "गृह", en: "Home", icon: "home-outline" as MobileNavIcon },
   { href: "/panchanga", ne: "सूर्य पञ्चाङ्ग", en: "Panchanga", icon: "sunny-outline" as MobileNavIcon },
-  { href: "/jyotish", ne: "ज्योतिष", en: "Jyotish", icon: "sparkles-outline" as MobileNavIcon },
+  { href: "/kundali", ne: "कुण्डली", en: "Kundali", icon: "sparkles-outline" as MobileNavIcon },
   { href: "/learn", ne: "सिकाइ", en: "Learn", icon: "book-outline" as MobileNavIcon },
   { href: "/dainikkranti", ne: "दैनिक क्रान्ति", en: "Transit", icon: "moon-outline" as MobileNavIcon },
 ] as const;
@@ -33,7 +33,17 @@ export function floatingNavBottomPadding(isTablet: boolean): number {
   return isTablet ? 112 : FLOATING_NAV_BOTTOM_PADDING;
 }
 
+/** Kundali list + detail share the bottom tab; milan is a stack screen. */
+export const KUNDALI_SIDEBAR_SPLIT = 992;
+
 export function isNavActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/" || pathname === "/index";
+  if (href === "/kundali") {
+    return (
+      pathname === "/kundali" ||
+      pathname.startsWith("/kundali/") ||
+      pathname === "/kundali-milan"
+    );
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -51,7 +51,7 @@ export default function Root({ children }: PropsWithChildren) {
       </head>
       <body>
         <div id="vp-boot-splash" aria-hidden="true">
-          <img src="/apple-touch-icon.png" alt="" width="160" height="160" />
+          <img src="/favicon.svg" alt="" width="160" height="160" />
         </div>
         {children}
       </body>

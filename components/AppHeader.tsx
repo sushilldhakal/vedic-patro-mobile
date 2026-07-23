@@ -11,6 +11,7 @@ import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import { DRAWER_NAV_EXTRA, FLOATING_NAV, isNavActive, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { cn } from "@/lib/utils";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 const NAV = [...FLOATING_NAV, ...DRAWER_NAV_EXTRA];
 
@@ -22,7 +23,7 @@ function BrandMark({ onPress, centered }: { onPress: () => void; centered?: bool
       className={cn("min-w-0 flex-row items-center gap-2.5 active:opacity-80", centered && "justify-center")}
     >
       <VedicPatroMark size={42} />
-      <Text className="text-base font-bold" numberOfLines={1}>
+      <Text className="text-base font-bold" numberOfLines={1} style={[nepaliTextStyle(16), { paddingVertical: 2 }]}>
         <Text className="text-secondary">{pick("वैदिक", "Vedic")}</Text>
         <Text className="text-foreground"> {pick("पात्रो", "Patro")}</Text>
       </Text>
@@ -55,7 +56,7 @@ export function AppHeader() {
           alignSelf: "center",
           paddingHorizontal: PAGE_HORIZONTAL_PADDING,
         }}
-        className="h-16 flex-row items-center"
+        className="min-h-16 flex-row items-center py-2"
       >
         {/* Left — hamburger */}
         <View className="flex-1 flex-row justify-start">
@@ -191,6 +192,7 @@ function NavDrawer({
                     "text-sm",
                     active ? "font-semibold text-secondary" : "text-foreground",
                   )}
+                  style={nepaliTextStyle(14)}
                 >
                   {pick(item.ne, item.en)}
                 </Text>

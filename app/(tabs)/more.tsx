@@ -8,7 +8,6 @@ import { useBreakpoint } from "@/lib/responsive";
 
 const LINKS = [
   { ne: "वेबसाइट", en: "Website", url: "https://vedicpatro.com" },
-  { ne: "कुण्डली", en: "Kundali", url: "https://vedicpatro.com/kundali" },
   { ne: "विवाह साइत", en: "Marriage muhurta", url: "https://vedicpatro.com/vivah-sait" },
   { ne: "दैनिक क्रान्ति", en: "Daily transit", url: "https://vedicpatro.com/dainikkranti" },
 ];
