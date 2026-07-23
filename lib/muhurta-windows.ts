@@ -1,5 +1,4 @@
 import type { PanchangaDay } from "@/lib/api";
-import { getPanchangaDetail } from "@/lib/panchanga-format";
 
 /** Auspicious muhurta window with local clock range. */
 export interface AuspiciousWindow {
@@ -17,7 +16,7 @@ export interface AuspiciousWindow {
  * `panchanga-format` through `tithi-wheel-data`.
  */
 export function getAuspiciousWindows(p: PanchangaDay): AuspiciousWindow[] {
-  const detail = getPanchangaDetail(p);
+  const detail = p.detail;
   const m = (detail?.muhurta ?? p.muhurta) as {
     auspicious_timings?: Array<{
       key?: string;

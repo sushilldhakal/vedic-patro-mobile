@@ -1,4 +1,4 @@
-import { Slot } from "expo-router";
+import { Tabs } from "expo-router";
 import { View } from "react-native";
 import { AppHeader } from "@/components/AppHeader";
 import { FloatingNavBar } from "@/components/FloatingNavBar";
@@ -13,11 +13,19 @@ export default function TabsLayout() {
       className={cn("flex-1 bg-background", resolvedTheme === "dark" && "dark")}
       style={{ flex: 1 }}
     >
-      <AppHeader />
-      <View style={{ flex: 1 }}>
-        <Slot />
-      </View>
-      <FloatingNavBar />
+      <Tabs
+        tabBar={() => <FloatingNavBar />}
+        screenLayout={({ children }) => (
+          <View style={{ flex: 1 }}>
+            <AppHeader />
+            <View style={{ flex: 1 }}>{children}</View>
+          </View>
+        )}
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: "transparent" },
+        }}
+      />
     </View>
   );
 }

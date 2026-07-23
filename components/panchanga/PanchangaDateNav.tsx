@@ -12,6 +12,7 @@ import {
   getBSMonthLength,
 } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
+import { useBreakpoint } from "@/lib/responsive";
 import { resolveSamvatsaraForBsYear } from "@/lib/samvatsara";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ export function PanchangaDateNav({
 }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useBreakpoint();
   const { pick, digits, lang } = useLocale();
   const bs = adToBS(date);
   const todayBs = adToBS(new Date(`${todayAd}T12:00:00`));
@@ -90,6 +92,61 @@ export function PanchangaDateNav({
   const pickerLabelCompact = clockSummary
     ? `${digits(bs.day)} · ${clockSummary}`
     : `${digits(bs.day)}`;
+
+  const pickerTitle = showTime ? pick("मिति र समय", "Date & time") : pick("मिति", "Date");
+
+  const pickerBody = pickerOpen ? (
+    <BsDateTimePicker
+      key={`${bs.year}-${bs.month}-${bs.day}-${clock ?? ""}`}
+      year={bs.year}
+      month={bs.month}
+      day={bs.day}
+      yearOptions={BS_YEAR_OPTIONS}
+      todayAd={todayAd}
+      onSelectDate={(y, m, d) => pickBsDate(onDateChange, y, m, d)}
+      monthAriaLabel={pick("महिना", "Month")}
+      yearAriaLabel={pick("वर्ष", "Year")}
+      clock={clock}
+      onClockChange={onClockChange}
+      hourAriaLabel={pick("घण्टा", "Hour")}
+      minuteAriaLabel={pick("मिनेट", "Minute")}
+      showTime={showTime}
+      onDone={() => setPickerOpen(false)}
+    />
+  ) : null;
+
+  const pickerHeader = (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }}
+    >
+      <Pressable onPress={() => setPickerOpen(false)} hitSlop={8} style={{ minWidth: 72 }}>
+        <Text style={{ fontSize: 16, color: colors.mutedForeground }}>
+          {pick("रद्द", "Cancel")}
+        </Text>
+      </Pressable>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: "center",
+          fontSize: 16,
+          fontWeight: "600",
+          color: colors.foreground,
+        }}
+        numberOfLines={1}
+      >
+        {pickerTitle}
+      </Text>
+      <View style={{ minWidth: 72 }} />
+    </View>
+  );
 
   return (
     <>
@@ -150,68 +207,56 @@ export function PanchangaDateNav({
         </View>
       </View>
 
-      <Modal visible={pickerOpen} animationType="slide" onRequestClose={() => setPickerOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: colors.card,
-            paddingTop: insets.top,
-            paddingBottom: Math.max(insets.bottom, 12),
-          }}
-        >
+      <Modal
+        visible={pickerOpen}
+        animationType={isTablet ? "fade" : "slide"}
+        transparent={isTablet}
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        {isTablet ? (
+          <Pressable
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 24,
+              backgroundColor: "rgba(0,0,0,0.45)",
+            }}
+            onPress={() => setPickerOpen(false)}
+          >
+            <View
+              style={{
+                width: "100%",
+                maxWidth: 360,
+                maxHeight: "85%",
+                borderRadius: 16,
+                overflow: "hidden",
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              {pickerHeader}
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {pickerBody}
+              </ScrollView>
+            </View>
+          </Pressable>
+        ) : (
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
+              flex: 1,
+              backgroundColor: colors.card,
+              paddingTop: insets.top,
+              paddingBottom: Math.max(insets.bottom, 12),
             }}
           >
-            <Pressable onPress={() => setPickerOpen(false)} hitSlop={8} style={{ minWidth: 72 }}>
-              <Text style={{ fontSize: 16, color: colors.mutedForeground }}>
-                {pick("रद्द", "Cancel")}
-              </Text>
-            </Pressable>
-            <Text
-              style={{
-                flex: 1,
-                textAlign: "center",
-                fontSize: 16,
-                fontWeight: "600",
-                color: colors.foreground,
-              }}
-              numberOfLines={1}
-            >
-              {showTime ? pick("मिति र समय", "Date & time") : pick("मिति", "Date")}
-            </Text>
-            <View style={{ minWidth: 72 }} />
+            {pickerHeader}
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {pickerBody}
+            </ScrollView>
           </View>
-
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {pickerOpen ? (
-              <BsDateTimePicker
-                key={`${bs.year}-${bs.month}-${bs.day}-${clock ?? ""}`}
-                year={bs.year}
-                month={bs.month}
-                day={bs.day}
-                yearOptions={BS_YEAR_OPTIONS}
-                todayAd={todayAd}
-                onSelectDate={(y, m, d) => pickBsDate(onDateChange, y, m, d)}
-                monthAriaLabel={pick("महिना", "Month")}
-                yearAriaLabel={pick("वर्ष", "Year")}
-                clock={clock}
-                onClockChange={onClockChange}
-                hourAriaLabel={pick("घण्टा", "Hour")}
-                minuteAriaLabel={pick("मिनेट", "Minute")}
-                showTime={showTime}
-                onDone={() => setPickerOpen(false)}
-              />
-            ) : null}
-          </ScrollView>
-        </View>
+        )}
       </Modal>
     </>
   );

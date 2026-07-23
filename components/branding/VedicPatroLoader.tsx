@@ -1,5 +1,4 @@
-import { useEffect, useRef } from "react";
-import { Animated, Easing, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import Svg, {
   Circle,
   Defs,
@@ -80,60 +79,6 @@ function LoaderSvg({ size }: { size: number }) {
   );
 }
 
-/**
- * Loader motion via RN Animated `transform`/`opacity` only — never Reanimated
- * shared values or NativeWind `animate-*` (those trigger strict-mode warnings).
- */
-function LoaderGraphic({ size }: { size: number }) {
-  const spin = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0.88)).current;
-
-  useEffect(() => {
-    spin.setValue(0);
-    const spinAnim = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 24000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    const pulseAnim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1400,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0.88,
-          duration: 1400,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    spinAnim.start();
-    pulseAnim.start();
-    return () => {
-      spinAnim.stop();
-      pulseAnim.stop();
-    };
-  }, [spin, pulse]);
-
-  const rotate = spin.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  return (
-    <Animated.View style={{ width: size, height: size, opacity: pulse, transform: [{ rotate }] }}>
-      <LoaderSvg size={size} />
-    </Animated.View>
-  );
-}
-
 export function VedicPatroLoader({
   label,
   size = PAGE_LOADER_SIZE,
@@ -149,7 +94,7 @@ export function VedicPatroLoader({
   return (
     <View className={`items-center justify-center gap-4 ${className ?? ""}`}>
       <View className="overflow-hidden rounded-[22%] shadow-md" style={{ width: size, height: size }}>
-        <LoaderGraphic size={size} />
+        <LoaderSvg size={size} />
       </View>
       {shown ? <Text className="text-sm text-muted-foreground">{shown}</Text> : null}
     </View>

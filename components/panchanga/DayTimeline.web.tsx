@@ -520,9 +520,9 @@ export function DayTimeline({
                         <clipPath id={clipId}>
                           <rect
                             x={x + 1}
-                            y={bandY}
+                            y={bandY - 4}
                             width={Math.max(0, w - 2)}
-                            height={bandH}
+                            height={bandH + 8}
                             rx={4}
                           />
                         </clipPath>
@@ -544,6 +544,7 @@ export function DayTimeline({
                             y={y + BAND / 2 + 4}
                             className={pgxSegnameCho(s.bad)}
                             textAnchor="middle"
+                            dominantBaseline="central"
                           >
                             {segText}
                           </text>
@@ -574,6 +575,7 @@ export function DayTimeline({
                             y={labelY}
                             className={narrow ? cn(pgxSegname, pgxSegnameSm) : pgxSegname}
                             textAnchor="middle"
+                            dominantBaseline="central"
                             clipPath={`url(#${clipId})`}
                           >
                             {mainName}

@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import type { CalendarDay } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 const WEEKDAYS_NE = ["आइतवार", "सोमवार", "मंगलवार", "बुधवार", "बिहीवार", "शुक्रवार", "शनिवार"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -133,7 +134,7 @@ export function BsCalendarGrid({
                     <Text
                       numberOfLines={1}
                       className="min-w-0 flex-1 text-left text-[10px] font-bold md:text-xs"
-                      style={{ color: theme.text }}
+                      style={{ color: theme.text, ...nepaliTextStyle(10) }}
                     >
                       {tithi}
                     </Text>
@@ -169,8 +170,11 @@ export function BsCalendarGrid({
                 {mainFest && !isOutside ? (
                   <Text
                     numberOfLines={2}
-                    className="text-center text-[10px] font-bold leading-tight md:text-xs"
-                    style={{ color: isPublicHoliday ? theme.danger : theme.text }}
+                    className="text-center text-[10px] font-bold md:text-xs"
+                    style={{
+                      color: isPublicHoliday ? theme.danger : theme.text,
+                      ...nepaliTextStyle(10),
+                    }}
                   >
                     {mainFest}
                   </Text>

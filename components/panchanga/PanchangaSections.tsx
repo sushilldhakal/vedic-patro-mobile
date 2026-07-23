@@ -63,6 +63,7 @@ import {
 } from "./PanchangaLayout";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/i18n";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 type AngaEnd = {
   name_ne?: string;
@@ -1011,6 +1012,7 @@ export function FestivalsSection({ p }: { p: PanchangaDay }) {
                 ? "text-sm font-semibold px-2.5 py-1.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20"
                 : "text-sm font-semibold px-2.5 py-1.5 rounded-full bg-secondary/12 text-secondary dark:text-accent border border-secondary/20"
             }
+            style={nepaliTextStyle(14)}
           >
             {pick(f.name_ne ?? f.name ?? "", f.name_en ?? f.name ?? f.name_ne ?? "")}
           </Text>

@@ -17,12 +17,11 @@ import {
 import { formatTimeShort, getSunrise, getSunset } from "@/lib/panchanga-format";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
-import { GhatiClock } from "@/components/panchanga/GhatiClock";
 import { DayTimeline } from "@/components/panchanga/DayTimeline";
 import { PanchangaWheel } from "@/components/panchanga/PanchangaWheel";
+import { PanchangaAsidePanels } from "@/components/panchanga/PanchangaAsidePanels";
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import { PlanetEventsPanel } from "@/components/panchanga/PlanetEventsPanel";
-import { EphemerisModeBanner, MuhurtaNowPanel } from "@/components/panchanga/MuhurtaNowPanel";
+import { EphemerisModeBanner } from "@/components/panchanga/MuhurtaNowPanel";
 import {
   DinVisheshSection,
   FestivalsSection,
@@ -183,7 +182,7 @@ export default function PanchangaScreen() {
         className="gap-4"
         style={splitSidebar ? { flexDirection: "row", alignItems: "flex-start", gap: 20 } : undefined}
       >
-        <View className="min-w-0 flex-1 gap-4" style={splitSidebar ? { flex: 1 } : undefined}>
+        <View className="min-w-0 flex-1 gap-4">
           <PanchangaDateNav
             date={date}
             onDateChange={setDate}
@@ -194,9 +193,7 @@ export default function PanchangaScreen() {
               <LocationSelector location={location} onLocationChange={setLocation} />
             }
           />
-
           {ephemeris && data ? <EphemerisModeBanner p={data} clock={clock} /> : null}
-
           {wheelData || showWheelSkeleton ? (
             <DayTimeline
               p={wheelData}
@@ -208,44 +205,6 @@ export default function PanchangaScreen() {
               showNeedle={clockUserAdjusted || isToday}
             />
           ) : null}
-
-          <View className="gap-4">
-            {wheelData || showWheelSkeleton ? (
-              <PanchangaWheel
-                p={wheelData}
-                loading={showWheelSkeleton}
-                bsYear={bs.year}
-                bsMonthNe={bs.monthName}
-                bsDay={bs.day}
-                isToday={isToday}
-                timezone={effectiveTimezone}
-                locationLabel={locationLabel}
-              />
-            ) : null}
-
-            {isError ? (
-              <View className="rounded-xl border border-destructive/20 bg-destructive/10 p-4">
-                <Text className="text-sm text-destructive">
-                  {pick("पञ्चाङ्ग लोड गर्न सकिएन।", "Could not load panchanga.")}
-                </Text>
-              </View>
-            ) : null}
-
-            {data ? (
-              <View className="gap-3">
-                <SunMoonSamvatSection p={data} />
-                <PanchangCoreSection p={data} />
-                <RashiSection p={data} />
-                <RituSection p={data} />
-                <BalamSection p={data} />
-                <PanchakaLagnaSection p={data} />
-                <NivasShoolSection p={data} fallback={wheelData} />
-                <MuhurtaTimingsSection p={data} />
-                <DinVisheshSection p={data} />
-                <FestivalsSection p={data} />
-              </View>
-            ) : null}
-          </View>
         </View>
 
         <View
@@ -256,10 +215,55 @@ export default function PanchangaScreen() {
               : { width: "100%" }
           }
         >
-          <GhatiClock sunrise={sunrise} sunset={sunset} timezone={effectiveTimezone} />
-          {ephemeris && data ? <MuhurtaNowPanel p={data} clock={clock} /> : null}
-          <PlanetEventsPanel dateAd={chartAd} location={location.params} />
+          <PanchangaAsidePanels
+            sunrise={sunrise}
+            sunset={sunset}
+            timezone={effectiveTimezone}
+            ephemeris={ephemeris}
+            data={data}
+            clock={clock}
+            chartAd={chartAd}
+            location={location.params}
+          />
         </View>
+      </View>
+
+      <View className="mt-4 gap-4">
+        {wheelData || showWheelSkeleton ? (
+          <PanchangaWheel
+            p={wheelData}
+            loading={showWheelSkeleton}
+            bsYear={bs.year}
+            bsMonthNe={bs.monthName}
+            bsDay={bs.day}
+            isToday={isToday}
+            timezone={effectiveTimezone}
+            locationLabel={locationLabel}
+          />
+        ) : null}
+
+        {isError ? (
+          <View className="rounded-xl border border-destructive/20 bg-destructive/10 p-4">
+            <Text className="text-sm text-destructive">
+              {pick("पञ्चाङ्ग लोड गर्न सकिएन।", "Could not load panchanga.")}
+            </Text>
+          </View>
+        ) : null}
+
+        {data ? (
+          <View className="gap-3">
+            <SunMoonSamvatSection p={data} />
+            <PanchangCoreSection p={data} />
+            <RashiSection p={data} />
+            <RituSection p={data} />
+            <BalamSection p={data} />
+            <PanchakaLagnaSection p={data} />
+            <NivasShoolSection p={data} fallback={wheelData} />
+            <MuhurtaTimingsSection p={data} />
+            <DinVisheshSection p={data} />
+            <FestivalsSection p={data} />
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );

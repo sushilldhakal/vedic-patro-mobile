@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo, useState, type ComponentProps, type ReactNode } from "react";
-import { View } from "react-native";
+import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { PanResponder, View } from "react-native";
 import Svg, {
   Circle,
   ClipPath,
@@ -28,6 +28,7 @@ import {
   WHEEL_RASHIS,
 } from "@/lib/wheel-data";
 import { KARANA_SEQ, karanaColor, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
+import { nepaliSvgTextCenter } from "@/lib/nepali-text";
 
 const DEG = Math.PI / 180;
 const CX = 500;
@@ -103,14 +104,85 @@ const R = {
 export type WheelHover = { type: "nak"; i: number } | { type: "rashi"; i: number };
 export type WheelPick = WheelHover;
 
-/** Satisfies react-native-svg onPress typing (web + native intersection). */
-function svgOnPress(fn: () => void) {
-  const handler = () => {
-    fn();
-    return {};
-  };
-  return handler as NonNullable<ComponentProps<typeof Path>["onPress"]>;
+function svgCoords(
+  locationX: number,
+  locationY: number,
+  layoutW: number,
+  layoutH: number,
+): { x: number; y: number; dist: number; L: number } {
+  const x = 42 + (locationX / layoutW) * 916;
+  const y = 42 + (locationY / layoutH) * 916;
+  const dx = x - CX;
+  const dy = y - CY;
+  const dist = Math.hypot(dx, dy);
+  const L = normDeg(Math.atan2(-dx, -dy) / DEG);
+  return { x, y, dist, L };
 }
+
+function wheelLFromTouch(L: number, spin: number): number {
+  return normDeg(L - spin);
+}
+
+function untransformTouch(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  pan: { x: number; y: number },
+  zoom: number,
+): { x: number; y: number } {
+  if (zoom === 1 && pan.x === 0 && pan.y === 0) return { x, y };
+  const cx = w / 2;
+  const cy = h / 2;
+  const tx = x - pan.x;
+  const ty = y - pan.y;
+  return {
+    x: cx + (tx - cx) / zoom,
+    y: cy + (ty - cy) / zoom,
+  };
+}
+
+function clampZoom(z: number): number {
+  return Math.max(0.55, Math.min(14, z));
+}
+
+function touchPageDistance(touches: readonly { pageX: number; pageY: number }[]): number {
+  if (touches.length < 2) return 0;
+  const t0 = touches[0]!;
+  const t1 = touches[1]!;
+  return Math.hypot(t1.pageX - t0.pageX, t1.pageY - t0.pageY);
+}
+
+function planetSvgPosition(lon: number, orbit: number, spinDeg: number): [number, number] {
+  const a = (lon + spinDeg) * DEG;
+  return [CX - orbit * ORBIT_SCALE * Math.sin(a), CY - orbit * ORBIT_SCALE * Math.cos(a)];
+}
+
+function planetVisualRadius(index: number): number {
+  const meta = GRAHA_META[index];
+  if (!meta) return 8;
+  if ("big" in meta && meta.big) return 15;
+  if (index === 1) return 10;
+  return 8;
+}
+
+/** Svg-space hit radius per graha (glow, label, and finger slop). */
+function planetHitRadius(index: number): number {
+  const r = planetVisualRadius(index);
+  if (index === 0) return r + 26;
+  // Saturn, Rahu, Ketu share the outer rim and often sit near each other.
+  if (index >= 6) return r + 32;
+  return r + 24;
+}
+
+function angularDiffDeg(a: number, b: number): number {
+  const d = Math.abs(normDeg(a) - normDeg(b));
+  return d > 180 ? 360 - d : d;
+}
+
+const WHEEL_TAP_SLOP_PX = 14;
+/** Extra slop before a planet tap turns into rotate/pan. */
+const PLANET_TAP_SLOP_PX = 24;
 
 function segNakFill(opts: { alt?: boolean; hot?: boolean; sel?: boolean }): string {
   if (opts.sel) return SEG_SEL;
@@ -142,10 +214,10 @@ function RingLabel({ L, r, spin, size, fill = W_INK, children }: RingLabelProps)
         x={CX}
         y={CY - r}
         textAnchor="middle"
-        alignmentBaseline="middle"
         fill={fill}
         fontSize={size ?? 11}
         fontFamily={FONT}
+        {...nepaliSvgTextCenter}
         {...(flip ? { transform: `rotate(180 ${CX} ${CY - r})` } : {})}
       >
         {children}
@@ -183,13 +255,241 @@ function WheelChartImpl({
   onHover: _onHover,
   onLeave: _onLeave,
   onPick,
-  onSpin: _onSpin,
+  onSpin,
   zoom,
-  onZoom: _onZoom,
+  onZoom,
   pan,
-  onPan: _onPan,
+  onPan,
 }: WheelChartProps) {
   const [lineTarget, setLineTarget] = useState(1);
+  const layoutRef = useRef({ w: 0, h: 0 });
+  const spinRef = useRef(spin);
+  spinRef.current = spin;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const pinchRef = useRef<{ dist0: number; zoom0: number } | null>(null);
+  const pinchingRef = useRef(false);
+  const dragRef = useRef<
+    | { mode: "t"; idx: number }
+    | { mode: "r"; spin0: number; angle0: number; moved: boolean }
+    | { mode: "p"; pan0x: number; pan0y: number; moved: boolean }
+    | null
+  >(null);
+
+  const angleAt = useCallback((locationX: number, locationY: number) => {
+    const { w, h } = layoutRef.current;
+    if (w <= 0 || h <= 0) return 0;
+    const cx = w / 2;
+    const cy = h / 2;
+    return (Math.atan2(locationY - cy, locationX - cx) * 180) / Math.PI;
+  }, []);
+
+  const pickPlanetAt = useCallback(
+    (rawX: number, rawY: number): number => {
+      if (!tw.show_planets) return -1;
+      const { w, h } = layoutRef.current;
+      if (w <= 0 || h <= 0) return -1;
+      const { x, y } = untransformTouch(rawX, rawY, w, h, panRef.current, zoomRef.current);
+      const { x: svgX, y: svgY, dist, L } = svgCoords(x, y, w, h);
+      if (dist > R.rashiOut + 36) return -1;
+
+      const tapL = wheelLFromTouch(L, spinRef.current);
+      const candidates: { i: number; score: number }[] = [];
+
+      for (let i = 0; i < det.grahas.length; i++) {
+        const meta = GRAHA_META[i]!;
+        const lon = markers.planetLons[i] ?? 0;
+        const hitR = planetHitRadius(i);
+        const planetR = planetVisualRadius(i);
+        const [px, py] = planetSvgPosition(lon, meta.orbit, spinRef.current);
+        const dCenter = Math.hypot(svgX - px, svgY - py);
+        const labelY = py + planetR + 9;
+        const dLabel = Math.hypot(svgX - px, svgY - labelY);
+        const d = Math.min(dCenter, dLabel);
+        if (d <= hitR) {
+          candidates.push({ i, score: d / hitR });
+        }
+      }
+
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          const scoreDelta = a.score - b.score;
+          if (Math.abs(scoreDelta) < 0.14) return b.i - a.i;
+          return scoreDelta;
+        });
+        return candidates[0]!.i;
+      }
+
+      // Orbit + angle snap when grahas overlap (conjunct / rim cluster).
+      let snapIdx = -1;
+      let snapScore = Infinity;
+      for (let i = 0; i < det.grahas.length; i++) {
+        const meta = GRAHA_META[i]!;
+        const lon = markers.planetLons[i] ?? 0;
+        const orbitR = meta.orbit * ORBIT_SCALE;
+        const radialSlop = i >= 6 ? 20 : 14;
+        const angularSlop = i >= 6 ? 14 : 10;
+        const radialDiff = Math.abs(dist - orbitR);
+        const angDiff = angularDiffDeg(tapL, lon);
+        if (radialDiff > radialSlop || angDiff > angularSlop) continue;
+        const score = angDiff / angularSlop + radialDiff / radialSlop;
+        if (score < snapScore) {
+          snapScore = score;
+          snapIdx = i;
+        }
+      }
+      return snapIdx;
+    },
+    [det.grahas, markers.planetLons, tw.show_planets],
+  );
+
+  const pickFromTouch = useCallback(
+    (rawX: number, rawY: number) => {
+      const planetIdx = pickPlanetAt(rawX, rawY);
+      if (planetIdx >= 0) {
+        setLineTarget(planetIdx);
+        return;
+      }
+
+      const { w, h } = layoutRef.current;
+      if (w <= 0 || h <= 0) return;
+      const { x, y } = untransformTouch(rawX, rawY, w, h, panRef.current, zoomRef.current);
+      const { dist, L } = svgCoords(x, y, w, h);
+      const wheelL = wheelLFromTouch(L, spinRef.current);
+
+      if (dist >= R.nakIn && dist <= R.nakOut) {
+        onPick({ type: "nak", i: Math.floor(wheelL / (360 / 27)) % 27 });
+        return;
+      }
+      if (dist >= R.rashiIn && dist <= R.rashiOut) {
+        onPick({ type: "rashi", i: Math.floor(wheelL / 30) % 12 });
+      }
+    },
+    [onPick, pickPlanetAt],
+  );
+
+  const wheelPan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: (evt) => {
+          pinchingRef.current = false;
+          pinchRef.current = null;
+          const { w, h } = layoutRef.current;
+          const { locationX, locationY } = evt.nativeEvent;
+          const planetIdx = pickPlanetAt(locationX, locationY);
+          if (planetIdx >= 0) {
+            dragRef.current = { mode: "t", idx: planetIdx };
+            return;
+          }
+          const { x, y } = untransformTouch(locationX, locationY, w, h, panRef.current, zoomRef.current);
+          if (zoomRef.current > 1) {
+            dragRef.current = {
+              mode: "p",
+              pan0x: panRef.current.x,
+              pan0y: panRef.current.y,
+              moved: false,
+            };
+          } else {
+            dragRef.current = {
+              mode: "r",
+              spin0: spinRef.current,
+              angle0: angleAt(x, y),
+              moved: false,
+            };
+          }
+        },
+        onPanResponderMove: (evt, gestureState) => {
+          const touches = evt.nativeEvent.touches;
+          if (touches.length >= 2) {
+            pinchingRef.current = true;
+            dragRef.current = null;
+            const dist = touchPageDistance(touches);
+            if (dist <= 0) return;
+            if (!pinchRef.current) {
+              pinchRef.current = { dist0: dist, zoom0: zoomRef.current };
+              return;
+            }
+            onZoom(clampZoom(pinchRef.current.zoom0 * (dist / pinchRef.current.dist0)));
+            return;
+          }
+
+          pinchRef.current = null;
+          const drag = dragRef.current;
+          if (!drag) return;
+
+          if (drag.mode === "t") {
+            if (Math.hypot(gestureState.dx, gestureState.dy) < PLANET_TAP_SLOP_PX) return;
+            const { w, h } = layoutRef.current;
+            const { locationX, locationY } = evt.nativeEvent;
+            const { x, y } = untransformTouch(locationX, locationY, w, h, panRef.current, zoomRef.current);
+            if (zoomRef.current > 1) {
+              dragRef.current = {
+                mode: "p",
+                pan0x: panRef.current.x,
+                pan0y: panRef.current.y,
+                moved: true,
+              };
+              onPan(panRef.current.x + gestureState.dx, panRef.current.y + gestureState.dy);
+            } else {
+              dragRef.current = {
+                mode: "r",
+                spin0: spinRef.current,
+                angle0: angleAt(x, y),
+                moved: true,
+              };
+            }
+            return;
+          }
+
+          if (drag.mode === "p") {
+            if (Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3) drag.moved = true;
+            onPan(drag.pan0x + gestureState.dx, drag.pan0y + gestureState.dy);
+            return;
+          }
+
+          const { w, h } = layoutRef.current;
+          const { locationX, locationY } = evt.nativeEvent;
+          const { x, y } = untransformTouch(locationX, locationY, w, h, panRef.current, zoomRef.current);
+          const angle = angleAt(x, y);
+          let delta = angle - drag.angle0;
+          if (delta > 180) delta -= 360;
+          if (delta < -180) delta += 360;
+          if (Math.abs(delta) > 1.2) drag.moved = true;
+          onSpin(drag.spin0 + delta);
+        },
+        onPanResponderRelease: (evt, gestureState) => {
+          const drag = dragRef.current;
+          const wasPinching = pinchingRef.current;
+          dragRef.current = null;
+          pinchRef.current = null;
+          pinchingRef.current = false;
+          if (wasPinching) return;
+          if (drag?.mode === "t") {
+            const refined = pickPlanetAt(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
+            setLineTarget(refined >= 0 ? refined : drag.idx);
+            return;
+          }
+          const moved =
+            Math.hypot(gestureState.dx, gestureState.dy) >= WHEEL_TAP_SLOP_PX ||
+            Boolean(drag?.moved);
+          if (moved) return;
+          pickFromTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
+        },
+        onPanResponderTerminate: () => {
+          dragRef.current = null;
+          pinchRef.current = null;
+          pinchingRef.current = false;
+        },
+      }),
+    [angleAt, onPan, onSpin, onZoom, pickFromTouch, pickPlanetAt],
+  );
 
   const pol = useCallback(
     (L: number, rad: number): [number, number] => {
@@ -340,7 +640,7 @@ function WheelChartImpl({
           key={`hn${i}`}
           d={arcSeg(L0, L1, R.nakIn, R.nakOut)}
           fill="transparent"
-          onPress={svgOnPress(() => onPick({ type: "nak", i }))}
+          pointerEvents="none"
         />,
       );
     }
@@ -352,7 +652,7 @@ function WheelChartImpl({
           key={`hr${i}`}
           d={arcSeg(L0, L1, R.rashiIn, R.rashiOut)}
           fill="transparent"
-          onPress={svgOnPress(() => onPick({ type: "rashi", i }))}
+          pointerEvents="none"
         />,
       );
     }
@@ -375,7 +675,7 @@ function WheelChartImpl({
       : [];
 
     return { nakSegs, nakDecor, rashiSegs, rashiDecor, padaCells, dayTicks, hits, rashiRays, gregLabels };
-  }, [spin, hover, sel, bsYear, tw, pol, arcSeg, onPick]);
+  }, [spin, hover, sel, bsYear, tw, pol, arcSeg]);
 
   const dataLayers = useMemo(() => {
     const sunRashiIdx = Math.floor(normDeg(sunLon) / 30);
@@ -713,10 +1013,6 @@ function WheelChartImpl({
             {g.ne}
           </SvgText>,
         );
-
-        core.push(
-          <Circle key={`hit${i}`} cx={px} cy={py} r={planetR + 7} fill="transparent" onPress={svgOnPress(() => setLineTarget(i))} />,
-        );
       });
 
       core.push(
@@ -754,8 +1050,15 @@ function WheelChartImpl({
         flex: 1,
         transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }],
       }}
+      onLayout={(e) => {
+        layoutRef.current = {
+          w: e.nativeEvent.layout.width,
+          h: e.nativeEvent.layout.height,
+        };
+      }}
+      {...wheelPan.panHandlers}
     >
-      <Svg viewBox="42 42 916 916" width="100%" height="100%">
+      <Svg viewBox="42 42 916 916" width="100%" height="100%" pointerEvents="none">
         <Circle cx={CX} cy={CY} r={R.bsOut} fill="none" stroke={W_RIM} strokeWidth={1.4} />
         {[R.bsIn, R.nakOut, R.nakIn, R.padaIn, R_KAR_I, R.rashiOut, R.rashiIn].map((rad, k) => (
           <Circle key={`rc${k}`} cx={CX} cy={CY} r={rad} fill="none" stroke={W_RIM} strokeWidth={0.8} opacity={0.55} />

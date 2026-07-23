@@ -1,13 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
-  PanResponder,
   Pressable,
   StatusBar,
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -27,8 +26,11 @@ import {
   gClock,
   scrubGToDatetime,
 } from "@/lib/wheel-data";
-import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
+import {
+  computeFullscreenWheelHeight,
+  computeInlineWheelStageSize,
+} from "@/lib/wheel-layout";
 import { WheelChart, type WheelHover, type WheelPick } from "./WheelChart";
 import { WheelPanel } from "./WheelPanel";
 import {
@@ -37,7 +39,6 @@ import {
 } from "@/lib/wheel-classes";
 
 const W_BG = "#061f21";
-const W_STAGE = "#0a2e30";
 const W_ACCENT = "#c62828";
 const W_INK = "#eaf3f1";
 const W_INK_DIM = "rgba(234, 243, 241, 0.65)";
@@ -66,12 +67,12 @@ const headTitleStyle = {
   fontSize: 18,
   fontWeight: "700" as const,
   lineHeight: 24,
-  marginTop: 6,
+  marginTop: 4,
 };
 const headSubStyle = {
   color: W_INK_DIM,
   fontSize: 14,
-  marginTop: 6,
+  marginTop: 4,
 };
 
 function bsMonthEnOf(ne: string): string {
@@ -130,6 +131,7 @@ function WheelDock({
   onToggleFullscreen,
   expanded,
   scrubTrackWidth,
+  bottomInset,
 }: {
   pick: (ne: string, en: string) => string;
   digits: (n: number | string) => string | number;
@@ -144,6 +146,7 @@ function WheelDock({
   onToggleFullscreen: () => void;
   expanded: boolean;
   scrubTrackWidth: number;
+  bottomInset?: number;
 }) {
   return (
     <View
@@ -152,7 +155,7 @@ function WheelDock({
         position: "absolute",
         left: 8,
         right: 8,
-        bottom: 14,
+        bottom: 14 + (bottomInset ?? 0),
         alignItems: "center",
         zIndex: 22,
       }}
@@ -249,30 +252,28 @@ function WheelBody({
   locationLabel,
 }: Omit<Props, "loading" | "p"> & { p: PanchangaDay }) {
   const { pick, digits } = useLocale();
-  const { width: screenW, height: screenH, isTablet } = useBreakpoint();
+  const { width: screenW, height: screenH, isTablet, isLandscape } = useBreakpoint();
+  const insets = useSafeAreaInsets();
   const [containerWidth, setContainerWidth] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const [fullscreenLayout, setFullscreenLayout] = useState({ width: 0, height: 0 });
-  const fallbackWidth = Math.max(screenW - PAGE_HORIZONTAL_PADDING * 2, 280);
-  const inlineStageSize = Math.min(Math.max(containerWidth || fallbackWidth, 280), isTablet ? 1400 : 640);
-  const expandedStageSize =
-    fullscreenLayout.width > 0 && fullscreenLayout.height > 0
-      ? Math.min(fullscreenLayout.width, fullscreenLayout.height)
-      : Math.min(screenW, screenH);
-  const scrubTrackWidth = isTablet ? 168 : Math.min(120, Math.max(88, screenW * 0.22));
+  const inlineStageSize = computeInlineWheelStageSize({
+    containerWidth,
+    screenW,
+    screenH,
+    safeAreaTop: insets.top,
+  });
+  const fullscreenStageHeight = computeFullscreenWheelHeight(screenH);
+  const compactHead = isTablet || isLandscape;
+  const scrubTrackWidth = isTablet ? (isLandscape ? 120 : 168) : Math.min(120, Math.max(88, screenW * 0.22));
   const det = useMemo(() => buildWheelDetail(p), [p]);
   const tz = resolveTimeZone(p?.location?.timezone, timezone);
   const [now, setNow] = useState(() => new Date());
   const [spin, setSpin] = useState(0);
-  const spinRef = useRef(spin);
-  spinRef.current = spin;
   const [scrubPinned, setScrubPinned] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [picked, setPicked] = useState<WheelPick | null>(null);
   const [hover, setHover] = useState<WheelHover | null>(null);
-  const spinStart = useRef({ spin0: 0, angle0: 0 });
-  const wheelSize = useRef({ w: 0, h: 0 });
 
   const nowG = useMemo(() => {
     const mins = minutesSinceMidnightInTimezone(now, tz, true);
@@ -360,10 +361,6 @@ function WheelBody({
   const toggleExpanded = useCallback(() => setExpanded((v) => !v), []);
 
   useEffect(() => {
-    if (!expanded) setFullscreenLayout({ width: 0, height: 0 });
-  }, [expanded]);
-
-  useEffect(() => {
     if (!isToday) return;
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
@@ -390,62 +387,68 @@ function WheelBody({
   const tithiEn = scrubTithi?.name ?? det.tithi2[0]?.en ?? tithiNe;
   const locLabel = locationLabel ?? p.location?.name ?? pick("काठमाडौं", "Kathmandu");
 
-  const rotatePan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2,
-      onPanResponderGrant: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        const { w, h } = wheelSize.current;
-        if (w <= 0 || h <= 0) return;
-        const cx = w / 2;
-        const cy = h / 2;
-        spinStart.current = {
-          spin0: spinRef.current,
-          angle0: (Math.atan2(locationY - cy, locationX - cx) * 180) / Math.PI,
-        };
-      },
-      onPanResponderMove: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        const { w, h } = wheelSize.current;
-        if (w <= 0 || h <= 0) return;
-        const cx = w / 2;
-        const cy = h / 2;
-        const angle = (Math.atan2(locationY - cy, locationX - cx) * 180) / Math.PI;
-        setSpin(spinStart.current.spin0 + (angle - spinStart.current.angle0));
-      },
-    }),
-  ).current;
+  const renderHeader = (fullscreen?: boolean) => {
+    const eyebrow = compactHead
+      ? { ...headEyebrowStyle, fontSize: 10, letterSpacing: 1.2 }
+      : headEyebrowStyle;
+    const title = compactHead
+      ? { ...headTitleStyle, fontSize: fullscreen ? 14 : 15, lineHeight: 19, marginTop: 2 }
+      : headTitleStyle;
+    const sub = compactHead
+      ? { ...headSubStyle, fontSize: 12, marginTop: 2 }
+      : headSubStyle;
+    const top = fullscreen ? insets.top + 6 : compactHead ? 8 : 10;
 
-  const renderHeader = (fullscreen?: boolean) => (
-    <View style={{ paddingHorizontal: fullscreen ? 16 : 16, paddingTop: fullscreen ? 8 : 16, paddingBottom: fullscreen ? 8 : 12 }}>
-      <Text style={headEyebrowStyle}>{pick("पञ्चाङ्ग चक्र", "Nepali Patro · Panchanga Wheel")}</Text>
-      <Text style={headTitleStyle}>
-        {isToday && !scrubPinned ? `${pick("आजको", "Today's")} ` : ""}
-        {pick("ग्रह–नक्षत्र · तिथि–करण चक्र", "Graha–Nakshatra · Tithi–Karana wheel")}{" "}
-        <Text style={{ color: W_ACCENT }}>{digits(bsYear)}</Text>
-      </Text>
-      <Text style={headSubStyle}>
-        {pick(det.weekday.ne, det.weekday.en)}, {pick(bsMonthNe, bsMonthEnOf(bsMonthNe))} {digits(bsDay)} ·{" "}
-        {pick(tithiNe, tithiEn)} · {locLabel}
-      </Text>
-    </View>
-  );
+    return (
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top,
+          left: 16,
+          right: 16,
+          zIndex: 20,
+        }}
+      >
+        {!compactHead ? (
+          <Text style={eyebrow}>{pick("पञ्चाङ्ग चक्र", "Nepali Patro · Panchanga Wheel")}</Text>
+        ) : null}
+        <Text style={title}>
+          {isToday && !scrubPinned ? `${pick("आजको", "Today's")} ` : ""}
+          {pick("ग्रह–नक्षत्र · तिथि–करण चक्र", "Graha–Nakshatra · Tithi–Karana wheel")}{" "}
+          <Text style={{ color: W_ACCENT }}>{digits(bsYear)}</Text>
+        </Text>
+        <Text style={sub} numberOfLines={compactHead ? 1 : 2}>
+          {pick(det.weekday.ne, det.weekday.en)}, {pick(bsMonthNe, bsMonthEnOf(bsMonthNe))} {digits(bsDay)} ·{" "}
+          {pick(tithiNe, tithiEn)} · {locLabel}
+        </Text>
+      </View>
+    );
+  };
 
-  const renderStage = (size: number, fullscreen: boolean) => (
+  const renderStage = (size: number | "fill", fullscreen: boolean) => (
     <View
-      style={{
-        width: size,
-        height: size,
-        alignSelf: "center",
-        overflow: "hidden",
-        backgroundColor: W_STAGE,
-      }}
+      style={
+        size === "fill"
+          ? {
+              width: "100%",
+              height: fullscreenStageHeight,
+              overflow: "hidden",
+              backgroundColor: W_BG,
+            }
+          : {
+              width: "100%",
+              height: size,
+              overflow: "hidden",
+              backgroundColor: W_BG,
+            }
+      }
       onLayout={(e) => {
-        wheelSize.current = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
+        setContainerWidth(e.nativeEvent.layout.width);
       }}
     >
-      <View className="flex-1" {...rotatePan.panHandlers}>
+      {renderHeader(fullscreen)}
+      <View className="flex-1">
         <WheelChart
           det={det}
           markers={markers}
@@ -465,27 +468,41 @@ function WheelBody({
         />
       </View>
 
-      {isTablet || fullscreen ? (
-        <View
-          pointerEvents="none"
-          style={{ position: "absolute", left: 16, bottom: 72, gap: 6, maxWidth: size * 0.45 }}
-        >
-          <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
-            <View className={wheelLegendDot} style={{ backgroundColor: W_ACCENT }} />
-            <Text style={{ fontSize: 13, color: W_INK_DIM }}>
-              {pick("लग्न · वर्तमान नक्षत्र · तिथि", "Lagna · current nakshatra · tithi")}
-            </Text>
-          </View>
-          <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
-            <View className={wheelLegendDot} style={{ backgroundColor: "#f2a81d" }} />
-            <Text style={{ fontSize: 13, color: W_INK_DIM }}>{pick("सूर्य राशि", "Sun sign")}</Text>
-          </View>
-          <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
-            <View className={wheelLegendDot} style={{ backgroundColor: "#d3dce4" }} />
-            <Text style={{ fontSize: 13, color: W_INK_DIM }}>{pick("चन्द्र राशि", "Moon sign")}</Text>
-          </View>
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 16,
+          bottom: fullscreen ? 88 + insets.bottom : 72,
+          gap: 6,
+          maxWidth: size === "fill" ? "45%" : "45%",
+          zIndex: 20,
+        }}
+      >
+        <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
+          <View className={wheelLegendDot} style={{ backgroundColor: W_ACCENT }} />
+          <Text style={{ fontSize: 13, color: W_INK_DIM }}>
+            {pick("लग्न · वर्तमान नक्षत्र · तिथि", "Lagna · current nakshatra · tithi")}
+          </Text>
         </View>
-      ) : null}
+        {!isTablet && !fullscreen ? (
+          <Text style={{ fontSize: 12, color: W_INK_FAINT }}>
+            {pick("घुमाउन तान्नुहोस् · जुम गर्नुहोस्", "Drag to rotate · pinch to zoom")}
+          </Text>
+        ) : null}
+        {isTablet || fullscreen ? (
+          <>
+            <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
+              <View className={wheelLegendDot} style={{ backgroundColor: "#f2a81d" }} />
+              <Text style={{ fontSize: 13, color: W_INK_DIM }}>{pick("सूर्य राशि", "Sun sign")}</Text>
+            </View>
+            <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
+              <View className={wheelLegendDot} style={{ backgroundColor: "#d3dce4" }} />
+              <Text style={{ fontSize: 13, color: W_INK_DIM }}>{pick("चन्द्र राशि", "Moon sign")}</Text>
+            </View>
+          </>
+        ) : null}
+      </View>
 
       <WheelDock
         pick={pick}
@@ -501,29 +518,12 @@ function WheelBody({
         onToggleFullscreen={toggleExpanded}
         expanded={fullscreen}
         scrubTrackWidth={scrubTrackWidth}
+        bottomInset={fullscreen ? insets.bottom : 0}
       />
     </View>
   );
 
-  const wheelShell = (
-    <>
-      {renderHeader()}
-      {renderStage(inlineStageSize, false)}
-      {!isTablet ? (
-        <View className="gap-1.5 px-4 py-3">
-          <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
-            <View className={wheelLegendDot} style={{ backgroundColor: W_ACCENT }} />
-            <Text style={{ fontSize: 13, color: W_INK_DIM }}>
-              {pick("लग्न · वर्तमान नक्षत्र · तिथि", "Lagna · current nakshatra · tithi")}
-            </Text>
-          </View>
-          <Text style={{ fontSize: 13, color: W_INK_FAINT }}>
-            {pick("घुमाउन तान्नुहोस् · जुम गर्नुहोस्", "Drag to rotate · pinch to zoom")}
-          </Text>
-        </View>
-      ) : null}
-    </>
-  );
+  const wheelShell = renderStage(inlineStageSize, false);
 
   return (
     <>
@@ -544,20 +544,9 @@ function WheelBody({
         statusBarTranslucent
         onRequestClose={toggleExpanded}
       >
-        <StatusBar barStyle="light-content" backgroundColor={W_BG} />
+        <StatusBar barStyle="light-content" backgroundColor={W_BG} translucent />
         <View style={{ flex: 1, backgroundColor: W_BG }}>
-          <SafeAreaView style={{ flex: 1 }}>
-            {renderHeader(true)}
-            <View
-              style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-              onLayout={(e) => {
-                const { width, height } = e.nativeEvent.layout;
-                setFullscreenLayout({ width, height });
-              }}
-            >
-              {expandedStageSize > 0 ? renderStage(expandedStageSize, true) : null}
-            </View>
-          </SafeAreaView>
+          {renderStage("fill", true)}
         </View>
       </Modal>
     </>

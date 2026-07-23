@@ -1811,17 +1811,6 @@ export function getInauspiciousWindows(p: PanchangaDay): InauspiciousWindow[] {
   return out;
 }
 
-export interface AuspiciousWindow {
-  key: string;
-  nameNe: string;
-  nameEn: string;
-  start: string;
-  end: string;
-  tillFullNight?: boolean;
-}
-
-export { getAuspiciousWindows } from "@/lib/muhurta-windows";
-
 export function getMuhurtaRows(
   p: PanchangaDay,
   lang?: string,

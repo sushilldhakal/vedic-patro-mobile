@@ -12,6 +12,7 @@ import type { CalendarDay, PanchangaDay } from "@/lib/api";
 import { MONTH_HERO_COLORS } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 type Props = {
   month: number;
@@ -137,7 +138,11 @@ function HeroPill({ label, kind }: { label: string; kind?: "public" | "festival"
       style={{ backgroundColor: bg, borderColor: border }}
       className="rounded-full border px-2.5 py-1.5"
     >
-      <Text style={{ color: text }} className="text-sm font-semibold" numberOfLines={1}>
+      <Text
+        style={{ color: text, ...nepaliTextStyle(14) }}
+        className="text-sm font-semibold"
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </View>

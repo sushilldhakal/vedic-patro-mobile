@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "@/lib/i18n-translations.web";
 import { cn } from "@/lib/utils";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useLocale } from "@/lib/i18n";
 import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
 
@@ -65,7 +66,7 @@ function rowLabel(labelKey?: string, label?: string, t?: (k: string) => string) 
 
 function QuadLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <Text className={cn("pt-0.5 text-xs font-semibold leading-snug md:text-sm", className)}>
+    <Text className={cn("pt-0.5 text-xs font-semibold md:text-sm", className)} style={nepaliTextStyle(12)}>
       {children}
     </Text>
   );
@@ -250,7 +251,9 @@ export function UptoValue({
     >
       <Text className="min-w-0 shrink flex-row flex-wrap items-baseline gap-1">
         {sym ? <Text className="shrink-0 text-sm">{sym}</Text> : null}
-        <Text className="font-semibold">{name}</Text>
+        <Text className="font-semibold" style={nepaliTextStyle(14)}>
+          {name}
+        </Text>
         {badge ? (
           <Text className="rounded-full bg-secondary/15 px-1.5 py-0.5 text-xs font-semibold text-secondary dark:text-accent">
             {badge}

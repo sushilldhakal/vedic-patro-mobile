@@ -23,6 +23,7 @@ import {
   type TimelineRowData,
 } from "@/lib/day-timeline-data";
 import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-time";
+import { nepaliSvgTextCenter, nepaliTextStyle } from "@/lib/nepali-text";
 import { useTheme } from "@/lib/theme-context";
 
 const W = 1000;
@@ -460,7 +461,15 @@ export function DayTimeline({
         const y = trackY(ti);
         return (
           <G key={tr.key}>
-            <SvgText x={8} y={y + BAND / 2 + 4} fill={C.fg} fontSize={11} fontFamily={FONT} fontWeight="700">
+            <SvgText
+              x={8}
+              y={y + BAND / 2 + 4}
+              fill={C.fg}
+              fontSize={11}
+              fontFamily={FONT}
+              fontWeight="700"
+              {...nepaliSvgTextCenter}
+            >
               {tr.ne}
             </SvgText>
             <Line x1={X0} y1={y + BAND} x2={X1} y2={y + BAND} stroke={C.sunLine} strokeWidth={0.8} opacity={0.35} />
@@ -505,6 +514,7 @@ export function DayTimeline({
                         fontSize={10}
                         fontFamily={FONT}
                         textAnchor="middle"
+                        {...nepaliSvgTextCenter}
                       >
                         {segText}
                       </SvgText>
@@ -518,12 +528,21 @@ export function DayTimeline({
                         fontSize={10}
                         fontFamily={FONT}
                         textAnchor="middle"
+                        {...nepaliSvgTextCenter}
                       >
                         {digits(si + 1)}
                       </SvgText>
                     ) : null
                   ) : w >= 20 ? (
-                    <SvgText x={midX} y={labelY} fill={C.fg} fontSize={narrow ? 9 : 10} fontFamily={FONT} textAnchor="middle">
+                    <SvgText
+                      x={midX}
+                      y={labelY}
+                      fill={C.fg}
+                      fontSize={narrow ? 9 : 10}
+                      fontFamily={FONT}
+                      textAnchor="middle"
+                      {...nepaliSvgTextCenter}
+                    >
                       {mainName}
                       {!narrow && paksha ? ` · ${paksha}` : ""}
                     </SvgText>
@@ -721,7 +740,7 @@ export function DayTimeline({
                     }}
                   >
                     <View className="flex-row items-baseline justify-between gap-1.5">
-                      <Text className="shrink-0 text-sm font-bold text-foreground" numberOfLines={1}>
+                      <Text className="shrink-0 text-sm font-bold text-foreground" numberOfLines={1} style={nepaliTextStyle(14)}>
                         {labelL}
                       </Text>
                       <Text className="min-w-0 flex-1 text-right text-sm font-semibold text-foreground" numberOfLines={1}>
@@ -730,7 +749,7 @@ export function DayTimeline({
                     </View>
                     {(nakWithPada || lordText) && (
                       <View className="flex-row items-baseline justify-between gap-1.5">
-                        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
+                        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1} style={nepaliTextStyle(14)}>
                           {nakWithPada}
                         </Text>
                         {lordText ? (
@@ -785,7 +804,9 @@ function PeriodCards({
               >
                 <Text className="text-xs font-bold text-white">{it.n}</Text>
               </View>
-              <Text className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">{it.label}</Text>
+              <Text className="min-w-0 flex-1 text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
+                {it.label}
+              </Text>
             </View>
             <Text className="text-sm font-semibold text-foreground">{it.time}</Text>
           </View>

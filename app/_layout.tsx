@@ -13,7 +13,9 @@ import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* Expo Go / hot reload may not register a native splash view controller. */
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,7 +46,9 @@ export default function RootLayout() {
     if (Platform.OS === "web") {
       window.__hideVedicPatroBootSplash?.();
     }
-    void SplashScreen.hideAsync();
+    void SplashScreen.hideAsync().catch(() => {
+      /* Already hidden or unavailable (common in Expo Go). */
+    });
   }, [loaded]);
 
   return (

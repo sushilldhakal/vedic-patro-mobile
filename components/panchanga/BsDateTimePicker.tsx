@@ -9,6 +9,7 @@ import {
   getBSMonthLength,
 } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
+import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 import { BsNativeSelect } from "@/components/ui/BsNativeSelect";
@@ -63,6 +64,9 @@ export function BsDateTimePicker({
 }: Props) {
   const colors = useThemeColors();
   const { lang, pick, digits } = useLocale();
+  const { isTablet, width: windowWidth } = useBreakpoint();
+  const calendarMaxWidth = Math.min(windowWidth - 32, isTablet ? 320 : 380);
+  const dayRowHeight = isTablet ? 34 : 36;
   const [draft, setDraft] = useState({ year, month, day, clock: clock ?? "" });
   const { year: dYear, month: dMonth, day: dDay } = draft;
 
@@ -135,7 +139,10 @@ export function BsDateTimePicker({
   };
 
   return (
-    <View className="gap-2.5 px-4 pb-4">
+    <View
+      className="gap-2.5 self-center px-4 pb-4"
+      style={{ width: "100%", maxWidth: calendarMaxWidth }}
+    >
       <View className="flex-row items-center gap-1.5">
         <Pressable
           disabled={prevDisabled}
@@ -176,62 +183,79 @@ export function BsDateTimePicker({
         </Pressable>
       </View>
 
-      <View className="flex-row">
-        {weekdays.map((wd, i) => (
-          <View key={wd} className="h-5 flex-1 items-center justify-center">
-            <Text
+      <View className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <View className="flex-row border-b border-border bg-muted/30">
+          {weekdays.map((wd, i) => (
+            <View
+              key={wd}
               className={cn(
-                "text-xs font-semibold uppercase tracking-tight",
-                i === 0 || i === 6 ? "text-destructive/80" : "text-muted-foreground",
+                "h-6 flex-1 items-center justify-center border-r border-border",
+                i === 6 && "border-r-0",
               )}
             >
-              {wd}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <View className="flex-row flex-wrap">
-        {cells.map((d, i) => {
-          if (d == null) {
-            return <View key={`e-${i}`} className="aspect-square w-[14.28%]" />;
-          }
-          const col = i % 7;
-          const isWeekend = col === 0 || col === 6;
-          const isSelected = d === dDay;
-          const isToday =
-            todayBs.year === dYear && todayBs.month === dMonth && todayBs.day === d;
-          return (
-            <Pressable
-              key={`${d}-${i}`}
-              onPress={() => setDraft((prev) => ({ ...prev, day: d }))}
-              accessibilityLabel={digits(d)}
-              accessibilityState={{ selected: isSelected }}
-              className="aspect-square w-[14.28%] items-center justify-center p-0.5"
-            >
-              <View
+              <Text
                 className={cn(
-                  "h-8 w-full items-center justify-center rounded-md",
-                  isSelected && "bg-secondary",
-                  isToday && !isSelected && "border border-secondary",
+                  "text-xs font-semibold uppercase tracking-tight",
+                  i === 0 || i === 6 ? "text-destructive/80" : "text-muted-foreground",
                 )}
               >
-                <Text
+                {wd}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View className="flex-row flex-wrap">
+          {cells.map((d, i) => {
+            if (d == null) {
+              return (
+                <View
+                  key={`e-${i}`}
+                  className="w-[14.28%] border-b border-r border-border bg-muted/10"
+                  style={{ height: dayRowHeight }}
+                />
+              );
+            }
+            const col = i % 7;
+            const isWeekend = col === 0 || col === 6;
+            const isSelected = d === dDay;
+            const isToday =
+              todayBs.year === dYear && todayBs.month === dMonth && todayBs.day === d;
+            return (
+              <Pressable
+                key={`${d}-${i}`}
+                onPress={() => setDraft((prev) => ({ ...prev, day: d }))}
+                accessibilityLabel={digits(d)}
+                accessibilityState={{ selected: isSelected }}
+                className="w-[14.28%] items-center justify-center border-b border-r border-border p-0.5"
+                style={{ height: dayRowHeight }}
+              >
+                <View
                   className={cn(
-                    "font-num text-sm font-semibold",
-                    isSelected
-                      ? "text-secondary-foreground"
-                      : isWeekend
-                        ? "text-destructive"
-                        : "text-foreground",
+                    "w-full items-center justify-center rounded-md",
+                    isTablet ? "h-7" : "h-8",
+                    isSelected && "bg-secondary",
+                    isToday && !isSelected && "border border-secondary",
                   )}
                 >
-                  {digits(d)}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
+                  <Text
+                    className={cn(
+                      "font-num font-semibold",
+                      isTablet ? "text-xs" : "text-sm",
+                      isSelected
+                        ? "text-secondary-foreground"
+                        : isWeekend
+                          ? "text-destructive"
+                          : "text-foreground",
+                    )}
+                  >
+                    {digits(d)}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {showTime && hourAriaLabel && minuteAriaLabel ? (
