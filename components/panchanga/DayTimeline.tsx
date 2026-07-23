@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
+import { ScrollView, View, type LayoutChangeEvent } from "react-native"
+import { Text } from "@/components/ui/Text"
 import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import type { PanchangaDay } from "@/lib/api";
 import { Card } from "@/components/ui/Card";

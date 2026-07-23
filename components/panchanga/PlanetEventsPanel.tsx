@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import { useQuery } from "@tanstack/react-query";
 import { fetchGochar, gocharKeys, type LocationParams } from "@/lib/api";
 import { formatClockNepali } from "@/lib/panchanga-format.web";

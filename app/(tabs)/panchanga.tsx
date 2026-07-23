@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import { useLocalSearchParams } from "expo-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {

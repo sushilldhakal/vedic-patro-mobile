@@ -6,10 +6,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useColorScheme as useSystemColorScheme } from "react-native";
+import { useColorScheme as useSystemColorScheme, View } from "react-native";
 import * as SystemUI from "expo-system-ui";
 import { colorScheme as nativeWindColorScheme } from "nativewind";
 import { darkTheme, lightTheme, type ThemeColors } from "@/lib/theme";
+import { nativeWindThemeVars } from "@/lib/nativewind-theme-vars";
+import { cn } from "@/lib/utils";
 import {
   getStoredThemePreference,
   setStoredThemePreference,
@@ -51,8 +53,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const colors = resolvedTheme === "dark" ? darkTheme : lightTheme;
 
   useEffect(() => {
-    nativeWindColorScheme.set(preference);
-  }, [preference]);
+    nativeWindColorScheme.set(preference === "system" ? "system" : resolvedTheme);
+  }, [preference, resolvedTheme]);
 
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(colors.background);
@@ -76,7 +78,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={value}>
-      {children}
+      <View
+        className={cn("flex-1 bg-background", resolvedTheme === "dark" && "dark")}
+        style={[nativeWindThemeVars(resolvedTheme), { flex: 1 }]}
+      >
+        {children}
+      </View>
     </ThemeContext.Provider>
   );
 }

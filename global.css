@@ -5,10 +5,10 @@
 @layer base {
   :root {
     --tw-background: 248 246 242;
-    --tw-foreground: 0 0 0;
+    --tw-foreground: 26 20 16;
     --tw-card: 255 255 255;
     --tw-muted: 240 235 227;
-    --tw-muted-foreground: 26 20 16;
+    --tw-muted-foreground: 92 74 58;
     --tw-primary: 217 119 6;
     --tw-secondary: 11 86 90;
     --tw-secondary-foreground: 255 255 255;

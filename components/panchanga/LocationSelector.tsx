@@ -1,15 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Keyboard,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Keyboard, Modal, Platform, Pressable, TextInput, View,  } from "react-native"
+import { Text } from "@/components/ui/Text"
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";

@@ -3,11 +3,17 @@ import type { CalendarDay } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { useBreakpoint } from "@/lib/responsive";
+import {
+  CALENDAR_GRID_GAP,
+  calendarColStyle,
+  selectionRingStyle,
+  useCalendarGridWidth,
+} from "./calendar-grid-layout";
 
 const WEEKDAYS_NE = ["आइतवार", "सोमवार", "मंगलवार", "बुधवार", "बिहीवार", "शुक्रवार", "शनिवार"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["आइत", "सोम", "मंगल", "बुध", "बिही", "शुक्र", "शनि"];
-const GRID_GAP = 1;
 
 function chunk<T>(items: T[], size: number): T[][] {
   const rows: T[][] = [];
@@ -38,27 +44,41 @@ export function BsCalendarGrid({
 }: Props) {
   const theme = useThemeColors();
   const { pick, digits, lang } = useLocale();
+  const { isTablet } = useBreakpoint();
+  const { onLayout, colWidth } = useCalendarGridWidth();
+  const col = (extra?: object) => calendarColStyle(colWidth, extra);
+  const metaSize = isTablet ? 12 : 10;
+  const metaTextStyle = lang === "en" ? undefined : nepaliTextStyle(metaSize);
+
   const cells: (CalendarDay | null)[] = [...days];
   while (cells.length % 7 !== 0) cells.push(null);
   const rows = chunk(cells, 7);
+  const weekdayLabels = lang === "en" ? WEEKDAYS_EN : WEEKDAYS_SHORT;
 
   return (
     <View
+      onLayout={onLayout}
       className="overflow-hidden rounded-xl border border-border shadow-sm"
-      style={{ backgroundColor: theme.border, gap: GRID_GAP }}
+      style={{ backgroundColor: theme.border, gap: CALENDAR_GRID_GAP }}
     >
-      <View style={{ flexDirection: "row", gap: GRID_GAP }}>
-        {(lang === "en" ? WEEKDAYS_EN : WEEKDAYS_SHORT).map((label, i) => {
+      <View style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
+        {weekdayLabels.map((label, i) => {
           const weekend = i === 0 || i === 6;
           return (
             <View
               key={label}
-              style={{ flex: 1, minWidth: 0, backgroundColor: theme.surfaceInset }}
+              style={col({ backgroundColor: theme.surfaceInset })}
               className="items-center px-1 py-2 md:py-2"
             >
               <Text
-                className="text-xs font-bold uppercase tracking-wide md:text-sm"
-                style={{ color: weekend && lang !== "en" ? theme.danger : theme.text }}
+                className="font-bold uppercase tracking-wide"
+                style={[
+                  {
+                    color: weekend && lang !== "en" ? theme.danger : theme.text,
+                    fontSize: isTablet ? 14 : 12,
+                  },
+                  lang === "en" ? undefined : nepaliTextStyle(isTablet ? 14 : 12),
+                ]}
               >
                 {label}
               </Text>
@@ -68,7 +88,7 @@ export function BsCalendarGrid({
       </View>
 
       {rows.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: GRID_GAP }}>
+        <View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
           {row.map((day, colIndex) => {
             const cellIndex = rowIndex * 7 + colIndex;
 
@@ -76,21 +96,18 @@ export function BsCalendarGrid({
               return (
                 <View
                   key={`empty-${cellIndex}`}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
+                  style={col({
                     minHeight: 96,
                     backgroundColor: theme.surfaceMuted,
-                  }}
+                  })}
                 />
               );
             }
 
-            const col = colIndex;
             const isOutside = day.outsideMonth === true;
             const isToday = day.date_ad === todayAd;
             const isSelected = day.date_ad === selectedAd && !isToday;
-            const isWeekend = col === 0 || col === 6;
+            const isWeekend = colIndex === 0 || colIndex === 6;
             const isPublicHoliday = !isOutside && publicHolidayDates.has(day.date_ad);
             const hasFestival = !isOutside && day.festivals.length > 0 && !isPublicHoliday;
             const mainFest = day.festivals[0];
@@ -111,30 +128,20 @@ export function BsCalendarGrid({
               <Pressable
                 key={day.date_ad}
                 onPress={() => onSelectDay?.(day)}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
+                style={col({
                   minHeight: 96,
                   backgroundColor: bg,
-                  ...(isSelected
-                    ? {
-                        shadowColor: theme.primary,
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 1,
-                        shadowRadius: 0,
-                        borderWidth: 2,
-                        borderColor: theme.primary,
-                      }
-                    : {}),
-                }}
-                className="p-1 active:opacity-90 md:min-h-[104px] md:p-2"
+                })}
+                className="relative p-1 active:opacity-90 md:min-h-[104px] md:p-2"
               >
+                {isSelected ? <View style={selectionRingStyle(theme.primary)} /> : null}
+
                 <View className="flex-row items-start justify-between gap-1">
                   {tithi ? (
                     <Text
                       numberOfLines={1}
-                      className="min-w-0 flex-1 text-left text-[10px] font-bold md:text-xs"
-                      style={{ color: theme.text, ...nepaliTextStyle(10) }}
+                      className="min-w-0 flex-1 text-left font-bold"
+                      style={{ color: theme.text, fontSize: metaSize, ...metaTextStyle }}
                     >
                       {tithi}
                     </Text>
@@ -144,8 +151,8 @@ export function BsCalendarGrid({
                     <View className="min-w-0 flex-1" />
                   )}
                   <Text
-                    className="font-num-bold shrink-0 text-right text-[10px] font-bold md:text-xs"
-                    style={{ color: theme.text }}
+                    className="font-num-bold shrink-0 text-right font-bold"
+                    style={{ color: theme.text, fontSize: metaSize, lineHeight: metaSize + 2 }}
                   >
                     {digits(fmtAdDay(day.date_ad))}
                   </Text>
@@ -160,8 +167,13 @@ export function BsCalendarGrid({
                     </View>
                   ) : null}
                   <Text
-                    className="font-num-bold text-2xl font-bold leading-none md:text-3xl"
-                    style={{ color: dayColor, opacity: isOutside ? 0.65 : 1 }}
+                    className="font-num-bold font-bold"
+                    style={{
+                      color: dayColor,
+                      opacity: isOutside ? 0.65 : 1,
+                      fontSize: isTablet ? 30 : 24,
+                      lineHeight: isTablet ? 32 : 26,
+                    }}
                   >
                     {digits(day.day)}
                   </Text>
@@ -170,10 +182,11 @@ export function BsCalendarGrid({
                 {mainFest && !isOutside ? (
                   <Text
                     numberOfLines={2}
-                    className="text-center text-[10px] font-bold md:text-xs"
+                    className="text-center font-bold"
                     style={{
                       color: isPublicHoliday ? theme.danger : theme.text,
-                      ...nepaliTextStyle(10),
+                      fontSize: metaSize,
+                      ...metaTextStyle,
                     }}
                   >
                     {mainFest}

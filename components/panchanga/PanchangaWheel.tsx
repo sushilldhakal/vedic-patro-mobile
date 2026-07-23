@@ -1,11 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  StatusBar,
-  Text,
-  View,
-} from "react-native";
+import { Modal, Pressable, StatusBar, View,  } from "react-native"
+import { Text } from "@/components/ui/Text"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";

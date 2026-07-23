@@ -237,21 +237,88 @@ async function get<T>(path: string): Promise<T> {
 export interface CalendarDayAnga {
   name?: string;
   name_ne?: string;
+  end?: string;
+  end_local_time?: string;
+  end_hours_clock?: string;
 }
+
+export interface LunarLayer {
+  name?: string;
+  full_name?: string;
+  is_adhik?: boolean;
+  type?: string;
+  paksha_model?: string;
+  window_start?: string;
+  window_end?: string;
+  solar_name?: string;
+  festival_masa?: string;
+}
+
+export interface PlanetInfo {
+  rashi?: string;
+  rashi_ne?: string;
+  rashi_name?: string;
+  rashi_no?: number;
+  degrees?: number;
+  deg_in_rashi?: number;
+  dms_in_rashi?: string;
+  retrograde?: boolean;
+  is_retrograde?: boolean;
+  longitude?: number;
+  speed?: number;
+  motion?: string;
+}
+
+export type PatroSolarCorrection = {
+  minutes?: number;
+  seconds?: number;
+  sign?: "dhan" | "rin";
+  sign_ne?: string;
+  label_ne?: string;
+  name_ne?: string;
+};
 
 export interface CalendarDayDetail {
   paksha?: string;
   paksha_ne?: string;
+  aayan?: string;
+  aayan_ne?: string;
+  ayana_mark?: "उ" | "द";
   tithi?: CalendarDayAnga;
   nakshatra?: CalendarDayAnga;
   yoga?: CalendarDayAnga;
   karana?: CalendarDayAnga;
+  surya_rashi?: string;
+  surya_rashi_ne?: string;
   chandra_rashi?: string;
   chandra_rashi_ne?: string;
-  udaya_lagna?: Array<{ rashi?: string; rashi_ne?: string; name_en?: string; name_ne?: string }>;
-  lagna_spans?: Array<{ rashi?: string; rashi_ne?: string; name_en?: string; name_ne?: string }>;
-  planets?: Record<string, { rashi?: string; rashi_ne?: string; rashi_no?: number }>;
+  ritu_ne?: string;
+  sun?: { sunrise?: string; sunset?: string; noon?: string };
   moon?: { rise?: string; set?: string };
+  dinamaan?: string;
+  lunar_month?: LunarLayer & { name_ne?: string };
+  udaya_lagna?: Array<{ rashi?: string; rashi_ne?: string; name_en?: string; name_ne?: string }>;
+  lagna_spans?: LagnaSpan[];
+  planets?: Record<string, PlanetInfo>;
+  planets_anchor?: {
+    type?: string;
+    local_time?: string;
+    label_ne?: string;
+    label_en?: string;
+  };
+  solar_corrections?: {
+    belaantar?: PatroSolarCorrection;
+    deshaantar?: PatroSolarCorrection;
+    ishtakaal_note_ne?: string;
+    ishtakaal_note_en?: string;
+    sunrise_includes_corrections?: boolean;
+  };
+  lunar_calendar?: {
+    adhik_maas?: { year_has_adhik?: boolean; name?: string; name_ne?: string };
+    amanta?: LunarLayer;
+    purnimant?: LunarLayer;
+    festival_masa?: string;
+  };
 }
 
 export interface CalendarDay {
@@ -694,6 +761,37 @@ export interface GocharNextEntry {
   entry_time_utc?: string;
 }
 
+export interface GocharIngressEvent {
+  graha: string;
+  graha_ne: string;
+  level: string;
+  to_rashi?: string;
+  to_rashi_ne?: string;
+  from_rashi?: string;
+  from_rashi_ne?: string;
+  to_nakshatra?: string;
+  to_nakshatra_ne?: string;
+  to_pada?: number;
+  to_pada_ne?: string;
+  label_ne?: string;
+  entry_time_local: string;
+  entry_time_local_short?: string;
+  entry_time_utc?: string;
+  entry_date_ad?: string;
+  entry_vedic_date_ad?: string;
+  event?: "udaya" | "asta";
+  hemisphere?: "east" | "west";
+  motion_ne?: string;
+}
+
+export interface GocharIngressResponse {
+  from_date_ad: string;
+  to_date_ad: string;
+  level: string;
+  location?: Record<string, unknown>;
+  events: GocharIngressEvent[];
+}
+
 export interface GocharGraha {
   name_ne: string;
   name_vedic?: string;
@@ -701,6 +799,11 @@ export interface GocharGraha {
   rashi?: string;
   rashi_ne?: string;
   rashi_no?: number;
+  deg_in_rashi?: number;
+  dms_in_rashi?: string;
+  dms_absolute?: string;
+  longitude?: number;
+  speed_deg_day?: number;
   motion?: string;
   is_retrograde?: boolean;
   next_rashi_entry?: GocharNextEntry | null;
@@ -717,10 +820,57 @@ export interface GocharResponse {
 export const gocharKeys = {
   day: (date: string, era: string, location?: LocationParams) =>
     ["gochar", date, era, locationCacheKey(location)] as const,
+  ingress: (
+    from: string,
+    to: string,
+    level: string,
+    location?: LocationParams,
+  ) => ["gochar", "ingress", from, to, level, locationCacheKey(location)] as const,
 };
 
 export const fetchGochar = (date: string, era: "bs" | "ad" = "ad", location?: LocationParams) =>
   get<GocharResponse>(appendLocation(`/nepal/gochar/${date}?era=${era}`, location));
+
+export const fetchGocharIngress = (
+  from: string,
+  to: string,
+  location?: LocationParams,
+  options?: { level?: "pada" | "nakshatra" | "rashi" | "patro" | "udayast"; era?: "bs" | "ad" },
+) => {
+  const params = new URLSearchParams();
+  params.set("from", from);
+  params.set("to", to);
+  params.set("era", options?.era ?? "ad");
+  params.set("level", options?.level ?? "pada");
+  return get<GocharIngressResponse>(
+    appendLocation(`/nepal/gochar/ingress?${params.toString()}`, location),
+  );
+};
+
+export interface SpecialMonthsResponse {
+  bs_year: number;
+  adhik_maas?: {
+    has_adhik_maas?: boolean;
+    month_name?: string;
+    full_name_en?: string;
+    full_name_ne?: string;
+    start_date?: string;
+    end_date?: string;
+    purnima_date?: string;
+    note?: string;
+  };
+  kshaya_maas?: {
+    is_kshaya?: boolean;
+    month_name?: string;
+  };
+}
+
+export const specialMonthsKeys = {
+  year: (year: number) => ["special-months", year] as const,
+};
+
+export const fetchSpecialMonths = (year: number) =>
+  get<SpecialMonthsResponse>(`/nepal/special-months/${year}`);
 
 export const fetchSaitMonthAll = async (
   year: number,

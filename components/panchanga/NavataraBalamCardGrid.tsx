@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import type { BalamCardItem } from "@/lib/balam-cards";
 import { findCurrentBalamCard } from "@/lib/balam-cards";
 import { formatNavataraQuality, formatNavataraTara } from "@/lib/navatara-bala";

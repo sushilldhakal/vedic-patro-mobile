@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import Animated, { useSharedValue } from "react-native-reanimated";
 import Svg, {
   Circle,
   Defs,
@@ -10,10 +11,24 @@ import Svg, {
   Stop,
 } from "react-native-svg";
 import { useLocale } from "@/lib/i18n";
+import {
+  AnimatedG,
+  useOpacityOscillation,
+  useOpacityPulse,
+  usePivotTransform,
+  useReduceMotionEnabled,
+  useScalePulse,
+  useSpin,
+} from "./svg-motion";
 
 export const PAGE_LOADER_SIZE = 120;
 
-const WRAY_PATHS = [
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+/** Center of inner 100×100 artboard — matches web `transform-origin: 50px 50px`. */
+const PIVOT = { x: 50, y: 50 };
+
+const WRAYS = [
   "M49.04 32.03 L50.00 22.00 L50.96 32.03 Z",
   "M58.15 33.95 L64.00 25.75 L59.82 34.92 Z",
   "M65.08 40.18 L74.25 36.00 L66.05 41.85 Z",
@@ -26,7 +41,7 @@ const WRAY_PATHS = [
   "M32.03 50.96 L22.00 50.00 L32.03 49.04 Z",
   "M33.95 41.85 L25.75 36.00 L34.92 40.18 Z",
   "M40.18 34.92 L36.00 25.75 L41.85 33.95 Z",
-];
+] as const;
 
 const DOTS = [
   [50, 10, 3], [60.35, 11.36, 2.83], [70, 15.36, 2.67], [78.28, 21.72, 2.5],
@@ -38,42 +53,99 @@ const DOTS = [
 ] as const;
 
 function LoaderSvg({ size }: { size: number }) {
+  const reduceMotion = useReduceMotionEnabled();
+
+  const wraysRotation = useSharedValue(0);
+  const dotsRotation = useSharedValue(0);
+  const ringRotation = useSharedValue(0);
+  const sunScale = useSharedValue(1);
+  const haloOpacity = useSharedValue(0.4);
+
+  useSpin(wraysRotation, -360, 30_000, reduceMotion);
+  useSpin(dotsRotation, 360, 48_000, reduceMotion);
+  useSpin(ringRotation, -360, 60_000, reduceMotion);
+  useScalePulse(sunScale, 1.05, 1700, reduceMotion);
+  useOpacityOscillation(haloOpacity, 0.85, 0.4, 1700, reduceMotion);
+
+  const wraysProps = usePivotTransform(PIVOT, wraysRotation, null);
+  const dotsProps = usePivotTransform(PIVOT, dotsRotation, null);
+  const ringProps = usePivotTransform(PIVOT, ringRotation, null);
+  const sunProps = usePivotTransform(PIVOT, null, sunScale);
+  const haloProps = useOpacityPulse(haloOpacity);
+
   return (
     <Svg width={size} height={size} viewBox="0 0 512 512">
       <Defs>
-        <LinearGradient id="ldr-g" x1="0" y1="0" x2="1" y2="1">
+        <LinearGradient id="vpl-g" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#f6da8a" />
           <Stop offset="0.5" stopColor="#e6b94d" />
           <Stop offset="1" stopColor="#c79126" />
         </LinearGradient>
-        <RadialGradient id="ldr-sun" cx="38%" cy="34%" r="75%">
+        <RadialGradient id="vpl-sun" cx="0.38" cy="0.34" r="0.75">
           <Stop offset="0" stopColor="#fbe9b6" />
           <Stop offset="0.55" stopColor="#ecc25e" />
           <Stop offset="1" stopColor="#cf9a2c" />
         </RadialGradient>
-        <RadialGradient id="ldr-halo" cx="50%" cy="50%" r="50%">
+        <RadialGradient id="vpl-halo" cx="0.5" cy="0.5" r="0.5">
           <Stop offset="0" stopColor="#ffe6a0" stopOpacity={0.9} />
           <Stop offset="0.55" stopColor="#f4c95e" stopOpacity={0.35} />
           <Stop offset="1" stopColor="#f4c95e" stopOpacity={0} />
         </RadialGradient>
-        <LinearGradient id="ldr-bg" x1="0" y1="0" x2="1" y2="1">
+        <LinearGradient id="vpl-bg" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#0e6a6f" />
           <Stop offset="1" stopColor="#073f43" />
         </LinearGradient>
       </Defs>
-      <Rect width="512" height="512" rx="116" fill="url(#ldr-bg)" />
+
+      <Rect width={512} height={512} rx={116} fill="url(#vpl-bg)" />
+
       <G transform="translate(26, 26) scale(4.6)">
-        <Circle cx="50" cy="50" r="44" fill="none" stroke="url(#ldr-g)" strokeWidth="1.4" opacity={0.5} />
-        <Circle cx="50" cy="50" r="33" fill="none" stroke="url(#ldr-g)" strokeWidth="1.4" opacity={0.5} />
-        {DOTS.map(([cx, cy, r], i) => (
-          <Circle key={i} cx={cx} cy={cy} r={r} fill="url(#ldr-g)" />
-        ))}
-        <Circle cx="50" cy="50" r="24" fill="url(#ldr-halo)" />
-        {WRAY_PATHS.map((d, i) => (
-          <Path key={i} d={d} fill="url(#ldr-g)" />
-        ))}
-        <Circle cx="50" cy="50" r="16" fill="url(#ldr-sun)" />
-        <Circle cx="50" cy="50" r="4.4" fill="#073f43" opacity={0.8} />
+        <AnimatedG animatedProps={ringProps}>
+          <Circle
+            cx={PIVOT.x}
+            cy={PIVOT.y}
+            r={44}
+            fill="none"
+            stroke="url(#vpl-g)"
+            strokeWidth={1.4}
+            opacity={0.5}
+          />
+        </AnimatedG>
+
+        <Circle
+          cx={PIVOT.x}
+          cy={PIVOT.y}
+          r={33}
+          fill="none"
+          stroke="url(#vpl-g)"
+          strokeWidth={1.4}
+          opacity={0.5}
+        />
+
+        <AnimatedG animatedProps={dotsProps}>
+          {DOTS.map(([cx, cy, r], i) => (
+            <Circle key={i} cx={cx} cy={cy} r={r} fill="url(#vpl-g)" />
+          ))}
+        </AnimatedG>
+
+        <AnimatedCircle
+          animatedProps={haloProps}
+          cx={PIVOT.x}
+          cy={PIVOT.y}
+          r={24}
+          fill="url(#vpl-halo)"
+        />
+
+        <AnimatedG animatedProps={wraysProps}>
+          {WRAYS.map((d, i) => (
+            <Path key={i} d={d} fill="url(#vpl-g)" />
+          ))}
+        </AnimatedG>
+
+        <AnimatedG animatedProps={sunProps}>
+          <Circle cx={PIVOT.x} cy={PIVOT.y} r={16} fill="url(#vpl-sun)" />
+          <Circle cx={PIVOT.x} cy={PIVOT.y} r={4.4} fill="#073f43" opacity={0.8} />
+        </AnimatedG>
       </G>
     </Svg>
   );

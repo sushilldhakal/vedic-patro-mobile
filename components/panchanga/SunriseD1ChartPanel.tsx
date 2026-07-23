@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import type { PanchangaDay } from "@/lib/api";
 import { D1Chart } from "@/components/panchanga/D1Chart";
 import { useLocale } from "@/lib/i18n";

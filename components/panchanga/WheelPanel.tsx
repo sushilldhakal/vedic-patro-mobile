@@ -1,4 +1,5 @@
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import {
   bsMonthsForWheel,

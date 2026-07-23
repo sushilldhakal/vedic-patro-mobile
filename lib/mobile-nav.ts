@@ -36,7 +36,14 @@ export function floatingNavBottomPadding(isTablet: boolean): number {
 /** Kundali list + detail share the bottom tab; milan is a stack screen. */
 export const KUNDALI_SIDEBAR_SPLIT = 992;
 
+/** Normalize expo-router pathnames (strip group segments like `/(tabs)`). */
+export function normalizeMobilePathname(pathname: string): string {
+  const normalized = pathname.replace(/\/\([^/]+\)/g, "");
+  return normalized.length > 0 ? normalized : "/";
+}
+
 export function isNavActive(pathname: string, href: string): boolean {
+  pathname = normalizeMobilePathname(pathname);
   if (href === "/") return pathname === "/" || pathname === "/index";
   if (href === "/kundali") {
     return (

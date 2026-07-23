@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import type { PanchangaDay } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n-translations.web";
 import {
@@ -175,7 +176,7 @@ export function SunMoonSamvatSection({ p }: { p: PanchangaDay }) {
         </PanchangaFieldCell>
       </PanchangaTableBody>
       {solar?.ishtakaal_note_ne ? (
-        <Text className="m-0 border-t border-border px-4 py-2 text-sm leading-snug">
+        <Text className="m-0 border-t border-border px-4 py-2 text-sm leading-snug text-muted-foreground">
           {solar.ishtakaal_note_ne}
         </Text>
       ) : null}

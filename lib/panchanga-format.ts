@@ -150,6 +150,56 @@ export function formatPatroDeshaantar(c?: SolarCorrection): string | undefined {
   return `उ ${mm}:${ss}`;
 }
 
+export function formatSolarCorrectionDisplay(
+  c?: SolarCorrection,
+  lang?: string,
+): string | undefined {
+  if (!c || c.minutes == null || c.seconds == null) return undefined;
+  const prefix = c.sign === "rin" ? "-" : "+";
+  const ss = String(c.seconds).padStart(2, "0");
+  if (normalizeLang(lang) === "en") {
+    return `${prefix}${c.minutes} min ${ss} sec`;
+  }
+  const body = `${prefix}${c.minutes} मि ${ss} से`;
+  const signNe = c.sign_ne ? ` (${c.sign_ne})` : "";
+  return `${toNepaliDigits(body)}${signNe}`;
+}
+
+/** BS date from YYYY-MM-DD (BS era), e.g. जेठ १५, वि.सं. २०८२. */
+export function formatBsIsoDateNepali(
+  bsIso?: string | null,
+  opts?: { includeYear?: boolean; lang?: string },
+): string | undefined {
+  if (!bsIso) return undefined;
+  const [ys, ms, ds] = bsIso.split("-");
+  const year = Number(ys);
+  const month = Number(ms);
+  const day = Number(ds);
+  if (!month || !day) return undefined;
+  const isEn = normalizeLang(opts?.lang) === "en";
+  const months = isEn ? BS_MONTH_NAMES : BS_MONTHS_NE;
+  const era = isEn ? "BS" : "वि.सं.";
+  const label = `${months[month - 1]} ${formatLocaleDigits(day, opts?.lang)}`;
+  if (opts?.includeYear === false || !year) return label;
+  return `${label}, ${era} ${formatLocaleDigits(year, opts?.lang)}`;
+}
+
+export function formatVedicPatroTime(
+  timeShort?: string | null,
+  sunriseShort?: string | null,
+): string | undefined {
+  const t = formatTimeShort(timeShort);
+  if (!t) return undefined;
+  const sunrise = formatTimeShort(sunriseShort);
+  if (!sunrise) return toNepaliDigits(t);
+  const [th, tm] = t.split(":").map(Number);
+  const [sh] = sunrise.split(":").map(Number);
+  if (th != null && tm != null && sh != null && th < sh) {
+    return toNepaliDigits(`${String(th + 24).padStart(2, "0")}:${String(tm).padStart(2, "0")}`);
+  }
+  return toNepaliDigits(t);
+}
+
 export function getPanchangaDetail(p: PanchangaDay) {
   return p.detail;
 }
@@ -361,7 +411,7 @@ export function longitudeToDegreeCells(longitude: number): string {
   return [d, m, sec].map((n) => toNepaliDigits(n)).join("|");
 }
 
-function dmsInRashiToDegreeCells(dms: string): string | undefined {
+export function dmsInRashiToDegreeCells(dms: string): string | undefined {
   const match = dms.match(/(\d+)°(\d+)'(\d+)"/);
   if (!match) return undefined;
   return [match[1], match[2], match[3]].map((n) => toNepaliDigits(Number(n))).join("|");
@@ -664,6 +714,11 @@ export function formatRashiDisplayNe(nameNe?: string): string | undefined {
 export function rashiNeFromNumber(rashi?: number): string | undefined {
   if (rashi == null || rashi < 1 || rashi > 12) return undefined;
   return RASHI_NE_LIST[rashi - 1];
+}
+
+export function rashiSymFromNumber(rashi?: number): string | undefined {
+  if (rashi == null || rashi < 1 || rashi > 12) return undefined;
+  return RASHI_SYM[rashi - 1];
 }
 
 export function getLagnaSpans(p: PanchangaDay) {

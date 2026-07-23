@@ -1,6 +1,15 @@
 export const APP_NAME_NE = "वैदिक पात्रो";
 export const APP_NAME_EN = "Vedic Patro";
 
+/** Hex (#rrggbb) → rgba for native styles where Tailwind opacity modifiers are unreliable. */
+export function colorWithAlpha(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "");
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export type ThemeColors = {
   background: string;
   foreground: string;
@@ -30,7 +39,7 @@ export type ThemeColors = {
 export const lightTheme: ThemeColors = {
   background: "#f8f6f2",
   foreground: "#1a1410",
-  text: "#000000",
+  text: "#1a1410",
   textMuted: "#1a1410",
   card: "#ffffff",
   muted: "#f0ebe3",

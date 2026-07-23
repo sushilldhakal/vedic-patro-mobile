@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/Text";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
@@ -7,15 +8,16 @@ import * as Facebook from "expo-auth-session/providers/facebook";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import {
+  getGoogleClientIds,
+  googleSignInSetupMessage,
+  isGoogleSignInConfiguredForPlatform,
+} from "@/lib/auth/google-oauth";
+import {
   facebookAppId,
   facebookSignInEnabled,
-  googleAndroidClientId,
-  googleIosClientId,
   googleSignInEnabled,
-  googleWebClientId,
 } from "@/lib/auth/oauth-config";
 
-// Finishes the OAuth redirect when the app is reopened from the browser.
 WebBrowser.maybeCompleteAuthSession();
 
 type Props = {
@@ -25,29 +27,28 @@ type Props = {
   disabled?: boolean;
 };
 
-/**
- * Google + Facebook sign-in — the mobile equivalent of the web social buttons.
- * Uses expo-auth-session so it works on iOS, Android and web without a native
- * SDK, and hands the API the exact same tokens the web flow does
- * (Google ID token → /auth/google, Facebook access token → /auth/facebook).
- */
 export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }: Props) {
   const colors = useThemeColors();
   const { pick } = useLocale();
   const [busy, setBusy] = useState<"google" | "facebook" | null>(null);
 
-  // Hooks must run unconditionally; an unset client id yields a null request,
-  // which disables that button.
+  const googleClientIds = getGoogleClientIds();
+  const googleConfigured = isGoogleSignInConfiguredForPlatform();
+
   const [googleRequest, googleResponse, googlePrompt] = Google.useIdTokenAuthRequest({
-    clientId: googleWebClientId,
-    iosClientId: googleIosClientId,
-    androidClientId: googleAndroidClientId,
+    ...googleClientIds,
   });
 
   const [fbRequest, fbResponse, fbPrompt] = Facebook.useAuthRequest({
     clientId: facebookAppId ?? "",
     scopes: ["public_profile", "email"],
   });
+
+  useEffect(() => {
+    if (!__DEV__ || !googleSignInEnabled) return;
+    console.info("[Google OAuth] redirect URI:", googleClientIds.redirectUri);
+    console.info("[Google OAuth] platform:", Platform.OS);
+  }, [googleClientIds.redirectUri]);
 
   useEffect(() => {
     if (!googleResponse) return;
@@ -57,7 +58,12 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
       if (idToken) onGoogle(idToken);
       else onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
     } else if (googleResponse.type === "error") {
-      onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
+      const err = googleResponse.error?.message ?? "";
+      if (/redirect_uri_mismatch/i.test(err)) {
+        onError?.(googleSignInSetupMessage());
+      } else {
+        onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
+      }
     }
     if (googleResponse.type !== "success") setBusy(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,17 +83,26 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fbResponse]);
 
-  if (!googleSignInEnabled && !facebookSignInEnabled) return null;
+  const showGoogle = googleSignInEnabled && googleConfigured;
+  const showGoogleSetupHint = googleSignInEnabled && !googleConfigured;
+
+  if (!showGoogle && !showGoogleSetupHint && !facebookSignInEnabled) return null;
 
   return (
     <View className="gap-3">
-      {googleSignInEnabled ? (
+      {showGoogleSetupHint ? (
+        <Text className="text-xs leading-relaxed text-muted-foreground">
+          {googleSignInSetupMessage()}
+        </Text>
+      ) : null}
+
+      {showGoogle ? (
         <Pressable
           disabled={disabled || !googleRequest || busy !== null}
           onPress={() => {
             setBusy("google");
             googlePrompt().catch(() => {
-              onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
+              onError?.(googleSignInSetupMessage());
               setBusy(null);
             });
           }}
@@ -129,12 +144,13 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
         </Pressable>
       ) : null}
 
-      {/* divider */}
-      <View className="flex-row items-center gap-3 py-0.5">
-        <View className="h-px flex-1" style={{ backgroundColor: colors.border }} />
-        <Text className="text-xs text-muted-foreground">{pick("वा", "or")}</Text>
-        <View className="h-px flex-1" style={{ backgroundColor: colors.border }} />
-      </View>
+      {showGoogle || facebookSignInEnabled ? (
+        <View className="flex-row items-center gap-3 py-0.5">
+          <View className="h-px flex-1" style={{ backgroundColor: colors.border }} />
+          <Text className="text-xs text-muted-foreground">{pick("वा", "or")}</Text>
+          <View className="h-px flex-1" style={{ backgroundColor: colors.border }} />
+        </View>
+      ) : null}
     </View>
   );
 }

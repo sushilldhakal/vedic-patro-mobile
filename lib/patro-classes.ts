@@ -107,7 +107,7 @@ export const patroMonthRangeCompactBtn =
 
 export function patroSegBtn(active: boolean) {
   return cn(
-    "h-[26px] cursor-pointer rounded-[calc(var(--radius-lg)-2px)] border-none px-3 text-xs font-semibold transition-colors",
+    "min-h-[30px] items-center justify-center rounded-md border-none px-3 py-1 text-xs font-semibold transition-colors",
     active
       ? "bg-secondary text-secondary-foreground"
       : "bg-transparent",

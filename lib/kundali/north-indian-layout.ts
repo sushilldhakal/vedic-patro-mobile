@@ -2,6 +2,22 @@
 
 export type Point = [number, number];
 
+/** Gochar chart: map sidereal rashi (1–12) to North-Indian house polygon. */
+export const GOCHAR_RASHI_TO_HOUSE: Record<number, number> = {
+  1: 11,
+  2: 12,
+  3: 1,
+  4: 2,
+  5: 3,
+  6: 4,
+  7: 5,
+  8: 6,
+  9: 7,
+  10: 8,
+  11: 9,
+  12: 10,
+};
+
 export const NI_HOUSE_POLYGONS: Record<number, Point[]> = {
   1: [[150, 0], [225, 75], [150, 150], [75, 75]],
   2: [[0, 0], [150, 0], [75, 75]],

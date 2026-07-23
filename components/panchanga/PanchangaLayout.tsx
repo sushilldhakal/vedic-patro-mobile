@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native"
+import { Text } from "@/components/ui/Text"
 import { useTranslation } from "@/lib/i18n-translations.web";
 import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -55,7 +56,7 @@ export function PanchangaSection({
       )}
     >
       <View className="flex flex-row items-baseline justify-center gap-2.5 border-b border-border bg-secondary/[0.09] px-3 py-2 dark:bg-secondary/20">
-        <Text className="m-0 text-sm font-bold">{title}</Text>
+        <Text className="m-0 text-sm font-bold text-foreground">{title}</Text>
       </View>
       {children}
     </View>
@@ -378,7 +379,7 @@ export function UptoValue({
       )}
     >
       <Text className="min-w-0 shrink flex-row flex-wrap items-baseline gap-1">
-        {sym ? <Text className="shrink-0 text-sm">{sym}</Text> : null}
+        {sym ? <Text className="shrink-0 text-sm text-foreground">{sym}</Text> : null}
         <Text className="font-semibold" style={nepaliTextStyle(14)}>
           {name}
         </Text>
@@ -409,7 +410,7 @@ export function TimingRange({
   const { t } = useTranslation();
   if (!start || !end) {
     return (
-      <Text className="text-xs">
+      <Text className="text-xs text-muted-foreground">
         {t("sections.dash")} {t("sections.not_available")}
       </Text>
     );
@@ -465,7 +466,7 @@ export function DenseListRow({
       )}
     >
       <View className="flex-row items-baseline justify-between gap-x-2">
-        <Text className="min-w-0 flex-1">{label}</Text>
+        <Text className="min-w-0 flex-1 text-foreground">{label}</Text>
         <Text className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground md:text-sm">
           {time ?? "—"}
         </Text>
@@ -489,7 +490,7 @@ export function PanchangaSubBlock({
 }) {
   return (
     <View className={cn("border-b border-border px-3 py-1.5 last:border-b-0", className)}>
-      <Text className="m-0 mb-1 text-xs font-semibold md:text-sm">{title}</Text>
+      <Text className="m-0 mb-1 text-xs font-semibold text-foreground md:text-sm">{title}</Text>
       {children}
     </View>
   );
@@ -511,8 +512,8 @@ export function PairedTimingTable({
   return (
     <View>
       <View className="flex-row border-b border-border bg-secondary/10 px-2 py-1">
-        <Text className="min-w-0 flex-1 text-xs font-semibold md:text-sm">{leftTitle}</Text>
-        <Text className="min-w-0 flex-1 border-l border-border/60 pl-2 text-xs font-semibold md:text-sm">
+        <Text className="min-w-0 flex-1 text-xs font-semibold text-foreground md:text-sm">{leftTitle}</Text>
+        <Text className="min-w-0 flex-1 border-l border-border/60 pl-2 text-xs font-semibold text-foreground md:text-sm">
           {rightTitle}
         </Text>
       </View>
@@ -560,7 +561,7 @@ function PairedTimingCell({
       <View className="flex-row items-start justify-between gap-1">
         <Text
           className={cn(
-            "min-w-0 flex-1 text-sm leading-snug",
+            "min-w-0 flex-1 text-sm leading-snug text-foreground",
             highlight && "font-semibold text-success",
           )}
           numberOfLines={2}

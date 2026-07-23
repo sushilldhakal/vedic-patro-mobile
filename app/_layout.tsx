@@ -53,7 +53,7 @@ export default function RootLayout() {
   }, [loaded]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }} className="flex-1">
+    <GestureHandlerRootView style={{ flex: 1 }} className="flex-1 bg-background">
       <SafeAreaProvider>
         <ThemeProvider>
           <LocaleProvider>
