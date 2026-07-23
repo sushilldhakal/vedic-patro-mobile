@@ -254,10 +254,10 @@ export default function PanchangaScreen() {
           <View className="gap-3">
             <SunMoonSamvatSection p={data} />
             <PanchangCoreSection p={data} />
-            <RashiSection p={data} />
+            <RashiSection p={wheelData ?? data} />
             <RituSection p={data} />
-            <BalamSection p={data} />
-            <PanchakaLagnaSection p={data} />
+            <BalamSection p={wheelData ?? data} clock={clock} />
+            <PanchakaLagnaSection p={wheelData ?? data} clock={clock} />
             <NivasShoolSection p={data} fallback={wheelData} />
             <MuhurtaTimingsSection p={data} />
             <DinVisheshSection p={data} />

@@ -696,6 +696,14 @@ export function getVaaraNe(p: PanchangaDay, fallback?: string): string | undefin
   );
 }
 
+export function getVaaraEn(p: PanchangaDay, fallback?: string): string | undefined {
+  const detail = getPanchangaDetail(p);
+  return (
+    (detail?.vaara as { name_english?: string } | undefined)?.name_english ??
+    fallback
+  );
+}
+
 export function formatBsTitle(p: PanchangaDay, fallbackDay?: number, fallbackMonth?: number, fallbackYear?: number): string {
   const detail = getPanchangaDetail(p);
   const bs = (detail?.bs_date ?? p.bs_date) as { year?: number; month?: number; day?: number; month_name?: string } | undefined;

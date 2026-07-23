@@ -4,16 +4,11 @@ import { useTranslation } from "@/lib/i18n-translations.web";
 import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useLocale } from "@/lib/i18n";
-import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
+import { patroNavataraToneBg } from "@/lib/patro-classes";
 
 /** Paired label|value columns — always on native (phones fit compact 2×2 rows). */
 export function usePanchangaLayoutWide(): boolean {
   return true;
-}
-
-function useQuadLabelWidth(): string {
-  const { width } = useBreakpoint();
-  return width >= BREAKPOINTS.md ? "w-[4.75rem]" : "w-[3.25rem]";
 }
 
 export function SectionSplitPanel({ left, right }: { left: ReactNode; right: ReactNode }) {
@@ -51,7 +46,7 @@ export function PanchangaSection({
         className,
       )}
     >
-      <View className="flex items-baseline gap-2.5 border-b border-border bg-secondary/[0.09] px-3 py-2 dark:bg-secondary/20">
+      <View className="flex flex-row items-baseline justify-center gap-2.5 border-b border-border bg-secondary/[0.09] px-3 py-2 dark:bg-secondary/20">
         <Text className="m-0 text-sm font-bold">{title}</Text>
       </View>
       {children}
@@ -72,11 +67,20 @@ function QuadLabel({ children, className }: { children: React.ReactNode; classNa
   );
 }
 
-function QuadValue({ children, className }: { children: React.ReactNode; className?: string }) {
+function QuadValue({
+  children,
+  className,
+  nowrap,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  nowrap?: boolean;
+}) {
   return (
     <View
       className={cn(
-        "min-w-0 flex flex-row flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm leading-snug",
+        "min-w-0 flex flex-row items-baseline gap-x-1.5 gap-y-0.5 text-sm leading-snug",
+        nowrap ? "flex-nowrap" : "flex-wrap",
         className,
       )}
     >
@@ -85,31 +89,162 @@ function QuadValue({ children, className }: { children: React.ReactNode; classNa
   );
 }
 
-/** One table band: label|value on the left, optional label|value on the right. */
-function QuadPair({
-  labelKey,
-  label,
+/** Flex wrap — content-sized cards, multiple per row, each row centered. */
+export const panchangaCardGrid =
+  "flex w-full flex-row flex-wrap justify-center gap-2 p-4";
+
+/** Content-sized card; width follows label + value, never stretches. */
+export const panchangaCardBase =
+  "shrink-0 grow-0 flex-col gap-1 self-start rounded-xl border border-border/80 bg-background/60 px-3.5 py-2.5 shadow-[0_1px_2px_color-mix(in_srgb,var(--foreground)_6%,transparent)]";
+
+/** Full-width subgroup label inside a card grid (forces a new row). */
+export function PanchangaGroupLabel({
   children,
-  t,
-  labelWidth,
-  bordered,
+  className,
 }: {
-  labelKey?: string;
-  label?: string;
   children: React.ReactNode;
-  t: (key: string) => string;
-  labelWidth: string;
-  bordered?: boolean;
+  className?: string;
+}) {
+  return (
+    <Text
+      className={cn(
+        "m-0 w-full basis-full pt-1 text-center text-sm font-semibold text-muted-foreground first:pt-0",
+        className,
+      )}
+      style={nepaliTextStyle(14)}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** Navatara balam card: name + time on top, tara/quality below, tone background. */
+export function PanchangaBalamCard({
+  titleLine,
+  subtitleLine,
+  tone = "neutral",
+  isCurrent,
+  className,
+}: {
+  titleLine: React.ReactNode;
+  subtitleLine?: React.ReactNode;
+  tone?: "best" | "good" | "neutral" | "bad" | "worst";
+  isCurrent?: boolean;
+  className?: string;
 }) {
   return (
     <View
       className={cn(
-        "min-w-0 flex-1 flex-row items-start gap-x-2",
-        bordered && "border-l border-border/70 pl-2",
+        panchangaCardBase,
+        "min-w-[8.5rem] gap-1 border-transparent",
+        patroNavataraToneBg(tone),
+        isCurrent &&
+          "shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_65%,transparent)] ring-2 ring-accent/80",
+        className,
       )}
     >
-      <QuadLabel className={cn(labelWidth, "shrink-0")}>{rowLabel(labelKey, label, t)}</QuadLabel>
-      <QuadValue className="min-w-0 flex-1">{children}</QuadValue>
+      <Text className="text-sm font-bold leading-snug text-foreground">{titleLine}</Text>
+      {subtitleLine ? (
+        <Text className="text-xs font-semibold leading-snug text-muted-foreground">{subtitleLine}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** Udaya lagna card: rashi + time on top, optional pushkara line below. */
+export function PanchangaLagnaCard({
+  titleLine,
+  footerLine,
+  isCurrent,
+  className,
+}: {
+  titleLine: React.ReactNode;
+  footerLine?: React.ReactNode;
+  isCurrent?: boolean;
+  className?: string;
+}) {
+  return (
+    <View
+      className={cn(
+        panchangaCardBase,
+        "min-w-[8.5rem] gap-1",
+        patroNavataraToneBg("neutral"),
+        isCurrent &&
+          "shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_65%,transparent)] ring-2 ring-accent/80",
+        className,
+      )}
+    >
+      <Text className="text-sm font-bold leading-snug text-foreground">{titleLine}</Text>
+      {footerLine ? (
+        <Text className="text-xs font-semibold leading-snug text-muted-foreground">{footerLine}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** Compact label + time card for muhurta / panchaka / lagna rows. */
+export function PanchangaTimingCard({
+  label,
+  time,
+  note,
+  highlight,
+  className,
+}: {
+  label: React.ReactNode;
+  time?: React.ReactNode;
+  note?: React.ReactNode;
+  highlight?: boolean;
+  className?: string;
+}) {
+  return (
+    <View
+      className={cn(
+        panchangaCardBase,
+        "gap-1.5",
+        highlight && "border-success/45 bg-success/[0.06]",
+        className,
+      )}
+    >
+      <Text
+        className={cn(
+          "text-sm font-semibold",
+          highlight ? "text-success" : "text-muted-foreground",
+        )}
+      >
+        {label}
+      </Text>
+      {time ? (
+        <Text className="font-mono text-sm font-semibold tabular-nums text-foreground">{time}</Text>
+      ) : null}
+      {note ? (
+        <Text className="text-xs font-mono text-muted-foreground">{note}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** Single label|value card inside a PanchangaTableBody grid. */
+export function PanchangaFieldCell({
+  labelKey,
+  label,
+  children,
+  className,
+  nowrap,
+}: {
+  labelKey?: string;
+  label?: string;
+  children: React.ReactNode;
+  className?: string;
+  nowrap?: boolean;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <View className={cn(panchangaCardBase, className)}>
+      <QuadLabel className="shrink-0 text-muted-foreground">
+        {rowLabel(labelKey, label, t)}
+      </QuadLabel>
+      <QuadValue nowrap={nowrap}>{children}</QuadValue>
     </View>
   );
 }
@@ -123,33 +258,22 @@ export function PanchangaQuadRow({
   right?: { labelKey?: string; label?: string; children: React.ReactNode };
   className?: string;
 }) {
-  const { t } = useTranslation();
-  const labelWidth = useQuadLabelWidth();
-
   return (
-    <View
-      className={cn(
-        "flex-row items-start gap-x-2 border-b border-border px-3 py-1.5",
-        className,
-      )}
-    >
-      <QuadPair labelKey={left.labelKey} label={left.label} t={t} labelWidth={labelWidth}>
+    <>
+      <PanchangaFieldCell
+        labelKey={left.labelKey}
+        label={left.label}
+        className={className}
+        nowrap
+      >
         {left.children}
-      </QuadPair>
+      </PanchangaFieldCell>
       {right ? (
-        <QuadPair
-          labelKey={right.labelKey}
-          label={right.label}
-          t={t}
-          labelWidth={labelWidth}
-          bordered
-        >
+        <PanchangaFieldCell labelKey={right.labelKey} label={right.label} nowrap>
           {right.children}
-        </QuadPair>
-      ) : (
-        <View className="min-w-0 flex-1 border-l border-border/70 pl-2" />
-      )}
-    </View>
+        </PanchangaFieldCell>
+      ) : null}
+    </>
   );
 }
 
@@ -165,19 +289,10 @@ export function PanchangaFullRow({
   children: React.ReactNode;
   className?: string;
 }) {
-  const { t } = useTranslation();
-  const labelWidth = useQuadLabelWidth();
-
   return (
-    <View
-      className={cn(
-        "flex-row items-start gap-x-2 border-b border-border px-3 py-1.5",
-        className,
-      )}
-    >
-      <QuadLabel className={cn(labelWidth, "shrink-0")}>{rowLabel(labelKey, label, t)}</QuadLabel>
-      <QuadValue className="min-w-0 flex-1">{children}</QuadValue>
-    </View>
+    <PanchangaFieldCell labelKey={labelKey} label={label} className={className}>
+      {children}
+    </PanchangaFieldCell>
   );
 }
 
@@ -188,11 +303,7 @@ export function PanchangaTableBody({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <View className={cn("[&>*:last-child]:border-b-0", className)}>
-      {children}
-    </View>
-  );
+  return <View className={cn(panchangaCardGrid, className)}>{children}</View>;
 }
 
 /** @deprecated use PanchangaQuadRow */
