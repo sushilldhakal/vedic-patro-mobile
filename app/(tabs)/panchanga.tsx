@@ -25,7 +25,6 @@ import { EphemerisModeBanner } from "@/components/panchanga/MuhurtaNowPanel";
 import {
   DinVisheshSection,
   FestivalsSection,
-  MuhurtaTimingsSection,
   NivasShoolSection,
   PanchangCoreSection,
   BalamSection,
@@ -219,9 +218,7 @@ export default function PanchangaScreen() {
             sunrise={sunrise}
             sunset={sunset}
             timezone={effectiveTimezone}
-            ephemeris={ephemeris}
-            data={data}
-            clock={clock}
+            chartData={data}
             chartAd={chartAd}
             location={location.params}
           />
@@ -259,7 +256,6 @@ export default function PanchangaScreen() {
             <BalamSection p={wheelData ?? data} clock={clock} />
             <PanchakaLagnaSection p={wheelData ?? data} clock={clock} />
             <NivasShoolSection p={data} fallback={wheelData} />
-            <MuhurtaTimingsSection p={data} />
             <DinVisheshSection p={data} />
             <FestivalsSection p={data} />
           </View>

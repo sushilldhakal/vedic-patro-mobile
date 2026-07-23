@@ -232,6 +232,7 @@ export interface DayTimelineData {
   badChoghadiya: ChoghadiyaSegment[];
   hora: HoraSegment[];
   ashubha: AshubhaSegment[];
+  ashubhaAll: AshubhaSegment[];
   shubha: ShubhaSegment[];
 }
 
@@ -347,6 +348,28 @@ const SHUDDHI_DOSHAS: Record<string, { ne: string; en: string }> = {
   bhadra: { ne: "करण", en: "Karana" },
 };
 
+function windowToSpan(
+  w: ReturnType<typeof getInauspiciousWindows>[number],
+  toG: (minutes: number) => number,
+): { startG: number; endG: number } | null {
+  const sMin = clockToMinutes(w.start);
+  if (sMin == null) return null;
+  const startG = toG(sMin);
+  if (startG < 0 || startG > 60) return null;
+  let endG: number;
+  if (w.tillFullNight) {
+    endG = 60;
+  } else {
+    const eMin = clockToMinutes(w.end);
+    if (eMin == null) return null;
+    endG = toG(eMin);
+    if (endG < startG) endG = 60;
+  }
+  endG = Math.min(endG, 60);
+  if (endG <= startG) return null;
+  return { startG, endG };
+}
+
 /**
  * Convert raw inauspicious windows (local clock ranges) into ashubha segments on
  * the shared 0–60 axis. `toG` maps minutes-from-midnight to a ghati position
@@ -435,6 +458,27 @@ function buildAshubhaSegments(
     startG: m.s,
     endG: m.e,
   }));
+}
+
+function buildAshubhaAllSegments(
+  windows: ReturnType<typeof getInauspiciousWindows>,
+  toG: (minutes: number) => number,
+): AshubhaSegment[] {
+  const segs: AshubhaSegment[] = [];
+  for (const w of windows) {
+    const span = windowToSpan(w, toG);
+    if (!span) continue;
+    segs.push({
+      name: w.nameNe,
+      nameEn: w.nameEn,
+      detailNe: w.nameNe,
+      detailEn: w.nameEn,
+      startG: span.startG,
+      endG: span.endG,
+    });
+  }
+  segs.sort((a, b) => a.startG - b.startG);
+  return segs;
 }
 
 function buildShubhaSegments(
@@ -691,7 +735,11 @@ export function buildDayTimelineData(p: PanchangaDay, _dateAd?: string): DayTime
   // Both choghadiya and hora come pre-computed from the API daily payload.
   const cho = apiChoghadiya?.length ? buildChoghadiyaFromApi(apiChoghadiya) : [];
   const hora = buildHoraTimelineSegments(p);
-  const ashubha = buildAshubhaSegments(getInauspiciousWindows(p), (min) =>
+  const inauspiciousWindows = getInauspiciousWindows(p);
+  const ashubha = buildAshubhaSegments(inauspiciousWindows, (min) =>
+    minutesToGhati(min, sunriseMin),
+  );
+  const ashubhaAll = buildAshubhaAllSegments(inauspiciousWindows, (min) =>
     minutesToGhati(min, sunriseMin),
   );
   const shubha = buildShubhaSegments(getAuspiciousWindows(p), (min) =>
@@ -776,6 +824,7 @@ export function buildDayTimelineData(p: PanchangaDay, _dateAd?: string): DayTime
     badChoghadiya: cho.filter((c) => c.bad),
     hora,
     ashubha,
+    ashubhaAll,
     shubha,
   };
 }
@@ -859,6 +908,9 @@ export function buildCivilTimelineData(
   const ashubha = p
     ? buildAshubhaSegments(getInauspiciousWindows(p), (min) => minToG(min))
     : [];
+  const ashubhaAll = p
+    ? buildAshubhaAllSegments(getInauspiciousWindows(p), (min) => minToG(min))
+    : [];
   const shubha = p
     ? buildShubhaSegments(getAuspiciousWindows(p), (min) => minToG(min))
     : [];
@@ -908,6 +960,7 @@ export function buildCivilTimelineData(
     badChoghadiya: choghadiya.filter((c) => c.bad),
     hora,
     ashubha,
+    ashubhaAll,
     shubha,
   };
 }

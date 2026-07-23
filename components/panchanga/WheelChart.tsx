@@ -27,7 +27,7 @@ import {
   type WheelTweaks,
   WHEEL_RASHIS,
 } from "@/lib/wheel-data";
-import { KARANA_SEQ, karanaColor, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
+import { KARANA_SEQ, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
 import { nepaliSvgTextCenter } from "@/lib/nepali-text";
 
 const DEG = Math.PI / 180;
@@ -146,6 +146,88 @@ function clampZoom(z: number): number {
   return Math.max(0.55, Math.min(14, z));
 }
 
+type LayoutMetrics = { w: number; h: number; pageX: number; pageY: number };
+
+function touchInView(
+  pageX: number,
+  pageY: number,
+  layout: LayoutMetrics,
+): { x: number; y: number } {
+  return { x: pageX - layout.pageX, y: pageY - layout.pageY };
+}
+
+type PinchGesture = {
+  dist0: number;
+  zoom0: number;
+  pan0x: number;
+  pan0y: number;
+  focalX: number;
+  focalY: number;
+  centroid0x: number;
+  centroid0y: number;
+};
+
+function touchCentroidInView(
+  touches: readonly { pageX: number; pageY: number }[],
+  pageX: number,
+  pageY: number,
+): { x: number; y: number } | null {
+  if (touches.length < 2) return null;
+  const t0 = touches[0]!;
+  const t1 = touches[1]!;
+  return {
+    x: (t0.pageX + t1.pageX) / 2 - pageX,
+    y: (t0.pageY + t1.pageY) / 2 - pageY,
+  };
+}
+
+/** Keep the point under `focal` fixed while zoom changes (scale is around view center). */
+function panForFocalZoom(
+  pan0x: number,
+  pan0y: number,
+  zoom0: number,
+  zoom1: number,
+  focalX: number,
+  focalY: number,
+  w: number,
+  h: number,
+): { x: number; y: number } {
+  const cx = w / 2;
+  const cy = h / 2;
+  const ratio = zoom1 / zoom0;
+  return {
+    x: pan0x + (focalX - pan0x - cx) * (1 - ratio),
+    y: pan0y + (focalY - pan0y - cy) * (1 - ratio),
+  };
+}
+
+function applyPinchTransform(
+  pinch: PinchGesture,
+  dist: number,
+  centroid: { x: number; y: number },
+  w: number,
+  h: number,
+): { zoom: number; pan: { x: number; y: number } } {
+  const zoom = clampZoom(pinch.zoom0 * (dist / pinch.dist0));
+  const p = panForFocalZoom(
+    pinch.pan0x,
+    pinch.pan0y,
+    pinch.zoom0,
+    zoom,
+    pinch.focalX,
+    pinch.focalY,
+    w,
+    h,
+  );
+  return {
+    zoom,
+    pan: {
+      x: p.x + (centroid.x - pinch.centroid0x),
+      y: p.y + (centroid.y - pinch.centroid0y),
+    },
+  };
+}
+
 function touchPageDistance(touches: readonly { pageX: number; pageY: number }[]): number {
   if (touches.length < 2) return 0;
   const t0 = touches[0]!;
@@ -181,8 +263,8 @@ function angularDiffDeg(a: number, b: number): number {
 }
 
 const WHEEL_TAP_SLOP_PX = 14;
-/** Extra slop before a planet tap turns into rotate/pan. */
-const PLANET_TAP_SLOP_PX = 24;
+/** Max finger movement still counted as a planet tap. */
+const PLANET_TAP_SLOP_PX = 28;
 
 function segNakFill(opts: { alt?: boolean; hot?: boolean; sel?: boolean }): string {
   if (opts.sel) return SEG_SEL;
@@ -262,21 +344,44 @@ function WheelChartImpl({
   onPan,
 }: WheelChartProps) {
   const [lineTarget, setLineTarget] = useState(1);
-  const layoutRef = useRef({ w: 0, h: 0 });
+  const viewRef = useRef<View>(null);
+  const layoutRef = useRef<LayoutMetrics>({ w: 0, h: 0, pageX: 0, pageY: 0 });
   const spinRef = useRef(spin);
   spinRef.current = spin;
   const panRef = useRef(pan);
   panRef.current = pan;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
-  const pinchRef = useRef<{ dist0: number; zoom0: number } | null>(null);
+  const pinchRef = useRef<PinchGesture | null>(null);
   const pinchingRef = useRef(false);
   const dragRef = useRef<
-    | { mode: "t"; idx: number }
     | { mode: "r"; spin0: number; angle0: number; moved: boolean }
     | { mode: "p"; pan0x: number; pan0y: number; moved: boolean }
     | null
   >(null);
+
+  const syncLayout = useCallback(() => {
+    viewRef.current?.measureInWindow((x, y, mw, mh) => {
+      const cur = layoutRef.current;
+      layoutRef.current = {
+        w: cur.w > 0 ? cur.w : mw,
+        h: cur.h > 0 ? cur.h : mh,
+        pageX: x,
+        pageY: y,
+      };
+    });
+  }, []);
+
+  const touchFromEvent = useCallback(
+    (evt: { nativeEvent: { locationX: number; locationY: number; pageX: number; pageY: number } }) => {
+      const layout = layoutRef.current;
+      if (layout.w > 0 && layout.h > 0 && (layout.pageX !== 0 || layout.pageY !== 0)) {
+        return touchInView(evt.nativeEvent.pageX, evt.nativeEvent.pageY, layout);
+      }
+      return { x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY };
+    },
+    [],
+  );
 
   const angleAt = useCallback((locationX: number, locationY: number) => {
     const { w, h } = layoutRef.current;
@@ -373,22 +478,25 @@ function WheelChartImpl({
   const wheelPan = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onStartShouldSetPanResponderCapture: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponderCapture: () => true,
+        onStartShouldSetPanResponder: (evt) => {
+          if (evt.nativeEvent.touches.length >= 2) return true;
+          syncLayout();
+          return pickPlanetAt(touchFromEvent(evt).x, touchFromEvent(evt).y) < 0;
+        },
+        onStartShouldSetPanResponderCapture: (evt) => {
+          if (evt.nativeEvent.touches.length >= 2) return true;
+          return pickPlanetAt(touchFromEvent(evt).x, touchFromEvent(evt).y) < 0;
+        },
+        onMoveShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponderCapture: () => false,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (evt) => {
+          syncLayout();
           pinchingRef.current = false;
           pinchRef.current = null;
           const { w, h } = layoutRef.current;
-          const { locationX, locationY } = evt.nativeEvent;
-          const planetIdx = pickPlanetAt(locationX, locationY);
-          if (planetIdx >= 0) {
-            dragRef.current = { mode: "t", idx: planetIdx };
-            return;
-          }
-          const { x, y } = untransformTouch(locationX, locationY, w, h, panRef.current, zoomRef.current);
+          const touch = touchFromEvent(evt);
+          const { x, y } = untransformTouch(touch.x, touch.y, w, h, panRef.current, zoomRef.current);
           if (zoomRef.current > 1) {
             dragRef.current = {
               mode: "p",
@@ -407,46 +515,35 @@ function WheelChartImpl({
         },
         onPanResponderMove: (evt, gestureState) => {
           const touches = evt.nativeEvent.touches;
-          if (touches.length >= 2) {
+          const layout = layoutRef.current;
+          if (touches.length >= 2 && layout.w > 0) {
             pinchingRef.current = true;
             dragRef.current = null;
             const dist = touchPageDistance(touches);
-            if (dist <= 0) return;
+            const centroid = touchCentroidInView(touches, layout.pageX, layout.pageY);
+            if (dist <= 0 || !centroid) return;
             if (!pinchRef.current) {
-              pinchRef.current = { dist0: dist, zoom0: zoomRef.current };
+              pinchRef.current = {
+                dist0: dist,
+                zoom0: zoomRef.current,
+                pan0x: panRef.current.x,
+                pan0y: panRef.current.y,
+                focalX: centroid.x,
+                focalY: centroid.y,
+                centroid0x: centroid.x,
+                centroid0y: centroid.y,
+              };
               return;
             }
-            onZoom(clampZoom(pinchRef.current.zoom0 * (dist / pinchRef.current.dist0)));
+            const next = applyPinchTransform(pinchRef.current, dist, centroid, layout.w, layout.h);
+            onZoom(next.zoom);
+            onPan(next.pan.x, next.pan.y);
             return;
           }
 
           pinchRef.current = null;
           const drag = dragRef.current;
           if (!drag) return;
-
-          if (drag.mode === "t") {
-            if (Math.hypot(gestureState.dx, gestureState.dy) < PLANET_TAP_SLOP_PX) return;
-            const { w, h } = layoutRef.current;
-            const { locationX, locationY } = evt.nativeEvent;
-            const { x, y } = untransformTouch(locationX, locationY, w, h, panRef.current, zoomRef.current);
-            if (zoomRef.current > 1) {
-              dragRef.current = {
-                mode: "p",
-                pan0x: panRef.current.x,
-                pan0y: panRef.current.y,
-                moved: true,
-              };
-              onPan(panRef.current.x + gestureState.dx, panRef.current.y + gestureState.dy);
-            } else {
-              dragRef.current = {
-                mode: "r",
-                spin0: spinRef.current,
-                angle0: angleAt(x, y),
-                moved: true,
-              };
-            }
-            return;
-          }
 
           if (drag.mode === "p") {
             if (Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3) drag.moved = true;
@@ -455,8 +552,8 @@ function WheelChartImpl({
           }
 
           const { w, h } = layoutRef.current;
-          const { locationX, locationY } = evt.nativeEvent;
-          const { x, y } = untransformTouch(locationX, locationY, w, h, panRef.current, zoomRef.current);
+          const touch = touchFromEvent(evt);
+          const { x, y } = untransformTouch(touch.x, touch.y, w, h, panRef.current, zoomRef.current);
           const angle = angleAt(x, y);
           let delta = angle - drag.angle0;
           if (delta > 180) delta -= 360;
@@ -470,17 +567,18 @@ function WheelChartImpl({
           dragRef.current = null;
           pinchRef.current = null;
           pinchingRef.current = false;
-          if (wasPinching) return;
-          if (drag?.mode === "t") {
-            const refined = pickPlanetAt(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
-            setLineTarget(refined >= 0 ? refined : drag.idx);
-            return;
+          const touch = touchFromEvent(evt);
+          const dist = Math.hypot(gestureState.dx, gestureState.dy);
+          if (!wasPinching) {
+            const planetIdx = pickPlanetAt(touch.x, touch.y);
+            if (planetIdx >= 0 && dist < PLANET_TAP_SLOP_PX) {
+              setLineTarget(planetIdx);
+              return;
+            }
           }
-          const moved =
-            Math.hypot(gestureState.dx, gestureState.dy) >= WHEEL_TAP_SLOP_PX ||
-            Boolean(drag?.moved);
+          const moved = dist >= WHEEL_TAP_SLOP_PX || Boolean(drag?.moved);
           if (moved) return;
-          pickFromTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
+          pickFromTouch(touch.x, touch.y);
         },
         onPanResponderTerminate: () => {
           dragRef.current = null;
@@ -488,7 +586,7 @@ function WheelChartImpl({
           pinchingRef.current = false;
         },
       }),
-    [angleAt, onPan, onSpin, onZoom, pickFromTouch, pickPlanetAt],
+    [angleAt, onPan, onSpin, onZoom, pickFromTouch, pickPlanetAt, syncLayout, touchFromEvent],
   );
 
   const pol = useCallback(
@@ -810,10 +908,9 @@ function WheelChartImpl({
           <Path
             key={`kar${k}`}
             d={arcSeg(L0, L1, R_KAR_I, R_KAR_O)}
-            fill={karanaColor(kd)}
-            stroke={isCur ? W_ACCENT : "rgba(0,0,0,0.32)"}
-            strokeWidth={isCur ? 1.7 : 0.4}
-            opacity={isCur ? 1 : 0.78}
+            fill={segRashiFill({ alt: k % 2 === 1, sel: isCur })}
+            stroke={isCur ? W_ACCENT : W_SEP}
+            strokeWidth={isCur ? 1.7 : 0.6}
           />,
         );
         innerRings.push(
@@ -823,7 +920,7 @@ function WheelChartImpl({
             r={(R_KAR_I + R_KAR_O) / 2}
             spin={spin}
             size={isCur ? 9 : 7.5}
-            fill={isCur ? W_ACCENT : "rgba(0,0,0,0.82)"}
+            fill={isCur ? W_ACCENT : "#ffffff"}
           >
             {kName.length > 4 ? kName.slice(0, 4) : kName}
           </RingLabel>,
@@ -930,7 +1027,7 @@ function WheelChartImpl({
         const [px, py] = pol(lon, meta.orbit * ORBIT_SCALE);
         const planetR = "big" in meta && meta.big ? 15 : i === 1 ? 10 : 8;
 
-        core.push(<Circle key={`pg${i}`} cx={px} cy={py} r={planetR + 6} fill={meta.color} opacity={0.55} />);
+        core.push(<Circle key={`pg${i}`} cx={px} cy={py} r={planetR + 6} fill={meta.color} opacity={0.55} pointerEvents="none" />);
 
         if (i === 0) {
           const rays: ReactNode[] = [];
@@ -952,7 +1049,7 @@ function WheelChartImpl({
               />,
             );
           }
-          core.push(<G key="sun-rays">{rays}</G>);
+          core.push(<G key="sun-rays" pointerEvents="none">{rays}</G>);
         }
 
         if ("ring" in meta && meta.ring) {
@@ -968,16 +1065,17 @@ function WheelChartImpl({
               strokeWidth={2.4}
               opacity={0.88}
               transform={`rotate(-20 ${px} ${py})`}
+              pointerEvents="none"
             />,
           );
         }
 
         if (i !== 1) {
-          core.push(<Circle key={`pl${i}`} cx={px} cy={py} r={planetR} fill={`url(#pg${i})`} />);
+          core.push(<Circle key={`pl${i}`} cx={px} cy={py} r={planetR} fill={`url(#pg${i})`} pointerEvents="none" />);
         } else {
           const moonElongation = normDeg(markers.moonLon - markers.sunLon);
           core.push(
-            <G key="moon-phase" transform={`translate(${px},${py})`}>
+            <G key="moon-phase" transform={`translate(${px},${py})`} pointerEvents="none">
               <MoonPhaseIcon elongation={moonElongation} r={planetR} />
             </G>,
           );
@@ -986,7 +1084,7 @@ function WheelChartImpl({
         if (i === 4) {
           const clipId = `jclip${i}`;
           core.push(
-            <G key={`jbands${i}`}>
+            <G key={`jbands${i}`} pointerEvents="none">
               {/* @ts-expect-error react-native-svg Defs children typing */}
               <Defs>
                 <ClipPath id={clipId}>
@@ -1009,14 +1107,14 @@ function WheelChartImpl({
         }
 
         core.push(
-          <SvgText key={`pn${i}`} x={px} y={py + planetR + 9} textAnchor="middle" fill={W_INK_DIM} fontSize={8.5} fontFamily={FONT}>
+          <SvgText key={`pn${i}`} x={px} y={py + planetR + 9} textAnchor="middle" fill={W_INK_DIM} fontSize={8.5} fontFamily={FONT} pointerEvents="none">
             {g.ne}
           </SvgText>,
         );
       });
 
       core.push(
-        <G key="earth">
+        <G key="earth" pointerEvents="none">
           <Circle cx={CX} cy={CY} r={13} fill="url(#pg-earth)" />
           <Circle cx={CX} cy={CY} r={13} fill="none" stroke="#9fe0c8" strokeWidth={0.8} opacity={0.5} />
         </G>,
@@ -1044,21 +1142,43 @@ function WheelChartImpl({
   const { nakSegs, nakDecor, rashiSegs, rashiDecor, padaCells, dayTicks, hits, rashiRays, gregLabels } = staticLayers;
   const { markerNodes, innerRings, core, bsLabels } = dataLayers;
 
+  const planetHitNodes = useMemo(() => {
+    if (!tw.show_planets) return null;
+    return det.grahas.map((_, i) => {
+      const meta = GRAHA_META[i]!;
+      const lon = planetLons[i] ?? 0;
+      const [px, py] = pol(lon, meta.orbit * ORBIT_SCALE);
+      return (
+        <Circle
+          key={`phit${i}`}
+          cx={px}
+          cy={py}
+          r={planetHitRadius(i)}
+          fill="transparent"
+          onPress={() => setLineTarget(i)}
+        />
+      );
+    });
+  }, [det.grahas, planetLons, pol, tw.show_planets]);
+
   return (
     <View
-      style={{
-        flex: 1,
-        transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }],
-      }}
+      ref={viewRef}
+      style={{ flex: 1 }}
       onLayout={(e) => {
-        layoutRef.current = {
-          w: e.nativeEvent.layout.width,
-          h: e.nativeEvent.layout.height,
-        };
+        const { width: w, height: h } = e.nativeEvent.layout;
+        layoutRef.current = { ...layoutRef.current, w, h };
+        syncLayout();
       }}
       {...wheelPan.panHandlers}
     >
-      <Svg viewBox="42 42 916 916" width="100%" height="100%" pointerEvents="none">
+      <View
+        style={{
+          flex: 1,
+          transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }],
+        }}
+      >
+        <Svg viewBox="42 42 916 916" width="100%" height="100%" pointerEvents="box-none">
         <Circle cx={CX} cy={CY} r={R.bsOut} fill="none" stroke={W_RIM} strokeWidth={1.4} />
         {[R.bsIn, R.nakOut, R.nakIn, R.padaIn, R_KAR_I, R.rashiOut, R.rashiIn].map((rad, k) => (
           <Circle key={`rc${k}`} cx={CX} cy={CY} r={rad} fill="none" stroke={W_RIM} strokeWidth={0.8} opacity={0.55} />
@@ -1080,7 +1200,9 @@ function WheelChartImpl({
         {core}
         {markerNodes}
         {hits}
+        {planetHitNodes}
       </Svg>
+      </View>
     </View>
   );
 }

@@ -487,7 +487,7 @@ function WheelBody({
         </View>
         {!isTablet && !fullscreen ? (
           <Text style={{ fontSize: 12, color: W_INK_FAINT }}>
-            {pick("घुमाउन तान्नुहोस् · जुम गर्नुहोस्", "Drag to rotate · pinch to zoom")}
+            {pick("घुमाउन तान्नुहोस् · जुम गर्नुहोस् · दुई औंलाले सार्नुहोस्", "Drag to rotate · pinch to zoom · two fingers to pan")}
           </Text>
         ) : null}
         {isTablet || fullscreen ? (

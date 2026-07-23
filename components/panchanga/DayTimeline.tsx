@@ -648,12 +648,12 @@ export function DayTimeline({
         )}
       </View>
 
-      {data.ashubha.length > 0 && (
+      {data.ashubhaAll.length > 0 && (
         <PeriodCards
           tone="danger"
           title={pick("अशुभ समय", "Inauspicious periods")}
           cardWidth={periodCardW}
-          items={data.ashubha.map((a, i) => ({
+          items={data.ashubhaAll.map((a, i) => ({
             n: digits(i + 1),
             label: pick(a.detailNe, a.detailEn),
             time: `${tLabel(a.startG)} – ${tLabel(a.endG)}`,

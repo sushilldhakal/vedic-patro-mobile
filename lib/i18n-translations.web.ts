@@ -45,6 +45,8 @@ const STRINGS: Record<string, [string, string]> = {
   "sections.pada_transitions": ["परिवर्तन", "transitions"],
   "sections.pada_detail": ["नक्षत्र पद विवरण", "Nakshatra pada detail"],
   "sections.balam": ["चन्द्रबलम् र ताराबलम्", "Moon strength & Star strength"],
+  "muhurta_aside.chandrabal": ["चन्द्रबल", "Chandrabal"],
+  "muhurta_aside.tarabal": ["ताराबल", "Tarabal"],
   "sections.auspicious_chandra": ["शुभ चन्द्रबलम्", "Auspicious Moon strength"],
   "sections.auspicious_tara": ["शुभ ताराबलम्", "Auspicious Tarabalam"],
   "sections.until": ["सम्म", "until"],

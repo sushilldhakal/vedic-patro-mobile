@@ -211,9 +211,7 @@ export default function PanchangaScreen() {
             sunrise={sunrise}
             sunset={sunset}
             timezone={effectiveTimezone}
-            ephemeris={ephemeris}
-            data={data}
-            clock={clock}
+            chartData={data}
             chartAd={chartAd}
             location={location.params}
           />

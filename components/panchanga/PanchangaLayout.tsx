@@ -4,7 +4,15 @@ import { useTranslation } from "@/lib/i18n-translations.web";
 import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useLocale } from "@/lib/i18n";
-import { patroNavataraToneBg } from "@/lib/patro-classes";
+import { useTheme } from "@/lib/theme-context";
+import {
+  PANCHANGA_FIELD_CARD_BG,
+  PANCHANGA_FIELD_CARD_BG_DARK,
+  PANCHANGA_TONE_BG,
+  PANCHANGA_TONE_BG_DARK,
+  PANCHANGA_TIMING_HIGHLIGHT_BG,
+  PANCHANGA_TIMING_HIGHLIGHT_BORDER,
+} from "@/lib/panchanga-card-colors";
 
 /** Paired label|value columns — always on native (phones fit compact 2×2 rows). */
 export function usePanchangaLayoutWide(): boolean {
@@ -93,9 +101,17 @@ function QuadValue({
 export const panchangaCardGrid =
   "flex w-full flex-row flex-wrap justify-center gap-2 p-4";
 
-/** Content-sized card; width follows label + value, never stretches. */
-export const panchangaCardBase =
-  "shrink-0 grow-0 flex-col gap-1 self-start rounded-xl border border-border/80 bg-background/60 px-3.5 py-2.5 shadow-[0_1px_2px_color-mix(in_srgb,var(--foreground)_6%,transparent)]";
+/** Content-sized card shell — bg via inline style for native reliability. */
+export const panchangaCardShellClass =
+  "shrink-0 grow-0 flex-col gap-1 self-start rounded-xl border border-border/80 px-3.5 py-2.5";
+
+function usePanchangaCardBg(tone?: keyof typeof PANCHANGA_TONE_BG) {
+  const { isDark } = useTheme();
+  if (tone) {
+    return isDark ? PANCHANGA_TONE_BG_DARK[tone] : PANCHANGA_TONE_BG[tone];
+  }
+  return isDark ? PANCHANGA_FIELD_CARD_BG_DARK : PANCHANGA_FIELD_CARD_BG;
+}
 
 /** Full-width subgroup label inside a card grid (forces a new row). */
 export function PanchangaGroupLabel({
@@ -132,16 +148,16 @@ export function PanchangaBalamCard({
   isCurrent?: boolean;
   className?: string;
 }) {
+  const bg = usePanchangaCardBg(tone);
   return (
     <View
       className={cn(
-        panchangaCardBase,
+        panchangaCardShellClass,
         "min-w-[8.5rem] gap-1 border-transparent",
-        patroNavataraToneBg(tone),
-        isCurrent &&
-          "shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_65%,transparent)] ring-2 ring-accent/80",
+        isCurrent && "border-2 border-accent",
         className,
       )}
+      style={{ backgroundColor: bg }}
     >
       <Text className="text-sm font-bold leading-snug text-foreground">{titleLine}</Text>
       {subtitleLine ? (
@@ -163,16 +179,16 @@ export function PanchangaLagnaCard({
   isCurrent?: boolean;
   className?: string;
 }) {
+  const bg = usePanchangaCardBg("neutral");
   return (
     <View
       className={cn(
-        panchangaCardBase,
+        panchangaCardShellClass,
         "min-w-[8.5rem] gap-1",
-        patroNavataraToneBg("neutral"),
-        isCurrent &&
-          "shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_65%,transparent)] ring-2 ring-accent/80",
+        isCurrent && "border-2 border-accent",
         className,
       )}
+      style={{ backgroundColor: bg }}
     >
       <Text className="text-sm font-bold leading-snug text-foreground">{titleLine}</Text>
       {footerLine ? (
@@ -196,14 +212,14 @@ export function PanchangaTimingCard({
   highlight?: boolean;
   className?: string;
 }) {
+  const bg = usePanchangaCardBg(highlight ? undefined : "neutral");
   return (
     <View
-      className={cn(
-        panchangaCardBase,
-        "gap-1.5",
-        highlight && "border-success/45 bg-success/[0.06]",
-        className,
-      )}
+      className={cn(panchangaCardShellClass, "gap-1.5", className)}
+      style={{
+        backgroundColor: highlight ? PANCHANGA_TIMING_HIGHLIGHT_BG : bg,
+        borderColor: highlight ? PANCHANGA_TIMING_HIGHLIGHT_BORDER : undefined,
+      }}
     >
       <Text
         className={cn(
@@ -238,9 +254,10 @@ export function PanchangaFieldCell({
   nowrap?: boolean;
 }) {
   const { t } = useTranslation();
+  const bg = usePanchangaCardBg();
 
   return (
-    <View className={cn(panchangaCardBase, className)}>
+    <View className={cn(panchangaCardShellClass, className)} style={{ backgroundColor: bg }}>
       <QuadLabel className="shrink-0 text-muted-foreground">
         {rowLabel(labelKey, label, t)}
       </QuadLabel>

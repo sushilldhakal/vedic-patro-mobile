@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -44,8 +44,23 @@ export default function HomeScreen() {
   const [month, setMonth] = useState(initial.month);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [patroView, setPatroView] = useState<HomePatroView>("calendar");
+  const [asideOffsetY, setAsideOffsetY] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
   const todayAd = todayAdString();
   const splitAside = width >= ASIDE_SPLIT;
+
+  const handleSelectDay = useCallback(
+    (day: CalendarDay) => {
+      if (day.outsideMonth) return;
+      setSelectedDay(day);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!selectedDay || splitAside || asideOffsetY <= 0) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, asideOffsetY - 12), animated: true });
+  }, [selectedDay, splitAside, asideOffsetY]);
 
   const monthQuery = useQuery({
     queryKey: apiKeys.month(year, month, location.params),
@@ -168,10 +183,7 @@ export default function HomeScreen() {
           selectedAd={selectedDay?.date_ad ?? (viewingCurrentBsMonth ? todayAd : undefined)}
           todayAd={todayAd}
           publicHolidayDates={publicHolidayDates}
-          onSelectDay={(day) => {
-            if (day.outsideMonth) return;
-            setSelectedDay((prev) => (prev?.date_ad === day.date_ad ? null : day));
-          }}
+          onSelectDay={handleSelectDay}
           isEnriching={monthQuery.isFetching && !!monthQuery.data}
         />
       )}
@@ -218,6 +230,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       className="flex-1 bg-background"
       contentContainerClassName="mx-auto w-full max-w-[1400px] pt-4"
       contentContainerStyle={{
@@ -227,7 +240,9 @@ export default function HomeScreen() {
     >
       <View className={splitAside ? "flex-row items-start gap-5" : "gap-5"}>
         {calendarBlock}
-        {asideBlock}
+        <View onLayout={(e) => setAsideOffsetY(e.nativeEvent.layout.y)}>
+          {asideBlock}
+        </View>
       </View>
 
       <Text className="mt-7 text-center text-sm text-muted-foreground">

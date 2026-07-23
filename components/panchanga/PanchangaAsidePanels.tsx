@@ -1,16 +1,14 @@
 import { View } from "react-native";
 import type { LocationParams, PanchangaDay } from "@/lib/api";
 import { GhatiClock } from "@/components/panchanga/GhatiClock";
-import { MuhurtaNowPanel } from "@/components/panchanga/MuhurtaNowPanel";
 import { PlanetEventsPanel } from "@/components/panchanga/PlanetEventsPanel";
+import { SunriseD1ChartPanel } from "@/components/panchanga/SunriseD1ChartPanel";
 
 type Props = {
   sunrise?: string;
   sunset?: string;
   timezone: string;
-  ephemeris: boolean;
-  data?: PanchangaDay;
-  clock: string;
+  chartData?: PanchangaDay | null;
   chartAd: string;
   location: LocationParams;
 };
@@ -19,16 +17,14 @@ export function PanchangaAsidePanels({
   sunrise,
   sunset,
   timezone,
-  ephemeris,
-  data,
-  clock,
+  chartData,
   chartAd,
   location,
 }: Props) {
   return (
     <View className="gap-4">
       <GhatiClock sunrise={sunrise} sunset={sunset} timezone={timezone} />
-      {ephemeris && data ? <MuhurtaNowPanel p={data} clock={clock} /> : null}
+      {chartData ? <SunriseD1ChartPanel p={chartData} /> : null}
       <PlanetEventsPanel dateAd={chartAd} location={location} />
     </View>
   );

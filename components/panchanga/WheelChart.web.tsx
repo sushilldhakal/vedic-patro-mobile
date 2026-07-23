@@ -13,7 +13,7 @@ import {
   type WheelTweaks,
   WHEEL_RASHIS,
 } from "@/lib/wheel-data";
-import { KARANA_SEQ, karanaColor, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
+import { KARANA_SEQ, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
 import { wheelSvg, wheelSvgWrap } from "@/lib/wheel-classes";
 import {
   wDaytick,
@@ -44,6 +44,82 @@ import {
 const DEG = Math.PI / 180;
 const CX = 500;
 const CY = 500;
+
+function clampZoom(z: number): number {
+  return Math.max(0.55, Math.min(14, z));
+}
+
+type PinchGesture = {
+  dist0: number;
+  zoom0: number;
+  pan0x: number;
+  pan0y: number;
+  focalX: number;
+  focalY: number;
+  centroid0x: number;
+  centroid0y: number;
+};
+
+function panForFocalZoom(
+  pan0x: number,
+  pan0y: number,
+  zoom0: number,
+  zoom1: number,
+  focalX: number,
+  focalY: number,
+  w: number,
+  h: number,
+): { x: number; y: number } {
+  const cx = w / 2;
+  const cy = h / 2;
+  const ratio = zoom1 / zoom0;
+  return {
+    x: pan0x + (focalX - pan0x - cx) * (1 - ratio),
+    y: pan0y + (focalY - pan0y - cy) * (1 - ratio),
+  };
+}
+
+function applyPinchTransform(
+  pinch: PinchGesture,
+  dist: number,
+  centroid: { x: number; y: number },
+  w: number,
+  h: number,
+): { zoom: number; pan: { x: number; y: number } } {
+  const zoom = clampZoom(pinch.zoom0 * (dist / pinch.dist0));
+  const p = panForFocalZoom(
+    pinch.pan0x,
+    pinch.pan0y,
+    pinch.zoom0,
+    zoom,
+    pinch.focalX,
+    pinch.focalY,
+    w,
+    h,
+  );
+  return {
+    zoom,
+    pan: {
+      x: p.x + (centroid.x - pinch.centroid0x),
+      y: p.y + (centroid.y - pinch.centroid0y),
+    },
+  };
+}
+
+function planetVisualRadius(index: number): number {
+  const meta = GRAHA_META[index];
+  if (!meta) return 8;
+  if ("big" in meta && meta.big) return 15;
+  if (index === 1) return 10;
+  return 8;
+}
+
+function planetHitRadius(index: number): number {
+  const r = planetVisualRadius(index);
+  if (index === 0) return r + 26;
+  if (index >= 6) return r + 32;
+  return r + 24;
+}
 
 /** Scale factor applied to all planet orbit radii to leave room for the inner yoga/karana/tithi rings. */
 const ORBIT_SCALE = 0.58;
@@ -154,7 +230,7 @@ function WheelChartImpl({
   const wrapRef = useRef<HTMLDivElement>(null);
   /** Active pointer positions for pinch-to-zoom. */
   const ptrRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pinchRef = useRef<{ dist: number; zoom0: number } | null>(null);
+  const pinchRef = useRef<PinchGesture | null>(null);
   /**
    * Graha the alignment needle points at (0..8 in GRAHA order). Defaults to
    * the Moon; tapping a planet moves the needle to it so you can read which
@@ -489,10 +565,9 @@ function WheelChartImpl({
         <path
           key={`kar${k}`}
           d={arcSeg(L0, L1, R_KAR_I, R_KAR_O)}
-          fill={karanaColor(kd)}
-          stroke={isCur ? "var(--w-accent)" : "rgba(0,0,0,.32)"}
-          strokeWidth={isCur ? 1.7 : 0.4}
-          opacity={isCur ? 1 : 0.78}
+          className={wSegRashi({ alt: k % 2 === 1, sel: isCur })}
+          stroke={isCur ? "var(--w-accent)" : undefined}
+          strokeWidth={isCur ? 1.7 : undefined}
         />
       );
       innerRings.push(
@@ -689,10 +764,14 @@ function WheelChartImpl({
           key={`hit${i}`}
           cx={px}
           cy={py}
-          r={rad + 7}
+          r={planetHitRadius(i)}
           fill="transparent"
           style={{ cursor: "pointer" }}
           onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => {
+            e.stopPropagation();
+            setLineTarget(i);
+          }}
           onClick={() => setLineTarget(i)}
         >
           <title>{g.ne}</title>
@@ -742,6 +821,33 @@ function WheelChartImpl({
     return Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
   };
 
+  const pointerCentroidInWrap = () => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect || ptrRef.current.size < 2) return null;
+    const pts = [...ptrRef.current.values()];
+    return {
+      x: (pts[0]!.x + pts[1]!.x) / 2 - rect.left,
+      y: (pts[0]!.y + pts[1]!.y) / 2 - rect.top,
+    };
+  };
+
+  const startPinch = () => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    const centroid = pointerCentroidInWrap();
+    const dist = pinchDist();
+    if (!rect || !centroid || dist <= 0) return;
+    pinchRef.current = {
+      dist0: dist,
+      zoom0: zoom,
+      pan0x: pan.x,
+      pan0y: pan.y,
+      focalX: centroid.x,
+      focalY: centroid.y,
+      centroid0x: centroid.x,
+      centroid0y: centroid.y,
+    };
+  };
+
   const onDown = (e: React.PointerEvent<SVGSVGElement>) => {
     ptrRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -754,18 +860,26 @@ function WheelChartImpl({
     } else {
       // Two fingers: cancel single-finger gesture, start pinch
       dragRef.current = null;
-      pinchRef.current = { dist: pinchDist(), zoom0: zoom };
+      startPinch();
     }
   };
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     ptrRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrRef.current.size >= 2) {
-      if (pinchRef.current) {
-        const d = pinchDist();
-        if (d > 0) {
-          const next = Math.max(0.55, Math.min(14, pinchRef.current.zoom0 * (d / pinchRef.current.dist)));
-          onZoom(next);
-        }
+      const rect = wrapRef.current?.getBoundingClientRect();
+      const centroid = pointerCentroidInWrap();
+      const d = pinchDist();
+      if (!pinchRef.current) startPinch();
+      if (pinchRef.current && rect && centroid && d > 0) {
+        const next = applyPinchTransform(
+          pinchRef.current,
+          d,
+          centroid,
+          rect.width,
+          rect.height,
+        );
+        onZoom(next.zoom);
+        onPan(next.pan.x, next.pan.y);
       }
       return;
     }
