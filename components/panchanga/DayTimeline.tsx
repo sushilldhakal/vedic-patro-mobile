@@ -1,9 +1,16 @@
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
 import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import type { PanchangaDay } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { useLocale } from "@/lib/i18n";
+import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
+import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
+import {
+  getPlanetRows,
+  getPlanetsAnchorLabel,
+} from "@/lib/panchanga-format";
 import {
   buildDayTimelineData,
   CHOGHADIYA_EN,
@@ -15,6 +22,8 @@ import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-tim
 import { useTheme } from "@/lib/theme-context";
 
 const W = 1000;
+/** Match web `min-w-[768px]` — chart never narrower; scroll when viewport is smaller. */
+const MIN_CHART_WIDTH = 767;
 const X0 = 70;
 const X1 = 994;
 const RULER_H = 58;
@@ -256,9 +265,12 @@ export function DayTimeline({
   needleClock,
   showNeedle = true,
 }: Props) {
-  const { pick, digits } = useLocale();
+  const { pick, digits, lang } = useLocale();
+  const { width: windowWidth } = useBreakpoint();
+  const [containerWidth, setContainerWidth] = useState(0);
   const C = useTimelineColors();
   const data = useMemo(() => (p ? buildDayTimelineData(p, dateAd) : null), [p, dateAd]);
+  const planets = useMemo(() => (p ? getPlanetRows(p) : []), [p]);
   const timeZone = resolveTimeZone(p?.location?.timezone, timezone);
   const [now, setNow] = useState(() => new Date());
 
@@ -272,7 +284,7 @@ export function DayTimeline({
 
   if (busy) {
     return (
-      <Card className="overflow-hidden p-0">
+      <Card className="w-full overflow-hidden p-0">
         <View className="border-b border-border px-4 py-2.5">
           <Text className="text-sm font-bold text-foreground">{pick("दिन-चक्र", "Day cycle")}</Text>
           <Text className="text-xs text-muted-foreground">
@@ -322,6 +334,11 @@ export function DayTimeline({
     });
 
   const H = T0 + tracks.length * TRACK + 6;
+  /** Web: `w-full min-w-[768px]` — at least 767px, grow to fill the card column. */
+  const measuredWidth = containerWidth || windowWidth - PAGE_HORIZONTAL_PADDING * 2;
+  const chartWidth = Math.max(MIN_CHART_WIDTH, measuredWidth);
+  const scrollChart = measuredWidth < MIN_CHART_WIDTH;
+  const ashubhaCols = measuredWidth >= BREAKPOINTS.sm;
   const tLabel = (g: number) => dualTimeAtGhati(g, data.sunriseMin).clock;
 
   let nowG: number | null = null;
@@ -343,8 +360,176 @@ export function DayTimeline({
   const nightBands = [[data.dayG, 60]] as Array<[number, number]>;
   const hairlineGs = [0, data.dayG, 60];
 
+  const chartContent = (
+    <>
+      {nightBands.map(([a, b], i) => (
+        <Rect key={`night-${i}`} x={gx(a)} y={RULER_H - 8} width={Math.max(0, gx(b) - gx(a))} height={H - RULER_H + 2} fill={C.night} />
+      ))}
+
+      <SvgText x={X0 - 10} y={20} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end">
+        {pick("घण्टा", "Hour")}
+      </SvgText>
+      <SvgText x={X0 - 10} y={47} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end" opacity={0.75}>
+        {pick("घडी", "Ghati")}
+      </SvgText>
+      <Line x1={X0} y1={30} x2={X1} y2={30} stroke={C.axis} strokeWidth={1.2} />
+
+      {data.civilHourTicks.map(({ hour, g }) => (
+        <G key={`h-${hour}-${g}`}>
+          <Line x1={gx(g)} y1={30} x2={gx(g)} y2={24} stroke={C.tick} strokeWidth={1} />
+          <SvgText x={gx(g)} y={18} fill={C.fg} fontSize={10} fontFamily={FONT} textAnchor="middle">
+            {digits(hour)}
+          </SvgText>
+        </G>
+      ))}
+
+      {GHATI_TICKS.map((g) => (
+        <G key={`g-${g}`}>
+          <Line x1={gx(g)} y1={30} x2={gx(g)} y2={36} stroke={C.tick} strokeWidth={1} />
+          <SvgText x={gx(g)} y={48} fill={C.muted} fontSize={10} fontFamily={FONT_SM} textAnchor="middle">
+            {digits(g)}
+          </SvgText>
+        </G>
+      ))}
+
+      <Line x1={X0} y1={SUNLINE_Y} x2={X1} y2={SUNLINE_Y} stroke={C.sunLine} strokeWidth={1} />
+      <Line x1={X0} y1={T0 - 1} x2={X1} y2={T0 - 1} stroke={C.moonLine} strokeWidth={1} strokeDasharray="3,5" opacity={0.7} />
+
+      <EventMarker g={0} sunriseMin={data.sunriseMin} kind="sunrise" anchor="start" digits={digits} C={C} />
+      <EventMarker g={data.dayG} sunriseMin={data.sunriseMin} kind="sunset" anchor="middle" digits={digits} C={C} />
+      {data.moonsetG != null && (
+        <EventMarker g={data.moonsetG} sunriseMin={data.sunriseMin} kind="moonset" anchor="middle" digits={digits} C={C} />
+      )}
+      {data.moonriseG != null && (
+        <EventMarker g={data.moonriseG} sunriseMin={data.sunriseMin} kind="moonrise" anchor="middle" digits={digits} C={C} />
+      )}
+      <EventMarker g={60} sunriseMin={data.sunriseMin} kind="next-sunrise" anchor="end" digits={digits} C={C} />
+
+      {hairlineGs.map((g) => (
+        <Line key={`hair-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.hair} strokeWidth={1} strokeDasharray="2,4" opacity={0.55} />
+      ))}
+
+      {tracks.map((tr, ti) => {
+        const y = trackY(ti);
+        return (
+          <G key={tr.key}>
+            <SvgText x={8} y={y + BAND / 2 + 4} fill={C.fg} fontSize={11} fontFamily={FONT} fontWeight="700">
+              {tr.ne}
+            </SvgText>
+            <Line x1={X0} y1={y + BAND} x2={X1} y2={y + BAND} stroke={C.sunLine} strokeWidth={0.8} opacity={0.35} />
+
+            {tr.segs.map((s, si) => {
+              const x = gx(s.fromG);
+              const x2 = gx(s.toG);
+              const w = x2 - x;
+              const isActiveLagna = tr.cls === "lagna" && nowG != null && nowG >= s.fromG && nowG < s.toG;
+              const fill = segFill(C, tr.cls, si % 2 === 1 && tr.cls !== "cho" && tr.cls !== "hora", isActiveLagna, s.bad);
+              const midX = clampX((x + x2) / 2, 26);
+              const narrow = w < 64;
+              const segText = pick(s.ne, s.en);
+              const [mainName, paksha] = segText.includes(", ")
+                ? [segText.split(", ")[0]!, segText.split(", ").slice(1).join(", ")]
+                : [segText, ""];
+              const laneCount = tr.cls === "ashubha" ? Math.max(1, s.laneCount ?? 1) : 1;
+              const laneGap = laneCount > 1 ? 1.5 : 0;
+              const laneH = BAND / laneCount;
+              const bandY = tr.cls === "ashubha" ? y + (s.lane ?? 0) * laneH : y;
+              const bandH = tr.cls === "ashubha" ? laneH - laneGap : BAND;
+              const labelY = bandY + bandH / 2 + 4;
+
+              return (
+                <G key={si}>
+                  <Rect
+                    x={x + 1}
+                    y={bandY}
+                    width={Math.max(0, w - 2)}
+                    height={bandH}
+                    rx={4}
+                    fill={fill}
+                    stroke={C.segStroke}
+                    strokeWidth={1}
+                  />
+                  {tr.cls === "cho" || tr.cls === "hora" ? (
+                    w > 20 ? (
+                      <SvgText
+                        x={(x + x2) / 2}
+                        y={y + BAND / 2 + 4}
+                        fill={s.bad ? C.danger : C.fg}
+                        fontSize={10}
+                        fontFamily={FONT}
+                        textAnchor="middle"
+                      >
+                        {segText}
+                      </SvgText>
+                    ) : null
+                  ) : tr.cls === "ashubha" ? (
+                    w >= 9 ? (
+                      <SvgText x={clampX((x + x2) / 2, 8)} y={labelY} fill={C.danger} fontSize={10} fontFamily={FONT} textAnchor="middle">
+                        {digits(si + 1)}
+                      </SvgText>
+                    ) : null
+                  ) : w >= 20 ? (
+                    <SvgText x={midX} y={labelY} fill={C.fg} fontSize={narrow ? 9 : 10} fontFamily={FONT} textAnchor="middle">
+                      {mainName}
+                      {!narrow && paksha ? ` · ${paksha}` : ""}
+                    </SvgText>
+                  ) : null}
+                </G>
+              );
+            })}
+          </G>
+        );
+      })}
+
+      {data.civilHourTicks.map(({ hour, g }) => (
+        <Line key={`grid-${hour}-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.grid} strokeWidth={1} strokeDasharray="3,4" />
+      ))}
+
+      {tracks.map((tr, ti) => {
+        const y = trackY(ti);
+        if (tr.cls === "cho" || tr.cls === "hora") return null;
+        return (
+          <G key={`${tr.key}-cuts`}>
+            {tr.segs.map((s, si) => {
+              if (!s.cut || s.toG >= 59.97) return null;
+              const x2 = gx(s.toG);
+              const time =
+                tr.cls === "lagna" && s.transitionLocal ? digits(s.transitionLocal) : tLabel(s.toG);
+              const prevTime = si > 0 && tr.segs[si - 1]?.cut ? tLabel(tr.segs[si - 1]!.toG) : null;
+              if (prevTime === time) return null;
+              return (
+                <G key={`cut-${si}`}>
+                  <TransitionArrow x2={x2} y={y} C={C} />
+                  <SvgText x={clampX(x2, 22)} y={y + BAND + 16} fill={C.fg} fontSize={9} fontFamily={FONT_SM} textAnchor="middle" opacity={tr.cls === "lagna" ? 0.9 : 1}>
+                    {time}
+                  </SvgText>
+                </G>
+              );
+            })}
+          </G>
+        );
+      })}
+
+      {nowG != null && nowG >= 0 && nowG <= 60 && (
+        <G>
+          <Line x1={gx(nowG)} y1={RULER_H - 6} x2={gx(nowG)} y2={H - 4} stroke={C.now} strokeWidth={1.4} />
+          <Rect x={clampX(gx(nowG), 30) - 48} y={RULER_H - 22} width={100} height={17} rx={9} fill={C.now} />
+          <SvgText x={clampX(gx(nowG), 30)} y={RULER_H - 10} fill="#fff" fontSize={9} fontFamily={FONT} textAnchor="middle">
+            {nowLabel} {tLabel(nowG)}
+          </SvgText>
+        </G>
+      )}
+    </>
+  );
+
   return (
-    <Card className="overflow-hidden p-0">
+    <Card
+      className="w-full overflow-hidden p-0"
+      onLayout={(e: LayoutChangeEvent) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0) setContainerWidth(w);
+      }}
+    >
       <View className="border-b border-border px-4 py-2.5">
         <Text className="text-sm font-bold text-foreground">{pick("दिन-चक्र", "Day cycle")}</Text>
         <Text className="text-xs text-muted-foreground">
@@ -357,184 +542,106 @@ export function DayTimeline({
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator className="px-1 py-3">
-        <Svg width={Math.max(768, W)} height={H} viewBox={`0 0 ${W} ${H}`}>
-          {nightBands.map(([a, b], i) => (
-            <Rect key={`night-${i}`} x={gx(a)} y={RULER_H - 8} width={Math.max(0, gx(b) - gx(a))} height={H - RULER_H + 2} fill={C.night} />
-          ))}
-
-          <SvgText x={X0 - 10} y={20} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end">
-            {pick("घण्टा", "Hour")}
-          </SvgText>
-          <SvgText x={X0 - 10} y={47} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end" opacity={0.75}>
-            {pick("घडी", "Ghati")}
-          </SvgText>
-          <Line x1={X0} y1={30} x2={X1} y2={30} stroke={C.axis} strokeWidth={1.2} />
-
-          {data.civilHourTicks.map(({ hour, g }) => (
-            <G key={`h-${hour}-${g}`}>
-              <Line x1={gx(g)} y1={30} x2={gx(g)} y2={24} stroke={C.tick} strokeWidth={1} />
-              <SvgText x={gx(g)} y={18} fill={C.fg} fontSize={10} fontFamily={FONT} textAnchor="middle">
-                {digits(hour)}
-              </SvgText>
-            </G>
-          ))}
-
-          {GHATI_TICKS.map((g) => (
-            <G key={`g-${g}`}>
-              <Line x1={gx(g)} y1={30} x2={gx(g)} y2={36} stroke={C.tick} strokeWidth={1} />
-              <SvgText x={gx(g)} y={48} fill={C.muted} fontSize={10} fontFamily={FONT_SM} textAnchor="middle">
-                {digits(g)}
-              </SvgText>
-            </G>
-          ))}
-
-          <Line x1={X0} y1={SUNLINE_Y} x2={X1} y2={SUNLINE_Y} stroke={C.sunLine} strokeWidth={1} />
-          <Line x1={X0} y1={T0 - 1} x2={X1} y2={T0 - 1} stroke={C.moonLine} strokeWidth={1} strokeDasharray="3,5" opacity={0.7} />
-
-          <EventMarker g={0} sunriseMin={data.sunriseMin} kind="sunrise" anchor="start" digits={digits} C={C} />
-          <EventMarker g={data.dayG} sunriseMin={data.sunriseMin} kind="sunset" anchor="middle" digits={digits} C={C} />
-          {data.moonsetG != null && (
-            <EventMarker g={data.moonsetG} sunriseMin={data.sunriseMin} kind="moonset" anchor="middle" digits={digits} C={C} />
-          )}
-          {data.moonriseG != null && (
-            <EventMarker g={data.moonriseG} sunriseMin={data.sunriseMin} kind="moonrise" anchor="middle" digits={digits} C={C} />
-          )}
-          <EventMarker g={60} sunriseMin={data.sunriseMin} kind="next-sunrise" anchor="end" digits={digits} C={C} />
-
-          {hairlineGs.map((g) => (
-            <Line key={`hair-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.hair} strokeWidth={1} strokeDasharray="2,4" opacity={0.55} />
-          ))}
-
-          {tracks.map((tr, ti) => {
-            const y = trackY(ti);
-            return (
-              <G key={tr.key}>
-                <SvgText x={8} y={y + BAND / 2 + 4} fill={C.fg} fontSize={11} fontFamily={FONT} fontWeight="700">
-                  {tr.ne}
-                </SvgText>
-                <Line x1={X0} y1={y + BAND} x2={X1} y2={y + BAND} stroke={C.sunLine} strokeWidth={0.8} opacity={0.35} />
-
-                {tr.segs.map((s, si) => {
-                  const x = gx(s.fromG);
-                  const x2 = gx(s.toG);
-                  const w = x2 - x;
-                  const isActiveLagna = tr.cls === "lagna" && nowG != null && nowG >= s.fromG && nowG < s.toG;
-                  const fill = segFill(C, tr.cls, si % 2 === 1 && tr.cls !== "cho" && tr.cls !== "hora", isActiveLagna, s.bad);
-                  const midX = clampX((x + x2) / 2, 26);
-                  const narrow = w < 64;
-                  const segText = pick(s.ne, s.en);
-                  const [mainName, paksha] = segText.includes(", ")
-                    ? [segText.split(", ")[0]!, segText.split(", ").slice(1).join(", ")]
-                    : [segText, ""];
-                  const laneCount = tr.cls === "ashubha" ? Math.max(1, s.laneCount ?? 1) : 1;
-                  const laneGap = laneCount > 1 ? 1.5 : 0;
-                  const laneH = BAND / laneCount;
-                  const bandY = tr.cls === "ashubha" ? y + (s.lane ?? 0) * laneH : y;
-                  const bandH = tr.cls === "ashubha" ? laneH - laneGap : BAND;
-                  const labelY = bandY + bandH / 2 + 4;
-
-                  return (
-                    <G key={si}>
-                      <Rect
-                        x={x + 1}
-                        y={bandY}
-                        width={Math.max(0, w - 2)}
-                        height={bandH}
-                        rx={4}
-                        fill={fill}
-                        stroke={C.segStroke}
-                        strokeWidth={1}
-                      />
-                      {tr.cls === "cho" || tr.cls === "hora" ? (
-                        w > 20 ? (
-                          <SvgText
-                            x={(x + x2) / 2}
-                            y={y + BAND / 2 + 4}
-                            fill={s.bad ? C.danger : C.fg}
-                            fontSize={10}
-                            fontFamily={FONT}
-                            textAnchor="middle"
-                          >
-                            {segText}
-                          </SvgText>
-                        ) : null
-                      ) : tr.cls === "ashubha" ? (
-                        w >= 9 ? (
-                          <SvgText x={clampX((x + x2) / 2, 8)} y={labelY} fill={C.danger} fontSize={10} fontFamily={FONT} textAnchor="middle">
-                            {digits(si + 1)}
-                          </SvgText>
-                        ) : null
-                      ) : w >= 20 ? (
-                        <SvgText x={midX} y={labelY} fill={C.fg} fontSize={narrow ? 9 : 10} fontFamily={FONT} textAnchor="middle">
-                          {mainName}
-                          {!narrow && paksha ? ` · ${paksha}` : ""}
-                        </SvgText>
-                      ) : null}
-                    </G>
-                  );
-                })}
-              </G>
-            );
-          })}
-
-          {data.civilHourTicks.map(({ hour, g }) => (
-            <Line key={`grid-${hour}-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.grid} strokeWidth={1} strokeDasharray="3,4" />
-          ))}
-
-          {tracks.map((tr, ti) => {
-            const y = trackY(ti);
-            if (tr.cls === "cho" || tr.cls === "hora") return null;
-            return (
-              <G key={`${tr.key}-cuts`}>
-                {tr.segs.map((s, si) => {
-                  if (!s.cut || s.toG >= 59.97) return null;
-                  const x2 = gx(s.toG);
-                  const time =
-                    tr.cls === "lagna" && s.transitionLocal ? digits(s.transitionLocal) : tLabel(s.toG);
-                  const prevTime = si > 0 && tr.segs[si - 1]?.cut ? tLabel(tr.segs[si - 1]!.toG) : null;
-                  if (prevTime === time) return null;
-                  return (
-                    <G key={`cut-${si}`}>
-                      <TransitionArrow x2={x2} y={y} C={C} />
-                      <SvgText x={clampX(x2, 22)} y={y + BAND + 16} fill={C.fg} fontSize={9} fontFamily={FONT_SM} textAnchor="middle" opacity={tr.cls === "lagna" ? 0.9 : 1}>
-                        {time}
-                      </SvgText>
-                    </G>
-                  );
-                })}
-              </G>
-            );
-          })}
-
-          {nowG != null && nowG >= 0 && nowG <= 60 && (
-            <G>
-              <Line x1={gx(nowG)} y1={RULER_H - 6} x2={gx(nowG)} y2={H - 4} stroke={C.now} strokeWidth={1.4} />
-              <Rect x={clampX(gx(nowG), 30) - 48} y={RULER_H - 22} width={100} height={17} rx={9} fill={C.now} />
-              <SvgText x={clampX(gx(nowG), 30)} y={RULER_H - 10} fill="#fff" fontSize={9} fontFamily={FONT} textAnchor="middle">
-                {nowLabel} {tLabel(nowG)}
-              </SvgText>
-            </G>
-          )}
-        </Svg>
-      </ScrollView>
+      <View className="w-full">
+        {scrollChart ? (
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator
+            style={{ width: "100%" }}
+            contentContainerStyle={{ width: MIN_CHART_WIDTH, minWidth: MIN_CHART_WIDTH }}
+            className="py-3 pl-1 pr-2"
+          >
+            <Svg
+              width={MIN_CHART_WIDTH}
+              height={H}
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="xMinYMid meet"
+            >
+              {chartContent}
+            </Svg>
+          </ScrollView>
+        ) : (
+          <View className="w-full py-3 pl-1 pr-2">
+            <Svg
+              width={chartWidth}
+              height={H}
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+            >
+              {chartContent}
+            </Svg>
+          </View>
+        )}
+      </View>
 
       {data.ashubha.length > 0 && (
         <View className="gap-1.5 border-t border-border px-4 py-3">
           <Text className="text-sm font-bold text-destructive">{pick("अशुभ समय", "Inauspicious periods")}</Text>
-          {data.ashubha.map((a, i) => (
-            <View key={`${a.startG}-${i}`} className="flex-row items-baseline gap-1.5">
-              <View className="h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1">
-                <Text className="text-xs font-bold text-white">{digits(i + 1)}</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              columnGap: 24,
+              rowGap: 4,
+            }}
+          >
+            {data.ashubha.map((a, i) => (
+              <View
+                key={`${a.startG}-${i}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "baseline",
+                  gap: 6,
+                  minWidth: 0,
+                  width: ashubhaCols ? "48%" : "100%",
+                }}
+              >
+                <View className="h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1">
+                  <Text className="text-xs font-bold text-white">{digits(i + 1)}</Text>
+                </View>
+                <Text
+                  className="text-sm font-semibold text-foreground"
+                  style={{ flex: 1, minWidth: 0 }}
+                  numberOfLines={2}
+                >
+                  {pick(a.detailNe, a.detailEn)}
+                </Text>
+                <Text className="shrink-0 pl-2 text-sm font-semibold text-muted-foreground">
+                  {tLabel(a.startG)} – {tLabel(a.endG)}
+                </Text>
               </View>
-              <Text className="flex-1 text-sm font-semibold text-foreground">{pick(a.detailNe, a.detailEn)}</Text>
-              <Text className="shrink-0 text-sm font-semibold text-muted-foreground">
-                {tLabel(a.startG)} – {tLabel(a.endG)}
-              </Text>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       )}
+
+      {p && planets.length > 0 ? (
+        <View className="gap-2 border-t border-border px-4 py-3">
+          <View className="gap-0.5">
+            <Text className="text-sm font-bold text-foreground">{pick("ग्रह", "Planets")}</Text>
+            <Text className="text-sm text-muted-foreground">{getPlanetsAnchorLabel(p, lang)}</Text>
+          </View>
+          <View className="flex-row flex-wrap gap-1.5">
+            {planets.map(({ key, label, labelEn, rashiNe, rashiEn, coords }) => {
+              const name = pick(label, labelEn);
+              const rashi = rashiNe || rashiEn ? pick(rashiNe ?? "", rashiEn ?? rashiNe ?? "") : undefined;
+              return (
+                <View
+                  key={key}
+                  className="min-w-[31%] flex-1 items-center gap-0.5 rounded-lg border border-border/60 bg-foreground/5 px-2 py-1.5"
+                >
+                  <Text className="text-center text-sm font-semibold text-foreground" numberOfLines={1}>
+                    {name}
+                    {rashi ? <Text className="text-foreground">–{rashi}</Text> : null}
+                  </Text>
+                  <Text className="font-num text-center text-sm font-semibold text-foreground">{coords}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </Card>
   );
 }

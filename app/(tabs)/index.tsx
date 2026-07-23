@@ -20,11 +20,13 @@ import {
 } from "@/lib/bs-calendar";
 import { buildCalendarGridDays, buildLocalMonthDays } from "@/lib/local-calendar";
 import { useLocale } from "@/lib/i18n";
-import { floatingNavBottomPadding } from "@/lib/mobile-nav";
+import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 
 const ASIDE_SPLIT = 1081;
+/** Below ASIDE_SPLIT: aside spans full content width. At/above: fixed sidebar column. */
+const ASIDE_WIDTH = 360;
 const ASIDE_MAX_WIDTH = 400;
 
 function monthStartAd(ctx: { year: number; month: number; days: CalendarDay[] }): string {
@@ -180,10 +182,19 @@ export default function HomeScreen() {
     <View
       style={
         splitAside
-          ? { width: 360, maxWidth: "38%" }
-          : { width: "100%", maxWidth: ASIDE_MAX_WIDTH, alignSelf: "center" }
+          ? {
+              width: ASIDE_WIDTH,
+              maxWidth: ASIDE_MAX_WIDTH,
+              flexGrow: 0,
+              flexShrink: 0,
+              alignSelf: "flex-start",
+            }
+          : {
+              width: "100%",
+              alignSelf: "stretch",
+            }
       }
-      className={splitAside ? "min-w-0 flex-1" : "min-w-0 w-full self-center"}
+      className="min-w-0 w-full"
     >
       <PanchangaAsidePanel
         month={month}
@@ -208,8 +219,11 @@ export default function HomeScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="mx-auto w-full max-w-[1400px] px-4 pt-4 md:px-6"
-      contentContainerStyle={{ paddingBottom: floatingNavBottomPadding(isTablet) }}
+      contentContainerClassName="mx-auto w-full max-w-[1400px] pt-4"
+      contentContainerStyle={{
+        paddingBottom: floatingNavBottomPadding(isTablet),
+        paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+      }}
     >
       <View className={splitAside ? "flex-row items-start gap-5" : "gap-5"}>
         {calendarBlock}

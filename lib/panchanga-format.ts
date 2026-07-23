@@ -713,7 +713,7 @@ export function getPlanetRows(p: PanchangaDay): PlanetRow[] {
   const anchor = detail?.planets_anchor ?? p.planets_anchor;
   const instant = p.mode === "ephemeris" || anchor?.type === "instant";
   const planets = (instant ? detail?.planets ?? p.planets : detail?.planets ?? p.planets) as
-    | Record<string, PlanetDetail>
+    | Record<string, PlanetDetail | string>
     | undefined;
   if (!planets) return [];
 
@@ -722,7 +722,15 @@ export function getPlanetRows(p: PanchangaDay): PlanetRow[] {
     .filter((key) => key in planets)
     .map((key) => {
       const g = GRAHA_NAME[key as GrahaKey];
-      const info = planets[key]!;
+      const info = planets[key];
+      if (typeof info === "string") {
+        return {
+          key,
+          label: g?.ne ?? key,
+          labelEn: g?.en ?? key,
+          coords: info,
+        };
+      }
       const rashiNe = info.rashi_ne ?? rashiNeFromNumber(info.rashi);
       const rashiEn = info.rashi_name ?? rashiEnFromNumber(info.rashi) ?? info.rashi_ne;
       return {
@@ -731,9 +739,27 @@ export function getPlanetRows(p: PanchangaDay): PlanetRow[] {
         labelEn: g?.en ?? key,
         rashiNe,
         rashiEn,
-        coords: formatPlanetGocharLine(info),
+        coords: planetDegreeCells(info),
       };
     });
+}
+
+export function getPlanetsAnchorLabel(p: PanchangaDay, lang?: string): string {
+  const detail = getPanchangaDetail(p);
+  const anchor = detail?.planets_anchor ?? p.planets_anchor;
+  const fallbackNe = "उदयकालिक स्पष्टग्रह (सूर्योदय)";
+  const fallbackEn = "Planets at sunrise";
+  const label = anchor?.label_ne || anchor?.label_en
+    ? pickLocale(
+        lang,
+        anchor.label_ne ?? anchor.label_en ?? fallbackNe,
+        anchor.label_en ?? anchor.label_ne ?? fallbackEn,
+      )
+    : pickLocale(lang, fallbackNe, fallbackEn);
+  const time = anchor?.local_time
+    ? formatLocaleDigits(formatTimeShort(anchor.local_time) ?? anchor.local_time, lang)
+    : undefined;
+  return time ? `${label} (${time})` : label;
 }
 
 export interface InauspiciousWindow {

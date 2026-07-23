@@ -5,6 +5,7 @@ import { PanchangaDetailCard } from "@/components/PanchangaDetailCard";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { apiKeys, fetchPanchanga } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
+import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DayDetailScreen() {
@@ -19,11 +20,11 @@ export default function DayDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="border-b border-border px-4 py-3">
+      <View className="border-b border-border py-3" style={{ paddingHorizontal: PAGE_HORIZONTAL_PADDING }}>
         <Text className="text-xl font-bold text-foreground">{pick("दिन विवरण", "Day detail")}</Text>
         <Text className="text-sm text-muted-foreground">{ad}</Text>
       </View>
-      <ScrollView contentContainerClassName="p-4">
+      <ScrollView contentContainerStyle={{ padding: PAGE_HORIZONTAL_PADDING }}>
         {query.isLoading ? (
           <LoadingState />
         ) : query.isError ? (

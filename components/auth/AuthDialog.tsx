@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -10,7 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { apiForgotPassword } from "@/lib/auth/client";
 import { useLocale } from "@/lib/i18n";
@@ -29,6 +30,7 @@ export function AuthDialog({
   initialMode?: Mode;
 }) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { pick } = useLocale();
   const { login, signup, loginWithGoogle, loginWithFacebook } = useAuth();
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -39,6 +41,10 @@ export function AuthDialog({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [open, initialMode]);
+
   function reset(next: Mode) {
     setMode(next);
     setError(null);
@@ -48,8 +54,8 @@ export function AuthDialog({
   }
 
   function close() {
+    Keyboard.dismiss();
     onOpenChange(false);
-    // Reset to a clean login form for next open.
     setTimeout(() => reset("login"), 200);
     setEmail("");
   }
@@ -150,44 +156,64 @@ export function AuthDialog({
         : pick("रिसेट लिङ्क पठाउनुहोस्", "Send reset link");
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
+    <Modal visible={open} animationType="slide" onRequestClose={close}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.card,
+          paddingTop: insets.top,
+          paddingBottom: Math.max(insets.bottom, 12),
+        }}
       >
-        <Pressable
-          className="flex-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-          onPress={close}
-        />
         <View
-          className="absolute inset-x-0 bottom-0 max-h-[92%] rounded-t-2xl border-t border-border"
-          style={{ backgroundColor: colors.card }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}
         >
-          <View className="items-center pt-2.5">
-            <View className="h-1 w-10 rounded-full" style={{ backgroundColor: colors.border }} />
-          </View>
-          <ScrollView
-            className="px-5"
-            contentContainerClassName="pb-8 pt-3"
-            keyboardShouldPersistTaps="handled"
+          <Pressable onPress={close} hitSlop={8} style={{ minWidth: 72 }}>
+            <Text style={{ fontSize: 16, color: colors.mutedForeground }}>
+              {pick("रद्द", "Cancel")}
+            </Text>
+          </Pressable>
+          <Text
+            style={{
+              flex: 1,
+              textAlign: "center",
+              fontSize: 16,
+              fontWeight: "600",
+              color: colors.foreground,
+            }}
           >
-            <View className="mb-4 flex-row items-start justify-between">
-              <View className="flex-1 pr-3">
-                <Text className="text-2xl font-bold text-foreground">{title}</Text>
-                <Text className="mt-1 text-sm text-muted-foreground">{desc}</Text>
-              </View>
-              <Pressable
-                onPress={close}
-                className="h-9 w-9 items-center justify-center rounded-full active:bg-muted"
-                accessibilityLabel={pick("बन्द गर्नुहोस्", "Close")}
-              >
-                <Ionicons name="close" size={22} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
+            {title}
+          </Text>
+          <Pressable onPress={close} hitSlop={8} style={{ minWidth: 72, alignItems: "flex-end" }}>
+            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.primary }}>
+              {pick("भयो", "Done")}
+            </Text>
+          </Pressable>
+        </View>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 48 : 0}
+        >
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <Text className="text-sm text-muted-foreground">{desc}</Text>
 
             {mode !== "forgot" ? (
-              <View className="mb-1">
+              <View className="mt-4">
                 <SocialSignInButtons
                   onGoogle={onGoogle}
                   onFacebook={onFacebook}
@@ -213,7 +239,9 @@ export function AuthDialog({
                 label={pick("पासवर्ड", "Password")}
                 value={password}
                 onChangeText={setPassword}
-                placeholder={mode === "signup" ? pick("कम्तीमा ८ अक्षर", "At least 8 characters") : "••••••••"}
+                placeholder={
+                  mode === "signup" ? pick("कम्तीमा ८ अक्षर", "At least 8 characters") : "••••••••"
+                }
                 secureTextEntry
                 autoCapitalize="none"
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
@@ -234,20 +262,20 @@ export function AuthDialog({
               />
             ) : null}
 
-            {error ? <Text className="mt-1 text-sm text-danger">{error}</Text> : null}
-            {notice ? <Text className="mt-1 text-sm text-accent">{notice}</Text> : null}
+            {error ? <Text className="mt-3 text-sm text-danger">{error}</Text> : null}
+            {notice ? <Text className="mt-3 text-sm text-accent">{notice}</Text> : null}
 
             <Pressable
               onPress={onSubmit}
               disabled={busy}
-              className="mt-4 h-12 flex-row items-center justify-center gap-2 rounded-lg bg-primary active:opacity-90"
+              className="mt-5 h-12 flex-row items-center justify-center gap-2 rounded-lg bg-primary active:opacity-90"
               style={busy ? { opacity: 0.6 } : undefined}
             >
               {busy ? <ActivityIndicator color="#fff" size="small" /> : null}
               <Text className="text-base font-semibold text-primary-foreground">{submitLabel}</Text>
             </Pressable>
 
-            <View className="mt-4 items-center gap-1.5">
+            <View className="mt-5 items-center gap-2 pb-4">
               {mode === "login" ? (
                 <>
                   <Pressable onPress={() => reset("forgot")}>
@@ -280,8 +308,8 @@ export function AuthDialog({
               ) : null}
             </View>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -296,8 +324,12 @@ function Field({
       <Text className="text-sm text-foreground">{label}</Text>
       <TextInput
         placeholderTextColor={colors.mutedForeground}
-        style={{ backgroundColor: colors.background, borderColor: colors.border }}
         className="h-12 rounded-lg border px-3 text-base text-foreground"
+        style={{
+          backgroundColor: colors.background,
+          borderColor: colors.border,
+          ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as never) : {}),
+        }}
         {...props}
       />
     </View>

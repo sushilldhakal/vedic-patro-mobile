@@ -663,9 +663,9 @@ export function DayTimeline({
           <span className="text-sm font-bold leading-tight text-[var(--color-danger)]">
             {pick("अशुभ समय", "Inauspicious periods")}
           </span>
-          <ol className="flex flex-col gap-1">
+          <ol className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
             {data.ashubha.map((a, i) => (
-              <li key={`${a.startG}-${i}`} className="flex items-baseline gap-1.5 leading-snug">
+              <li key={`${a.startG}-${i}`} className="flex min-w-0 items-baseline gap-1.5 leading-snug">
                 <span className="inline-flex h-[16px] min-w-[16px] shrink-0 items-center justify-center rounded-full bg-[var(--color-danger)] px-1 text-sm font-bold text-white">
                   {digits(i + 1)}
                 </span>
@@ -690,54 +690,23 @@ export function DayTimeline({
             </span>
           </div>
           <div className="grid grid-cols-2 min-[380px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
-            {planets.map(
-              ({
-                key: planetKey,
-                label,
-                labelEn,
-                rashiNe,
-                rashiEn,
-                coords,
-                nakshatraNe,
-                nakshatraEn,
-                pada,
-                nakshatraLordNe,
-                nakshatraLordEn,
-              }) => {
+            {planets.map(({ key: planetKey, label, labelEn, rashiNe, rashiEn, coords }) => {
               const labelL = pick(label, labelEn);
-              const rashiL = pick(
-                rashiNe ?? "—",
-                rashiEn ?? TL_RASHI_EN[rashiNe ?? ""] ?? rashiNe ?? "—",
-              );
-              const nakName = pick(nakshatraNe ?? "—", nakshatraEn ?? nakshatraNe ?? "—");
-              const padaLabel =
-                pada != null
-                  ? pick(`पद ${digits(pada)}`, `Pada ${digits(pada)}`)
+              const rashiL =
+                rashiNe || rashiEn
+                  ? pick(rashiNe ?? "", rashiEn ?? TL_RASHI_EN[rashiNe ?? ""] ?? rashiNe ?? "")
                   : undefined;
-              const lordL = pick(nakshatraLordNe ?? "—", nakshatraLordEn ?? nakshatraLordNe ?? "—");
-              const nakLine =
-                nakName && padaLabel ? `${nakName} · ${padaLabel}` : nakName ?? undefined;
               return (
               <div
                 key={planetKey}
                 className="flex w-full flex-col items-center gap-0.5 rounded-lg bg-foreground/4 px-2 py-1.5 shadow-[0_0_0_1px_color-mix(in_srgb,var(--foreground)_10%,transparent)]"
-                title={[labelL, rashiL, coords, nakLine, lordL].filter(Boolean).join(" · ")}
+                title={[labelL, rashiL ? `–${rashiL}` : undefined, coords].filter(Boolean).join(" · ")}
               >
                 <span className="inline-flex max-w-full items-baseline justify-center gap-0.5 text-center text-sm font-semibold leading-tight">
                   <span className="truncate">{labelL}</span>
-                  <span className="shrink-0">–{rashiL}</span>
+                  {rashiL ? <span className="shrink-0">–{rashiL}</span> : null}
                 </span>
                 <span className={cn(patroMono, "text-sm font-semibold tabular-nums")}>{coords}</span>
-                {nakLine ? (
-                  <span className="max-w-full truncate text-center text-sm leading-tight">
-                    {nakLine}
-                  </span>
-                ) : null}
-                {lordL ? (
-                  <span className="text-center text-sm leading-tight">
-                    {pick("नक्षत्रेश", "Lord")} {lordL}
-                  </span>
-                ) : null}
               </div>
               );
             })}

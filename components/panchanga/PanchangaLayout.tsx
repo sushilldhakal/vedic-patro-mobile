@@ -1,6 +1,33 @@
+import type { ReactNode } from "react";
+import { Text, View } from "react-native";
 import { useTranslation } from "@/lib/i18n-translations.web";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/i18n";
+import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
+
+/** Use 2-column section rows when the card/page has room (matches web sm: / md: paired layouts). */
+export function usePanchangaLayoutWide(): boolean {
+  const { width } = useBreakpoint();
+  return width >= BREAKPOINTS.sm;
+}
+
+export function SectionSplitPanel({ left, right }: { left: ReactNode; right: ReactNode }) {
+  const wide = usePanchangaLayoutWide();
+  if (wide) {
+    return (
+      <View className="flex-row">
+        <View className="min-w-0 flex-1 border-r border-border px-4 py-3">{left}</View>
+        <View className="min-w-0 flex-1 px-4 py-2.5">{right}</View>
+      </View>
+    );
+  }
+  return (
+    <View>
+      <View className="border-b border-border px-4 py-3">{left}</View>
+      <View className="px-4 py-3">{right}</View>
+    </View>
+  );
+}
 
 export function PanchangaSection({
   titleKey,
@@ -22,17 +49,17 @@ export function PanchangaSection({
     : pick(titleNe ?? titleEn ?? "", titleEn ?? titleNe ?? "");
 
   return (
-    <section
+    <View
       className={cn(
         "rounded-xl overflow-hidden bg-card shadow-[0_0_0_1px_color-mix(in_srgb,var(--foreground)_10%,transparent)]",
         className,
       )}
     >
-      <header className="flex items-baseline gap-2.5 px-4 py-2.5 border-b border-border bg-secondary/[0.09] dark:bg-secondary/20">
-        <h2 className="text-sm font-bold m-0">{title}</h2>
-      </header>
+      <View className="flex items-baseline gap-2.5 px-4 py-2.5 border-b border-border bg-secondary/[0.09] dark:bg-secondary/20">
+        <Text className="text-sm font-bold m-0">{title}</Text>
+      </View>
       {children}
-    </section>
+    </View>
   );
 }
 
@@ -43,31 +70,57 @@ function rowLabel(labelKey?: string, label?: string, t?: (k: string) => string) 
 
 function QuadLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
+    <Text
       className={cn(
         "text-sm font-semibold leading-snug pt-0.5",
         className,
       )}
     >
       {children}
-    </div>
+    </Text>
   );
 }
 
 function QuadValue({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
+    <View
       className={cn(
         "text-sm text-base leading-snug flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0",
         className,
       )}
     >
       {children}
-    </div>
+    </View>
   );
 }
 
 /** One table band: label|value on the left, optional label|value on the right. */
+function QuadPair({
+  labelKey,
+  label,
+  children,
+  t,
+  stackTopBorder,
+}: {
+  labelKey?: string;
+  label?: string;
+  children: React.ReactNode;
+  t: (key: string) => string;
+  stackTopBorder?: boolean;
+}) {
+  return (
+    <View
+      className={cn(
+        "min-w-0 flex-1 flex-row items-start gap-x-3 gap-y-1.5",
+        stackTopBorder && "mt-1.5 border-t border-dashed border-border pt-2",
+      )}
+    >
+      <QuadLabel className="w-[4.75rem] shrink-0">{rowLabel(labelKey, label, t)}</QuadLabel>
+      <QuadValue className="min-w-0 flex-1">{children}</QuadValue>
+    </View>
+  );
+}
+
 export function PanchangaQuadRow({
   left,
   right,
@@ -78,31 +131,37 @@ export function PanchangaQuadRow({
   className?: string;
 }) {
   const { t } = useTranslation();
+  const wide = usePanchangaLayoutWide();
+
+  if (wide && right) {
+    return (
+      <View
+        className={cn(
+          "flex-row items-start gap-x-3 gap-y-1.5 border-b border-border px-4 py-2",
+          className,
+        )}
+      >
+        <QuadPair labelKey={left.labelKey} label={left.label} t={t}>
+          {left.children}
+        </QuadPair>
+        <QuadPair labelKey={right.labelKey} label={right.label} t={t}>
+          {right.children}
+        </QuadPair>
+      </View>
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[minmax(4.75rem,6.25rem)_1fr] sm:grid-cols-[minmax(4.75rem,6.25rem)_1fr_minmax(4.75rem,6.25rem)_1fr]",
-        "gap-x-3 gap-y-1.5 px-4 py-2 border-b border-border items-start",
-        className,
-      )}
-    >
-      <QuadLabel>{rowLabel(left.labelKey, left.label, t)}</QuadLabel>
-      <QuadValue>{left.children}</QuadValue>
+    <View className={cn("gap-y-1.5 border-b border-border px-4 py-2", className)}>
+      <QuadPair labelKey={left.labelKey} label={left.label} t={t}>
+        {left.children}
+      </QuadPair>
       {right ? (
-        <>
-          <QuadLabel className="max-sm:col-span-2 max-sm:mt-1.5 max-sm:pt-2 max-sm:border-t max-sm:border-dashed max-sm:border-border">
-            {rowLabel(right.labelKey, right.label, t)}
-          </QuadLabel>
-          <QuadValue className="max-sm:col-span-2">{right.children}</QuadValue>
-        </>
-      ) : (
-        <>
-          <div className="hidden sm:block" aria-hidden />
-          <div className="hidden sm:block" aria-hidden />
-        </>
-      )}
-    </div>
+        <QuadPair labelKey={right.labelKey} label={right.label} t={t} stackTopBorder>
+          {right.children}
+        </QuadPair>
+      ) : null}
+    </View>
   );
 }
 
@@ -121,15 +180,15 @@ export function PanchangaFullRow({
   const { t } = useTranslation();
 
   return (
-    <div
+    <View
       className={cn(
-        "grid grid-cols-[minmax(4.75rem,6.25rem)_1fr] gap-x-3 gap-y-1 px-4 py-2 border-b border-border items-start",
+        "flex-row items-start gap-x-3 gap-y-1 border-b border-border px-4 py-2",
         className,
       )}
     >
-      <QuadLabel>{rowLabel(labelKey, label, t)}</QuadLabel>
-      <QuadValue>{children}</QuadValue>
-    </div>
+      <QuadLabel className="w-[4.75rem] shrink-0">{rowLabel(labelKey, label, t)}</QuadLabel>
+      <QuadValue className="min-w-0 flex-1">{children}</QuadValue>
+    </View>
   );
 }
 
@@ -141,9 +200,9 @@ export function PanchangaTableBody({
   className?: string;
 }) {
   return (
-    <div className={cn("[&>*:last-child]:border-b-0", className)}>
+    <View className={cn("[&>*:last-child]:border-b-0", className)}>
       {children}
-    </div>
+    </View>
   );
 }
 
@@ -195,27 +254,27 @@ export function UptoValue({
   const { t } = useTranslation();
   if (!name) return null;
   return (
-    <div
+    <View
       className={cn(
         "flex items-baseline gap-1.5 min-w-0",
         compact ? "justify-between gap-2 w-full" : "flex-wrap",
       )}
     >
-      <span className="inline-flex items-baseline gap-1.5 min-w-0">
-        {sym && <span className="text-sm shrink-0">{sym}</span>}
-        <span className="font-semibold">{name}</span>
+      <Text className="inline-flex items-baseline gap-1.5 min-w-0">
+        {sym && <Text className="text-sm shrink-0">{sym}</Text>}
+        <Text className="font-semibold">{name}</Text>
         {badge && (
-          <span className="text-sm font-semibold px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary dark:text-accent">
+          <Text className="text-sm font-semibold px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary dark:text-accent">
             {badge}
-          </span>
+          </Text>
         )}
-      </span>
+      </Text>
       {endTime && (
-        <span className="text-sm font-mono font-semibold text-foreground whitespace-nowrap shrink-0">
+        <Text className="text-sm font-mono font-semibold text-foreground whitespace-nowrap shrink-0">
           {endTime} {t("sections.until")}
-        </span>
+        </Text>
       )}
-    </div>
+    </View>
   );
 }
 
@@ -231,13 +290,13 @@ export function TimingRange({
   const { t } = useTranslation();
   if (!start || !end) {
     return (
-      <span className="text-xs">
+      <Text className="text-xs">
         {t("sections.dash")} {t("sections.not_available")}
-      </span>
+      </Text>
     );
   }
   return (
-    <span
+    <Text
       className={cn(
         "font-mono text-sm font-semibold",
         variant === "good" && "text-[var(--color-success)]",
@@ -246,7 +305,7 @@ export function TimingRange({
       )}
     >
       {start} → {end}
-    </span>
+    </Text>
   );
 }
 
@@ -259,9 +318,9 @@ export function DenseListTable({
   className?: string;
 }) {
   return (
-    <div className={cn("divide-y divide-border/80 rounded-md border border-border/80", className)}>
+    <View className={cn("divide-y divide-border/80 rounded-md border border-border/80", className)}>
       {children}
-    </div>
+    </View>
   );
 }
 
@@ -279,23 +338,23 @@ export function DenseListRow({
   className?: string;
 }) {
   return (
-    <div
+    <View
       className={cn(
         "grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 px-2.5 py-1 text-sm leading-snug",
         highlight && "font-semibold text-success",
         className,
       )}
     >
-      <span className="min-w-0 truncate">{label}</span>
-      <span className="shrink-0 font-mono text-sm font-semibold text-foreground tabular-nums">
+      <Text className="min-w-0 truncate">{label}</Text>
+      <Text className="shrink-0 font-mono text-sm font-semibold text-foreground tabular-nums">
         {time ?? "—"}
-      </span>
+      </Text>
       {note ? (
-        <span className="col-span-2 text-sm font-mono text-base text-foreground/90 -mt-0.5 pb-0.5">
+        <Text className="col-span-2 text-sm font-mono text-base text-foreground/90 -mt-0.5 pb-0.5">
           {note}
-        </span>
+        </Text>
       ) : null}
-    </div>
+    </View>
   );
 }
 
@@ -310,10 +369,10 @@ export function PanchangaSubBlock({
   className?: string;
 }) {
   return (
-    <div className={cn("border-b border-border px-4 py-2 last:border-b-0", className)}>
-      <p className="m-0 mb-1.5 text-sm font-semibold">{title}</p>
+    <View className={cn("border-b border-border px-4 py-2 last:border-b-0", className)}>
+      <Text className="m-0 mb-1.5 text-sm font-semibold">{title}</Text>
       {children}
-    </div>
+    </View>
   );
 }
 
@@ -330,42 +389,54 @@ export function PairedTimingTable({
     right?: { label: React.ReactNode; time?: React.ReactNode; note?: React.ReactNode };
   }>;
 }) {
+  const wide = usePanchangaLayoutWide();
+
   return (
-    <div className="text-sm">
-      <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] sm:gap-x-2 border-b border-border bg-secondary/[0.06] px-3 py-1.5 text-sm font-semibold">
-        <span className="col-span-2">{leftTitle}</span>
-        <span className="col-span-2 border-l border-border/60 pl-2">{rightTitle}</span>
-      </div>
-      <div className="divide-y divide-border/80">
+    <View className="text-sm">
+      {wide ? (
+        <View className="flex-row border-b border-border bg-secondary/10 px-3 py-1.5">
+          <Text className="min-w-0 flex-1 text-sm font-semibold">{leftTitle}</Text>
+          <Text className="min-w-0 flex-1 border-l border-border/60 pl-2 text-sm font-semibold">
+            {rightTitle}
+          </Text>
+        </View>
+      ) : null}
+      <View className="divide-y divide-border/80">
         {rows.map((row, i) => (
-          <div
+          <View
             key={i}
-            className="grid grid-cols-1 gap-2 px-3 py-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] sm:gap-x-2 sm:gap-y-0 sm:py-1 sm:items-start"
+            className={cn(
+              "gap-2 px-3 py-1.5",
+              wide ? "flex-row items-start py-1" : "flex-col",
+            )}
           >
             <PairedTimingCell
+              wide={wide}
               title={leftTitle}
-              showTitleOnMobile
+              showTitleOnMobile={!wide}
               label={row.left?.label}
               time={row.left?.time}
               note={row.left?.note}
               highlight={row.left?.highlight}
             />
             <PairedTimingCell
+              wide={wide}
               title={rightTitle}
-              showTitleOnMobile
+              showTitleOnMobile={!wide}
               label={row.right?.label}
               time={row.right?.time}
               note={row.right?.note}
               bordered
             />
-          </div>
+          </View>
         ))}
-      </div>
-    </div>
+      </View>
+    </View>
   );
 }
 
 function PairedTimingCell({
+  wide,
   title,
   label,
   time,
@@ -374,6 +445,7 @@ function PairedTimingCell({
   showTitleOnMobile,
   bordered,
 }: {
+  wide: boolean;
   title: string;
   label?: React.ReactNode;
   time?: React.ReactNode;
@@ -383,34 +455,31 @@ function PairedTimingCell({
   bordered?: boolean;
 }) {
   if (!label && !time) {
-    return <div className={cn("hidden sm:block sm:col-span-2", bordered && "sm:border-l sm:border-border/60")} />;
+    return wide ? <View className={cn("min-w-0 flex-1", bordered && "border-l border-border/60 pl-2")} /> : null;
   }
 
   return (
-    <div
+    <View
       className={cn(
-        "sm:col-span-2",
-        bordered && "max-sm:pt-2 max-sm:border-t max-sm:border-border/60 sm:border-l sm:border-border/60 sm:pl-2",
+        "min-w-0 flex-1",
+        bordered && !wide && "border-t border-border/60 pt-2",
+        bordered && wide && "border-l border-border/60 pl-2",
       )}
     >
       {showTitleOnMobile ? (
-        <span className="mb-0.5 block text-sm font-semibold sm:hidden">
-          {title}
-        </span>
+        <Text className="mb-0.5 text-sm font-semibold">{title}</Text>
       ) : null}
-      <div className="flex items-start justify-between gap-2">
-        <span className={cn("min-w-0 text-base leading-snug", highlight && "font-semibold text-success")}>
+      <View className="flex-row items-start justify-between gap-2">
+        <Text className={cn("min-w-0 flex-1 text-base leading-snug", highlight && "font-semibold text-success")}>
           {label}
-        </span>
-        <div className="shrink-0 text-right">
-          <div className="font-mono text-sm font-semibold text-foreground tabular-nums leading-snug">{time}</div>
+        </Text>
+        <View className="shrink-0 items-end">
+          <Text className="font-mono text-sm font-semibold tabular-nums leading-snug text-foreground">{time}</Text>
           {note ? (
-            <div className="mt-0.5 max-w-[9.5rem] text-sm font-mono text-base text-foreground/90 leading-tight">
-              {note}
-            </div>
+            <Text className="mt-0.5 max-w-[9.5rem] text-sm leading-tight text-foreground/90">{note}</Text>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </View>
+      </View>
+    </View>
   );
 }

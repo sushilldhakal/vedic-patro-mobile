@@ -1,5 +1,5 @@
 import { ScrollView, Text, View } from "react-native";
-import { floatingNavBottomPadding } from "@/lib/mobile-nav";
+import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
 
 export function AppShell({
@@ -17,8 +17,11 @@ export function AppShell({
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="mx-auto w-full max-w-[1400px] px-4 pt-4 md:px-6"
-      contentContainerStyle={{ paddingBottom: floatingNavBottomPadding(isTablet) }}
+      contentContainerClassName="mx-auto w-full max-w-[1400px] pt-4"
+      contentContainerStyle={{
+        paddingBottom: floatingNavBottomPadding(isTablet),
+        paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+      }}
     >
       <View className="mb-4 flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">

@@ -9,7 +9,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
-import { DRAWER_NAV_EXTRA, FLOATING_NAV, isNavActive } from "@/lib/mobile-nav";
+import { DRAWER_NAV_EXTRA, FLOATING_NAV, isNavActive, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { cn } from "@/lib/utils";
 
 const NAV = [...FLOATING_NAV, ...DRAWER_NAV_EXTRA];
@@ -49,8 +49,13 @@ export function AppHeader() {
       className="border-b border-border bg-background/95"
     >
       <View
-        style={{ maxWidth: 1400, width: "100%", alignSelf: "center" }}
-        className="h-16 flex-row items-center px-4"
+        style={{
+          maxWidth: 1400,
+          width: "100%",
+          alignSelf: "center",
+          paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+        }}
+        className="h-16 flex-row items-center"
       >
         {/* Left — hamburger */}
         <View className="flex-1 flex-row justify-start">
@@ -150,7 +155,10 @@ function NavDrawer({
         className="border-r border-border"
       >
         {/* Brand header */}
-        <View className="flex-row items-center gap-2.5 border-b border-border px-4 py-4">
+        <View
+          className="flex-row items-center gap-2.5 border-b border-border py-4"
+          style={{ paddingHorizontal: PAGE_HORIZONTAL_PADDING }}
+        >
           <VedicPatroMark size={40} />
           <View className="min-w-0">
             <Text className="text-base font-bold">

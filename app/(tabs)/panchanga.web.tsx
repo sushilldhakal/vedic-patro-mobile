@@ -42,7 +42,7 @@ import {
 } from "@/components/panchanga/use-panchanga-mode";
 import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { useLocale } from "@/lib/i18n";
-import { floatingNavBottomPadding } from "@/lib/mobile-nav";
+import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING, PANCHANGA_SIDEBAR_SPLIT, PANCHANGA_SIDEBAR_WIDTH } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
 
 function toAdStr(d: Date): string {
@@ -59,7 +59,8 @@ function parseAdStr(s: string): Date {
 
 export default function PanchangaScreen() {
   const { pick } = useLocale();
-  const { isTablet } = useBreakpoint();
+  const { width, isTablet } = useBreakpoint();
+  const splitSidebar = width >= PANCHANGA_SIDEBAR_SPLIT;
   const params = useLocalSearchParams<{ date?: string }>();
   const { location, setLocation, ready } = usePanchangaLocation();
 
@@ -159,12 +160,18 @@ export default function PanchangaScreen() {
 
   return (
     <ScrollView
-      className="mx-auto w-full max-w-[1400px] flex-1 bg-background px-4 pb-16 pt-4 md:px-6"
-      contentContainerStyle={{ paddingBottom: floatingNavBottomPadding(isTablet) }}
+      className="mx-auto w-full max-w-[1400px] flex-1 bg-background pb-16 pt-4"
+      contentContainerStyle={{
+        paddingBottom: floatingNavBottomPadding(isTablet),
+        paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+      }}
       showsVerticalScrollIndicator={false}
     >
-      <View className="mt-2 gap-4 xl:flex-row xl:items-start xl:gap-5">
-        <View className="min-w-0 flex-1 gap-4">
+      <View
+        className="mt-2 gap-4"
+        style={splitSidebar ? { flexDirection: "row", alignItems: "flex-start", gap: 20 } : undefined}
+      >
+        <View className="min-w-0 flex-1 gap-4" style={splitSidebar ? { flex: 1 } : undefined}>
           <PanchangaDateNav
             date={date}
             onDateChange={setDate}
@@ -231,7 +238,14 @@ export default function PanchangaScreen() {
           ) : null}
         </View>
 
-        <View className="min-w-0 gap-4 xl:w-[330px] xl:shrink-0">
+        <View
+          className="min-w-0 gap-4"
+          style={
+            splitSidebar
+              ? { width: PANCHANGA_SIDEBAR_WIDTH, flexShrink: 0, alignSelf: "flex-start" }
+              : { width: "100%" }
+          }
+        >
           <GhatiClock sunrise={sunrise} sunset={sunset} timezone={effectiveTimezone} />
           {ephemeris && data ? <MuhurtaNowPanel p={data} clock={clock} /> : null}
           <PlanetEventsPanel dateAd={chartAd} location={location.params} />

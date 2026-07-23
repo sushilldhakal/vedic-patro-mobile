@@ -679,6 +679,49 @@ export const fetchCivilTimeline = (date: string, era: "bs" | "ad" = "ad", locati
 export const fetchHolidays = (year: number) =>
   get<HolidaysResponse>(withCache(`/nepal/holidays?year=${year}&era=bs`));
 
+// ─── Gochar (planetary transits) ─────────────────────────────────────────────
+
+export interface GocharNextEntry {
+  to_rashi?: string;
+  to_rashi_ne?: string;
+  to_nakshatra?: string;
+  to_nakshatra_ne?: string;
+  to_pada?: number;
+  to_pada_ne?: string;
+  label_ne?: string;
+  entry_time_local: string;
+  entry_time_local_short?: string;
+  entry_time_utc?: string;
+}
+
+export interface GocharGraha {
+  name_ne: string;
+  name_vedic?: string;
+  symbol: string;
+  rashi?: string;
+  rashi_ne?: string;
+  rashi_no?: number;
+  motion?: string;
+  is_retrograde?: boolean;
+  next_rashi_entry?: GocharNextEntry | null;
+  next_nakshatra_entry?: GocharNextEntry | null;
+  next_pada_entry?: GocharNextEntry | null;
+}
+
+export interface GocharResponse {
+  date_ad: string;
+  date_bs?: string;
+  gochar: Record<string, GocharGraha>;
+}
+
+export const gocharKeys = {
+  day: (date: string, era: string, location?: LocationParams) =>
+    ["gochar", date, era, locationCacheKey(location)] as const,
+};
+
+export const fetchGochar = (date: string, era: "bs" | "ad" = "ad", location?: LocationParams) =>
+  get<GocharResponse>(appendLocation(`/nepal/gochar/${date}?era=${era}`, location));
+
 export const fetchSaitMonthAll = async (
   year: number,
   month: number,

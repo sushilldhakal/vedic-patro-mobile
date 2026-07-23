@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useColorScheme as useSystemColorScheme, View } from "react-native";
+import { useColorScheme as useSystemColorScheme } from "react-native";
 import * as SystemUI from "expo-system-ui";
 import { colorScheme as nativeWindColorScheme } from "nativewind";
 import { darkTheme, lightTheme, type ThemeColors } from "@/lib/theme";
@@ -76,9 +76,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={value}>
-      <View className={resolvedTheme === "dark" ? "dark flex-1" : "flex-1"} style={{ flex: 1 }}>
-        {children}
-      </View>
+      {children}
     </ThemeContext.Provider>
   );
 }

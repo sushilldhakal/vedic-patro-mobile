@@ -21,6 +21,13 @@ export const DRAWER_NAV_EXTRA = [
 
 export const FLOATING_NAV_BOTTOM_PADDING = 104;
 
+/** Standard left/right inset for page scroll content and headers. */
+export const PAGE_HORIZONTAL_PADDING = 15;
+
+/** Panchanga main + sidebar split — matches web `xl:grid-cols-[1fr_330px]` (1280px). */
+export const PANCHANGA_SIDEBAR_SPLIT = 1280;
+export const PANCHANGA_SIDEBAR_WIDTH = 330;
+
 /** Bottom inset for scroll content — scales slightly on tablet. */
 export function floatingNavBottomPadding(isTablet: boolean): number {
   return isTablet ? 112 : FLOATING_NAV_BOTTOM_PADDING;
