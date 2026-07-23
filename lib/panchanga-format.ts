@@ -2,6 +2,7 @@ import type { CalendarDay, PanchangaDay } from "@/lib/api";
 import { adToBS, BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import type { AppLanguage } from "@/lib/i18n";
+import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 
 const NEPALI_DIGITS: Record<string, string> = {
   "0": "०", "1": "१", "2": "२", "3": "३", "4": "४",
@@ -333,6 +334,13 @@ type PlanetDetail = {
   rashi_ne?: string;
   deg_in_rashi?: number;
   dms_in_rashi?: string;
+  nakshatra?: {
+    number?: number;
+    name?: string;
+    name_ne?: string;
+    pada?: number;
+    lord?: string;
+  };
 };
 
 export function longitudeToDegreeCells(longitude: number): string {
@@ -697,56 +705,200 @@ export type PlanetRow = {
   rashiNe?: string;
   rashiEn?: string;
   coords: string;
+  siderealLongitude?: number;
+  nakshatraNe?: string;
+  nakshatraEn?: string;
+  pada?: number;
+  nakshatraLordNe?: string;
+  nakshatraLordEn?: string;
+  nakshatraSubLordNe?: string;
+  nakshatraSubLordEn?: string;
 };
 
+const RASHI_EN_NAMES = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+
+type NakshatraFields = Pick<
+  PlanetRow,
+  | "nakshatraNe"
+  | "nakshatraEn"
+  | "pada"
+  | "nakshatraLordNe"
+  | "nakshatraLordEn"
+  | "nakshatraSubLordNe"
+  | "nakshatraSubLordEn"
+>;
+
+const VIMSHOTTARI: Array<[GrahaKey, number]> = [
+  ["ketu", 7], ["venus", 20], ["sun", 6], ["moon", 10], ["mars", 7],
+  ["rahu", 18], ["jupiter", 16], ["saturn", 19], ["mercury", 17],
+];
+const VIMSHOTTARI_TOTAL = 120;
+
+function subLordKeyFromLongitude(longitude: number): GrahaKey {
+  const span = 360 / 27;
+  const norm = ((longitude % 360) + 360) % 360;
+  const idx = Math.min(26, Math.floor(norm / span));
+  const posInNak = norm - idx * span;
+  const startIdx = idx % 9;
+  let acc = 0;
+  for (let i = 0; i < 9; i += 1) {
+    const [key, years] = VIMSHOTTARI[(startIdx + i) % 9]!;
+    acc += (years / VIMSHOTTARI_TOTAL) * span;
+    if (posInNak < acc - 1e-9) return key;
+  }
+  return VIMSHOTTARI[(startIdx + 8) % 9]![0];
+}
+
+export function nakshatraFieldsFromLongitude(longitude: number): NakshatraFields {
+  const norm = ((longitude % 360) + 360) % 360;
+  const span = 360 / 27;
+  const idx = Math.min(26, Math.floor(norm / span));
+  const pada = Math.min(4, Math.floor((norm - idx * span) / (span / 4)) + 1);
+  const icon = NAKSHATRA_ICONS[idx];
+  const lordKey = VIMSHOTTARI[idx % 9]![0];
+  const subKey = subLordKeyFromLongitude(norm);
+  return {
+    nakshatraNe: icon?.ne,
+    nakshatraEn: icon?.en,
+    pada,
+    nakshatraLordNe: GRAHA_NAME[lordKey].ne,
+    nakshatraLordEn: GRAHA_NAME[lordKey].en,
+    nakshatraSubLordNe: GRAHA_NAME[subKey].ne,
+    nakshatraSubLordEn: GRAHA_NAME[subKey].en,
+  };
+}
+
+export function formatDegreeInRashi(longitude: number, rashiNe?: string): string {
+  const norm = ((longitude % 360) + 360) % 360;
+  const degInRashi = norm % 30;
+  let d = Math.floor(degInRashi);
+  let totalSec = Math.round((degInRashi - d) * 3600);
+  let m = Math.floor(totalSec / 60);
+  let s = totalSec % 60;
+  if (s === 60) { s = 0; m += 1; }
+  if (m === 60) { m = 0; d += 1; }
+  const pad = (n: number) => toNepaliDigits(String(n).padStart(2, "0"));
+  const rashi = rashiNe ? `${rashiNe} ` : "";
+  return `${pad(d)}° ${rashi}${pad(m)}′ ${pad(s)}″`;
+}
+
+function planetNakshatraFields(info: PlanetDetail): NakshatraFields {
+  const nak = info.nakshatra;
+  if (nak?.number) {
+    const lord = nak.lord as GrahaKey | undefined;
+    return {
+      nakshatraNe: nak.name_ne ?? NAKSHATRA_ICONS[nak.number - 1]?.ne,
+      nakshatraEn: nak.name ?? NAKSHATRA_ICONS[nak.number - 1]?.en,
+      pada: nak.pada,
+      nakshatraLordNe: lord ? GRAHA_NAME[lord]?.ne : undefined,
+      nakshatraLordEn: lord ? GRAHA_NAME[lord]?.en : undefined,
+    };
+  }
+  const lon =
+    info.longitude ??
+    (info.rashi != null && info.deg_in_rashi != null
+      ? (info.rashi - 1) * 30 + info.deg_in_rashi
+      : undefined);
+  return lon != null ? nakshatraFieldsFromLongitude(lon) : {};
+}
+
 function rashiEnFromNumber(rashi?: number): string | undefined {
-  const EN = [
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
-  ];
   if (rashi == null || rashi < 1 || rashi > 12) return undefined;
-  return EN[rashi - 1];
+  return RASHI_EN_NAMES[rashi - 1];
 }
 
 export function getPlanetRows(p: PanchangaDay): PlanetRow[] {
-  const detail = getPanchangaDetail(p);
-  const anchor = detail?.planets_anchor ?? p.planets_anchor;
-  const instant = p.mode === "ephemeris" || anchor?.type === "instant";
-  const planets = (instant ? detail?.planets ?? p.planets : detail?.planets ?? p.planets) as
-    | Record<string, PlanetDetail | string>
-    | undefined;
+  const planets = resolvePlanetsRecord(p);
   if (!planets) return [];
 
   const order = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn", "rahu", "ketu"];
   return order
     .filter((key) => key in planets)
     .map((key) => {
-      const g = GRAHA_NAME[key as GrahaKey];
+      const { label, labelEn } = planetLabelPair(key);
       const info = planets[key];
       if (typeof info === "string") {
-        return {
-          key,
-          label: g?.ne ?? key,
-          labelEn: g?.en ?? key,
-          coords: info,
-        };
+        return { key, label, labelEn, coords: info };
       }
       const rashiNe = info.rashi_ne ?? rashiNeFromNumber(info.rashi);
       const rashiEn = info.rashi_name ?? rashiEnFromNumber(info.rashi) ?? info.rashi_ne;
+      const coords = planetDegreeCells(info);
+      const siderealLongitude =
+        info.longitude ??
+        (info.rashi != null && info.deg_in_rashi != null
+          ? (info.rashi - 1) * 30 + info.deg_in_rashi
+          : undefined);
       return {
         key,
-        label: g?.ne ?? key,
-        labelEn: g?.en ?? key,
+        label,
+        labelEn,
         rashiNe,
         rashiEn,
-        coords: planetDegreeCells(info),
+        coords,
+        siderealLongitude,
+        ...planetNakshatraFields(info),
       };
     });
 }
 
+export type InstantLagna = {
+  number?: number;
+  name_ne?: string;
+  name?: string;
+  degree_in_rashi?: number;
+  longitude?: number;
+};
+
+export function getInstantLagna(p: PanchangaDay): InstantLagna | undefined {
+  const detail = getPanchangaDetail(p);
+  if (p.mode === "ephemeris") {
+    const instant = detail?.instant_lagna as InstantLagna | undefined;
+    if (instant) return instant;
+  }
+  const lagna = (detail?.lagna ?? p.lagna) as InstantLagna | string | undefined;
+  if (!lagna || typeof lagna === "string") return undefined;
+  return lagna;
+}
+
+export function resolveLagnaSiderealLongitude(lagna: InstantLagna): number | undefined {
+  if (lagna.longitude != null) return lagna.longitude;
+  const { number, degree_in_rashi } = lagna;
+  if (number != null && degree_in_rashi != null) {
+    return (number - 1) * 30 + degree_in_rashi;
+  }
+  return undefined;
+}
+
+export function getSunriseLagnaRow(p: PanchangaDay): PlanetRow | undefined {
+  const lagna = getInstantLagna(p);
+  if (!lagna) return undefined;
+  const lon =
+    resolveLagnaSiderealLongitude(lagna) ??
+    (lagna.number != null && lagna.degree_in_rashi != null
+      ? (lagna.number - 1) * 30 + lagna.degree_in_rashi
+      : undefined);
+  if (lon == null) return undefined;
+  const rashiNum = Math.floor((((lon % 360) + 360) % 360) / 30) + 1;
+  return {
+    key: "lagna",
+    label: "लग्न",
+    labelEn: "Lagna",
+    rashiNe: lagna.name_ne ?? rashiNeFromNumber(rashiNum),
+    rashiEn: lagna.name ?? rashiEnFromNumber(rashiNum),
+    coords: longitudeToDegreeCells(lon),
+    siderealLongitude: lon,
+    ...nakshatraFieldsFromLongitude(lon),
+  };
+}
+
 export function getPlanetsAnchorLabel(p: PanchangaDay, lang?: string): string {
   const detail = getPanchangaDetail(p);
-  const anchor = detail?.planets_anchor ?? p.planets_anchor;
+  const anchor = (detail?.planets_anchor ?? p.planets_anchor) as
+    | { label_ne?: string; label_en?: string; local_time?: string; type?: string }
+    | undefined;
   const fallbackNe = "उदयकालिक स्पष्टग्रह (सूर्योदय)";
   const fallbackEn = "Planets at sunrise";
   const label = anchor?.label_ne || anchor?.label_en
@@ -828,3 +980,14 @@ export function getInauspiciousWindows(p: PanchangaDay): InauspiciousWindow[] {
 
   return out;
 }
+
+export interface AuspiciousWindow {
+  key: string;
+  nameNe: string;
+  nameEn: string;
+  start: string;
+  end: string;
+  tillFullNight?: boolean;
+}
+
+export { getAuspiciousWindows } from "@/lib/muhurta-windows";

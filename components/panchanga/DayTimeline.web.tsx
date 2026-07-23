@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CivilTimeline, PanchangaDay } from "@/lib/api";
-import { getPlanetRows, getPlanetsAnchorLabel } from "@/lib/panchanga-format.web";
+import { formatDegreeInRashi, getPlanetRows, getPlanetsAnchorLabel, getSunriseLagnaRow } from "@/lib/panchanga-format.web";
 import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-time";
 import {
   buildCivilTimelineData,
@@ -37,6 +37,7 @@ import {
   pgxSeg,
   pgxSegname,
   pgxSegnameBad,
+  pgxSegnameGood,
   pgxSegnameCho,
   pgxSegnameSm,
   pgxSunhair,
@@ -73,6 +74,7 @@ const TRACK_CLS: Record<string, string> = {
   होरा: "hora",
   लग्न: "lagna",
   अशुभ: "ashubha",
+  शुभ: "shubha",
 };
 
 function gx(g: number) {
@@ -262,7 +264,12 @@ export function DayTimeline({
     if (isCivil) return civil ? buildCivilTimelineData(civil, p) : null;
     return p ? buildDayTimelineData(p, dateAd) : null;
   }, [isCivil, civil, p, dateAd]);
-  const planets = useMemo(() => (p ? getPlanetRows(p) : []), [p]);
+  const planets = useMemo(() => {
+    if (!p) return [];
+    const rows = getPlanetRows(p);
+    const lagna = getSunriseLagnaRow(p);
+    return lagna ? [lagna, ...rows] : rows;
+  }, [p]);
   const timeZone = resolveTimeZone(p?.location?.timezone, timezone);
 
   const [now, setNow] = useState(() => new Date());
@@ -320,6 +327,18 @@ export function DayTimeline({
                     detailEn: a.detailEn,
                   })),
                 )
+              : row.kind === "shubha"
+                ? assignLanes(
+                    data.shubha.map((s) => ({
+                      ne: s.name,
+                      en: s.nameEn,
+                      fromG: s.startG,
+                      toG: s.endG,
+                      cut: false,
+                      detailNe: s.name,
+                      detailEn: s.nameEn,
+                    })),
+                  )
               : segmentsFromRow(row);
       return { key: row.label, ne: row.label, en: row.en, cls, segs };
     });
@@ -485,11 +504,12 @@ export function DayTimeline({
 
                   // Overlapping अशुभ windows are split into vertical lanes so their
                   // number badges never sit on top of one another.
-                  const laneCount = tr.cls === "ashubha" ? Math.max(1, s.laneCount ?? 1) : 1;
+                  const laned = tr.cls === "ashubha" || tr.cls === "shubha";
+                  const laneCount = laned ? Math.max(1, s.laneCount ?? 1) : 1;
                   const laneGap = laneCount > 1 ? 1.5 : 0;
                   const laneH = BAND / laneCount;
-                  const bandY = tr.cls === "ashubha" ? y + (s.lane ?? 0) * laneH : y;
-                  const bandH = tr.cls === "ashubha" ? laneH - laneGap : BAND;
+                  const bandY = laned ? y + (s.lane ?? 0) * laneH : y;
+                  const bandH = laned ? laneH - laneGap : BAND;
 
                   const clipId = `pgx-clip-${ti}-${si}`;
                   const labelY = bandY + bandH / 2 + Math.min(4, bandH / 3);
@@ -528,17 +548,19 @@ export function DayTimeline({
                             {segText}
                           </text>
                         )
-                      ) : tr.cls === "ashubha" ? (
+                      ) : tr.cls === "ashubha" || tr.cls === "shubha" ? (
                         w >= 9 && (
                           <text
                             x={clampX((x + x2) / 2, 8)}
                             y={labelY}
                             className={
-                              laneCount > 2
-                                ? cn(pgxSegnameBad, "text-sm")
-                                : laneCount > 1
+                              tr.cls === "shubha"
+                                ? pgxSegnameGood
+                                : laneCount > 2
                                   ? cn(pgxSegnameBad, "text-sm")
-                                  : pgxSegnameBad
+                                  : laneCount > 1
+                                    ? cn(pgxSegnameBad, "text-sm")
+                                    : pgxSegnameBad
                             }
                             textAnchor="middle"
                           >
@@ -659,26 +681,27 @@ export function DayTimeline({
       </div>
 
       {data.ashubha.length > 0 && (
-        <div className="flex flex-col gap-1.5 border-t border-border px-4 py-3">
-          <span className="text-sm font-bold leading-tight text-[var(--color-danger)]">
-            {pick("अशुभ समय", "Inauspicious periods")}
-          </span>
-          <ol className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-            {data.ashubha.map((a, i) => (
-              <li key={`${a.startG}-${i}`} className="flex min-w-0 items-baseline gap-1.5 leading-snug">
-                <span className="inline-flex h-[16px] min-w-[16px] shrink-0 items-center justify-center rounded-full bg-[var(--color-danger)] px-1 text-sm font-bold text-white">
-                  {digits(i + 1)}
-                </span>
-                <span className="text-sm font-semibold">
-                  {pick(a.detailNe, a.detailEn)}
-                </span>
-                <span className="ml-auto shrink-0 pl-2 text-sm font-semibold [font-family:Mukta,sans-serif]">
-                  {tLabel(a.startG)} – {tLabel(a.endG)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
+        <PeriodCards
+          tone="danger"
+          title={pick("अशुभ समय", "Inauspicious periods")}
+          items={data.ashubha.map((a, i) => ({
+            n: digits(i + 1),
+            label: pick(a.detailNe, a.detailEn),
+            time: `${tLabel(a.startG)} – ${tLabel(a.endG)}`,
+          }))}
+        />
+      )}
+
+      {data.shubha.length > 0 && (
+        <PeriodCards
+          tone="success"
+          title={pick("शुभ समय", "Auspicious periods")}
+          items={data.shubha.map((s, i) => ({
+            n: digits(i + 1),
+            label: pick(s.name, s.nameEn),
+            time: `${tLabel(s.startG)} – ${tLabel(s.endG)}`,
+          }))}
+        />
       )}
 
       {p && planets.length > 0 && (
@@ -689,30 +712,148 @@ export function DayTimeline({
               {getPlanetsAnchorLabel(p, lang)}
             </span>
           </div>
-          <div className="grid grid-cols-2 min-[380px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
-            {planets.map(({ key: planetKey, label, labelEn, rashiNe, rashiEn, coords }) => {
-              const labelL = pick(label, labelEn);
-              const rashiL =
-                rashiNe || rashiEn
-                  ? pick(rashiNe ?? "", rashiEn ?? TL_RASHI_EN[rashiNe ?? ""] ?? rashiNe ?? "")
-                  : undefined;
-              return (
-              <div
-                key={planetKey}
-                className="flex w-full flex-col items-center gap-0.5 rounded-lg bg-foreground/4 px-2 py-1.5 shadow-[0_0_0_1px_color-mix(in_srgb,var(--foreground)_10%,transparent)]"
-                title={[labelL, rashiL ? `–${rashiL}` : undefined, coords].filter(Boolean).join(" · ")}
-              >
-                <span className="inline-flex max-w-full items-baseline justify-center gap-0.5 text-center text-sm font-semibold leading-tight">
-                  <span className="truncate">{labelL}</span>
-                  {rashiL ? <span className="shrink-0">–{rashiL}</span> : null}
-                </span>
-                <span className={cn(patroMono, "text-sm font-semibold tabular-nums")}>{coords}</span>
-              </div>
-              );
-            })}
+          <div className="grid grid-cols-2 min-[380px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+            {planets.map(
+              ({
+                key: planetKey,
+                label,
+                labelEn,
+                rashiNe,
+                rashiEn,
+                coords,
+                siderealLongitude,
+                nakshatraNe,
+                nakshatraEn,
+                pada,
+                nakshatraLordNe,
+                nakshatraLordEn,
+                nakshatraSubLordNe,
+                nakshatraSubLordEn,
+              }) => {
+                const labelL = pick(label, labelEn);
+                const isLagna = planetKey === "lagna";
+                const rashiL = pick(
+                  rashiNe ?? "—",
+                  rashiEn ?? TL_RASHI_EN[rashiNe ?? ""] ?? rashiNe ?? "—",
+                );
+                const coordText =
+                  siderealLongitude != null
+                    ? formatDegreeInRashi(siderealLongitude, rashiL)
+                    : coords;
+                const nakName =
+                  nakshatraNe || nakshatraEn
+                    ? pick(nakshatraNe ?? nakshatraEn ?? "", nakshatraEn ?? nakshatraNe ?? "")
+                    : undefined;
+                const nakWithPada =
+                  nakName && pada != null ? `${nakName} (${digits(pada)})` : nakName ?? undefined;
+                const lordL =
+                  nakshatraLordNe || nakshatraLordEn
+                    ? pick(
+                        nakshatraLordNe ?? nakshatraLordEn ?? "",
+                        nakshatraLordEn ?? nakshatraLordNe ?? "",
+                      )
+                    : undefined;
+                const subLordL =
+                  nakshatraSubLordNe || nakshatraSubLordEn
+                    ? pick(
+                        nakshatraSubLordNe ?? nakshatraSubLordEn ?? "",
+                        nakshatraSubLordEn ?? nakshatraSubLordNe ?? "",
+                      )
+                    : undefined;
+                const lordText = lordL ? (subLordL ? `${lordL}/${subLordL}` : lordL) : undefined;
+                return (
+                  <div
+                    key={planetKey}
+                    className={cn(
+                      "flex w-full min-w-0 flex-col gap-0.5 rounded-lg px-2 py-1.5 shadow-[0_0_0_1px_color-mix(in_srgb,var(--foreground)_10%,transparent)]",
+                      isLagna ? "bg-secondary/12" : "bg-foreground/4",
+                    )}
+                    title={[
+                      labelL,
+                      coordText,
+                      nakWithPada,
+                      lordText && `${pick("नक्षत्रेश / उप", "Lord / Sub")} ${lordText}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  >
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <span className="shrink-0 text-sm font-bold leading-tight">{labelL}</span>
+                      <span className={cn(patroMono, "min-w-0 truncate text-sm tabular-nums leading-tight")}>
+                        {coordText}
+                      </span>
+                    </div>
+                    {(nakWithPada || lordText) && (
+                      <div className="flex items-baseline justify-between gap-1.5 text-sm leading-tight">
+                        <span className="min-w-0 truncate">{nakWithPada}</span>
+                        {lordText ? (
+                          <span
+                            className="shrink-0 font-semibold text-secondary"
+                            title={pick("नक्षत्रेश / उप स्वामी", "Nakshatra lord / sub-lord")}
+                          >
+                            {lordText}
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              },
+            )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * शुभ / अशुभ periods rendered as a responsive card grid: number badge + name on
+ * top, the time range pinned to the bottom so every card lines up regardless of
+ * name length. `tone` swaps the danger/success accent.
+ */
+function PeriodCards({
+  tone,
+  title,
+  items,
+}: {
+  tone: "danger" | "success";
+  title: string;
+  items: { n: string; label: string; time: string }[];
+}) {
+  const accent = tone === "danger" ? "var(--color-danger)" : "var(--color-success)";
+  return (
+    <div className="flex flex-col gap-2 border-t border-border px-4 py-3">
+      <span className="text-sm font-bold leading-tight" style={{ color: accent }}>
+        {title}
+      </span>
+      <ol className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {items.map((it, i) => (
+          <li
+            key={`${it.time}-${i}`}
+            className="flex min-w-0 flex-col gap-1.5 rounded-lg border px-2.5 py-2"
+            style={{
+              borderColor: `color-mix(in srgb, ${accent} 28%, transparent)`,
+              background: `color-mix(in srgb, ${accent} 7%, transparent)`,
+            }}
+          >
+            <div className="flex min-w-0 items-start gap-1.5">
+              <span
+                className="mt-px inline-flex h-[17px] min-w-[17px] shrink-0 items-center justify-center rounded-full px-1 text-sm font-bold text-white"
+                style={{ background: accent }}
+              >
+                {it.n}
+              </span>
+              <span className="min-w-0 text-sm font-semibold leading-snug [font-family:Mukta,sans-serif]">
+                {it.label}
+              </span>
+            </div>
+            <span className="mt-auto text-sm font-semibold tabular-nums [font-family:Mukta,sans-serif]">
+              {it.time}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

@@ -26,6 +26,10 @@ export const wheelDockSep =
 export const wheelIconBtn =
   "grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--w-surface-border)] bg-transparent text-sm text-[var(--w-ink)] transition-colors hover:border-[var(--w-accent)] max-[720px]:h-7 max-[720px]:w-7 max-[720px]:text-xs max-[480px]:h-6 max-[480px]:w-6 max-[480px]:text-sm";
 
+/** Native: use inline styles — `transition-*` / `animate-*` trigger Reanimated strict-mode warnings. */
+export const wheelIconBtnNative =
+  "grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[var(--w-surface-border)] bg-transparent text-sm text-[var(--w-ink)]";
+
 export const wheelDockLabel =
   "whitespace-nowrap text-sm text-base text-[var(--w-ink-dim)] max-[720px]:hidden";
 

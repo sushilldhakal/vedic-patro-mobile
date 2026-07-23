@@ -12,7 +12,6 @@ import { LocaleProvider } from "@/lib/i18n";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
-import { cn } from "@/lib/utils";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -64,25 +63,26 @@ export default function RootLayout() {
 }
 
 function RootShell({ loaded }: { loaded: boolean }) {
-  const { resolvedTheme } = useTheme();
+  const { colors } = useTheme();
 
   return (
-    <View
-      className={cn("flex-1 bg-background", resolvedTheme === "dark" && "dark")}
-      style={{ flex: 1 }}
-    >
-      <Stack screenOptions={{ headerShown: false }} />
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
       {loaded ? <ThemedStatusBar /> : null}
       {!loaded ? (
         <View
           pointerEvents="none"
-          style={[StyleSheet.absoluteFillObject, styles.fontGate]}
-          className="bg-background"
+          style={[StyleSheet.absoluteFillObject, styles.fontGate, { backgroundColor: colors.background }]}
         >
           <VedicPatroLoader />
         </View>
       ) : null}
-    </View>
+    </>
   );
 }
 

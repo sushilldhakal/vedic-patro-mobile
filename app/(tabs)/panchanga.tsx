@@ -239,8 +239,8 @@ export default function PanchangaScreen() {
                 <RituSection p={data} />
                 <BalamSection p={data} />
                 <PanchakaLagnaSection p={data} />
-                <MuhurtaTimingsSection p={data} />
                 <NivasShoolSection p={data} fallback={wheelData} />
+                <MuhurtaTimingsSection p={data} />
                 <DinVisheshSection p={data} />
                 <FestivalsSection p={data} />
               </View>

@@ -1,13 +1,5 @@
-import { useEffect } from "react";
-import { Text, View } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedProps,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, Text, View } from "react-native";
 import Svg, {
   Circle,
   Defs,
@@ -19,9 +11,6 @@ import Svg, {
   Stop,
 } from "react-native-svg";
 import { useLocale } from "@/lib/i18n";
-
-const AnimatedG = Animated.createAnimatedComponent(G);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export const PAGE_LOADER_SIZE = 120;
 
@@ -49,58 +38,7 @@ const DOTS = [
   [15.36, 30, 2.33], [21.72, 21.72, 2.5], [30, 15.36, 2.67], [39.65, 11.36, 2.83],
 ] as const;
 
-/** Animated loader — same artwork as web `public/loader.svg`. */
-function LoaderGraphic({ size }: { size: number }) {
-  const dotsSpin = useSharedValue(0);
-  const wraysSpin = useSharedValue(0);
-  const ringSpin = useSharedValue(0);
-  const haloOpacity = useSharedValue(0.4);
-  const sunScale = useSharedValue(1);
-
-  useEffect(() => {
-    dotsSpin.value = withRepeat(withTiming(360, { duration: 48000, easing: Easing.linear }), -1, false);
-    wraysSpin.value = withRepeat(withTiming(-360, { duration: 30000, easing: Easing.linear }), -1, false);
-    ringSpin.value = withRepeat(withTiming(-360, { duration: 60000, easing: Easing.linear }), -1, false);
-    haloOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.85, { duration: 1700, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.4, { duration: 1700, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-    sunScale.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 1700, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-  }, [dotsSpin, wraysSpin, ringSpin, haloOpacity, sunScale]);
-
-  const ringProps = useAnimatedProps(() => ({
-    rotation: ringSpin.value,
-    originX: 50,
-    originY: 50,
-  }));
-  const dotsProps = useAnimatedProps(() => ({
-    rotation: dotsSpin.value,
-    originX: 50,
-    originY: 50,
-  }));
-  const wraysProps = useAnimatedProps(() => ({
-    rotation: wraysSpin.value,
-    originX: 50,
-    originY: 50,
-  }));
-  const haloProps = useAnimatedProps(() => ({ opacity: haloOpacity.value }));
-  const sunProps = useAnimatedProps(() => ({
-    scale: sunScale.value,
-    originX: 50,
-    originY: 50,
-  }));
-
+function LoaderSvg({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 512 512">
       <Defs>
@@ -126,27 +64,73 @@ function LoaderGraphic({ size }: { size: number }) {
       </Defs>
       <Rect width="512" height="512" rx="116" fill="url(#ldr-bg)" />
       <G transform="translate(26, 26) scale(4.6)">
-        <AnimatedG animatedProps={ringProps}>
-          <Circle cx="50" cy="50" r="44" fill="none" stroke="url(#ldr-g)" strokeWidth="1.4" opacity={0.5} />
-        </AnimatedG>
+        <Circle cx="50" cy="50" r="44" fill="none" stroke="url(#ldr-g)" strokeWidth="1.4" opacity={0.5} />
         <Circle cx="50" cy="50" r="33" fill="none" stroke="url(#ldr-g)" strokeWidth="1.4" opacity={0.5} />
-        <AnimatedG animatedProps={dotsProps}>
-          {DOTS.map(([cx, cy, r], i) => (
-            <Circle key={i} cx={cx} cy={cy} r={r} fill="url(#ldr-g)" />
-          ))}
-        </AnimatedG>
-        <AnimatedCircle animatedProps={haloProps} cx="50" cy="50" r="24" fill="url(#ldr-halo)" />
-        <AnimatedG animatedProps={wraysProps}>
-          {WRAY_PATHS.map((d, i) => (
-            <Path key={i} d={d} fill="url(#ldr-g)" />
-          ))}
-        </AnimatedG>
-        <AnimatedG animatedProps={sunProps}>
-          <Circle cx="50" cy="50" r="16" fill="url(#ldr-sun)" />
-          <Circle cx="50" cy="50" r="4.4" fill="#073f43" opacity={0.8} />
-        </AnimatedG>
+        {DOTS.map(([cx, cy, r], i) => (
+          <Circle key={i} cx={cx} cy={cy} r={r} fill="url(#ldr-g)" />
+        ))}
+        <Circle cx="50" cy="50" r="24" fill="url(#ldr-halo)" />
+        {WRAY_PATHS.map((d, i) => (
+          <Path key={i} d={d} fill="url(#ldr-g)" />
+        ))}
+        <Circle cx="50" cy="50" r="16" fill="url(#ldr-sun)" />
+        <Circle cx="50" cy="50" r="4.4" fill="#073f43" opacity={0.8} />
       </G>
     </Svg>
+  );
+}
+
+/**
+ * Loader motion via RN Animated `transform`/`opacity` only — never Reanimated
+ * shared values or NativeWind `animate-*` (those trigger strict-mode warnings).
+ */
+function LoaderGraphic({ size }: { size: number }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0.88)).current;
+
+  useEffect(() => {
+    spin.setValue(0);
+    const spinAnim = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 24000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    const pulseAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.88,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    spinAnim.start();
+    pulseAnim.start();
+    return () => {
+      spinAnim.stop();
+      pulseAnim.stop();
+    };
+  }, [spin, pulse]);
+
+  const rotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <Animated.View style={{ width: size, height: size, opacity: pulse, transform: [{ rotate }] }}>
+      <LoaderSvg size={size} />
+    </Animated.View>
   );
 }
 

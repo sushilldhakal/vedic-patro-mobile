@@ -14,6 +14,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { PanchangaDay } from "@/lib/api";
 import { fetchPanchangaAtTime, panchangaKeys } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
+import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
 import { useLocale } from "@/lib/i18n";
 import { getPanchangaDetail } from "@/lib/panchanga-format";
 import { BS_MONTHS_NE, BS_MONTH_NAMES } from "@/lib/bs-calendar";
@@ -31,7 +32,6 @@ import { useBreakpoint } from "@/lib/responsive";
 import { WheelChart, type WheelHover, type WheelPick } from "./WheelChart";
 import { WheelPanel } from "./WheelPanel";
 import {
-  wheelIconBtn,
   wheelLegendDot,
   wheelLegendRow,
 } from "@/lib/wheel-classes";
@@ -44,6 +44,15 @@ const W_INK_DIM = "rgba(234, 243, 241, 0.65)";
 const W_INK_FAINT = "rgba(234, 243, 241, 0.45)";
 const W_DOCK_BG = "rgba(11, 20, 22, 0.94)";
 const W_DOCK_BORDER = "rgba(143, 191, 193, 0.28)";
+const wheelDockIconStyle = {
+  width: 32,
+  height: 32,
+  alignItems: "center" as const,
+  justifyContent: "center" as const,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: W_DOCK_BORDER,
+};
 
 const headEyebrowStyle = {
   color: W_INK_FAINT,
@@ -196,32 +205,28 @@ function WheelDock({
           ) : null}
           <Pressable
             onPress={onReset}
-            className={wheelIconBtn}
-            style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 999, borderWidth: 1, borderColor: W_DOCK_BORDER }}
+            style={wheelDockIconStyle}
             accessibilityLabel={pick("रिलोड · जुम रिसेट · सूर्योदय", "Reload · reset zoom · sunrise")}
           >
             <Ionicons name="refresh-outline" size={16} color={W_INK} />
           </Pressable>
           <Pressable
             onPress={onZoomIn}
-            className={wheelIconBtn}
-            style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 999, borderWidth: 1, borderColor: W_DOCK_BORDER }}
+            style={wheelDockIconStyle}
             accessibilityLabel={pick("जुम इन", "Zoom in")}
           >
             <Ionicons name="add-outline" size={18} color={W_INK} />
           </Pressable>
           <Pressable
             onPress={onZoomOut}
-            className={wheelIconBtn}
-            style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 999, borderWidth: 1, borderColor: W_DOCK_BORDER }}
+            style={wheelDockIconStyle}
             accessibilityLabel={pick("जुम आउट", "Zoom out")}
           >
             <Ionicons name="remove-outline" size={18} color={W_INK} />
           </Pressable>
           <Pressable
             onPress={onToggleFullscreen}
-            className={wheelIconBtn}
-            style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 999, borderWidth: 1, borderColor: W_DOCK_BORDER }}
+            style={wheelDockIconStyle}
             accessibilityLabel={
               expanded ? pick("सामान्य दृश्य", "Exit full screen") : pick("पूर्ण स्क्रिन", "Full screen")
             }
@@ -570,7 +575,7 @@ function WheelSkeleton({
 
   return (
     <Card className="overflow-hidden p-0" style={{ backgroundColor: W_BG }}>
-      <View className="mx-auto animate-pulse bg-muted/20" style={{ width: 320, height: 320 }} />
+      <SkeletonPulse className="mx-auto bg-muted/20" style={{ width: 320, height: 320 }} />
     </Card>
   );
 }

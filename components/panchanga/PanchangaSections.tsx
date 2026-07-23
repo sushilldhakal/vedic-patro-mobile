@@ -393,7 +393,7 @@ function BalamChips({ items }: { items: BalamChip[] }) {
 }
 
 const splitPanelHeading =
-  "mb-2 text-sm font-semibold uppercase tracking-wide text-foreground";
+  "mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground md:text-sm";
 
 function PadaDetailGrid({
   padaSpans,
@@ -472,7 +472,7 @@ export function BalamSection({ p }: { p: PanchangaDay }) {
               ) : null}
             </Text>
             <BalamChips items={chandra?.set1 ?? []} />
-            <Text className={cn(splitPanelHeading, "mt-3")}>{t("sections.until_sunrise")}</Text>
+            <Text className={cn(splitPanelHeading, "mt-2")}>{t("sections.until_sunrise")}</Text>
             <BalamChips items={chandra?.set2 ?? []} />
           </>
         }
@@ -488,7 +488,7 @@ export function BalamSection({ p }: { p: PanchangaDay }) {
               ) : null}
             </Text>
             <BalamChips items={tara?.set1 ?? []} />
-            <Text className={cn(splitPanelHeading, "mt-3")}>{t("sections.until_sunrise")}</Text>
+            <Text className={cn(splitPanelHeading, "mt-2")}>{t("sections.until_sunrise")}</Text>
             <BalamChips items={tara?.set2 ?? []} />
           </>
         }
@@ -632,7 +632,7 @@ export function RituSection({ p }: { p: PanchangaDay }) {
           left={{
             labelKey: "sections.madhyahna",
             children: (
-              <Text className="font-mono font-semibold">
+              <Text className="font-mono text-xs font-semibold md:text-sm">
                 {formatMadhyahnaDisplay(p, lang) ?? "—"}
               </Text>
             ),

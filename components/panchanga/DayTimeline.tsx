@@ -4,18 +4,22 @@ import { ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
 import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import type { PanchangaDay } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
+import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
 import { useLocale } from "@/lib/i18n";
 import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
 import {
+  formatDegreeInRashi,
   getPlanetRows,
   getPlanetsAnchorLabel,
+  getSunriseLagnaRow,
 } from "@/lib/panchanga-format";
 import {
   buildDayTimelineData,
   CHOGHADIYA_EN,
   dualTimeAtGhati,
   needleGhatiOnVedicChart,
+  TL_RASHI_EN,
   type TimelineRowData,
 } from "@/lib/day-timeline-data";
 import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-time";
@@ -40,6 +44,27 @@ const SUN_R = 6;
 const GHATI_TICKS = Array.from({ length: 16 }, (_, i) => i * 4);
 const FONT = "Mukta_600SemiBold";
 const FONT_SM = "Mukta_500Medium";
+const SECTION_H_PAD = 16;
+const PERIOD_CARD_GAP = 8;
+const PLANET_CARD_GAP = 6;
+
+function periodGridCols(width: number): number {
+  if (width >= BREAKPOINTS.lg) return 5;
+  if (width >= BREAKPOINTS.md) return 4;
+  if (width >= 420) return 3;
+  return 2;
+}
+
+function planetGridCols(width: number): number {
+  if (width >= BREAKPOINTS.md) return 4;
+  if (width >= 380) return 3;
+  return 2;
+}
+
+function gridItemWidth(containerWidth: number, cols: number, gap: number, horizontalPad = SECTION_H_PAD): number {
+  const inner = Math.max(0, containerWidth - horizontalPad * 2);
+  return (inner - gap * (cols - 1)) / cols;
+}
 
 const TRACK_CLS: Record<string, string> = {
   तिथि: "tithi",
@@ -50,6 +75,7 @@ const TRACK_CLS: Record<string, string> = {
   होरा: "hora",
   लग्न: "lagna",
   अशुभ: "ashubha",
+  शुभ: "shubha",
 };
 
 const C_BASE = {
@@ -64,6 +90,7 @@ const C_BASE = {
   choGood: "rgba(46,160,120,0.13)",
   choBad: "rgba(231,76,60,0.13)",
   ashubha: "rgba(231,76,60,0.22)",
+  shubha: "rgba(46,160,120,0.22)",
 } as const;
 
 function useTimelineColors() {
@@ -149,6 +176,7 @@ function segFill(
 ): string {
   if (cls === "cho" || cls === "hora") return bad ? C.choBad : C.choGood;
   if (cls === "ashubha") return C.ashubha;
+  if (cls === "shubha") return C.shubha;
   if (cls === "lagna" && active) return C.lagnaActive;
   const palette = C[cls as keyof typeof C_BASE];
   if (Array.isArray(palette)) return alt ? palette[1]! : palette[0]!;
@@ -270,7 +298,12 @@ export function DayTimeline({
   const [containerWidth, setContainerWidth] = useState(0);
   const C = useTimelineColors();
   const data = useMemo(() => (p ? buildDayTimelineData(p, dateAd) : null), [p, dateAd]);
-  const planets = useMemo(() => (p ? getPlanetRows(p) : []), [p]);
+  const planets = useMemo(() => {
+    if (!p) return [];
+    const rows = getPlanetRows(p);
+    const lagna = getSunriseLagnaRow(p);
+    return lagna ? [lagna, ...rows] : rows;
+  }, [p]);
   const timeZone = resolveTimeZone(p?.location?.timezone, timezone);
   const [now, setNow] = useState(() => new Date());
 
@@ -291,7 +324,7 @@ export function DayTimeline({
             {pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
           </Text>
         </View>
-        <View className="mx-3 my-3 h-[320px] animate-pulse rounded-lg bg-muted/40" />
+        <SkeletonPulse className="mx-3 my-3 h-[320px] rounded-lg bg-muted/40" />
       </Card>
     );
   }
@@ -329,6 +362,17 @@ export function DayTimeline({
                     detailEn: a.detailEn,
                   })),
                 )
+              : row.kind === "shubha"
+                ? assignLanes(
+                    data.shubha.map((s) => ({
+                      ne: s.name,
+                      en: s.nameEn,
+                      fromG: s.startG,
+                      toG: s.endG,
+                      detailNe: s.name,
+                      detailEn: s.nameEn,
+                    })),
+                  )
               : segmentsFromRow(row);
       return { key: row.label, ne: row.label, en: row.en, cls, segs };
     });
@@ -338,7 +382,10 @@ export function DayTimeline({
   const measuredWidth = containerWidth || windowWidth - PAGE_HORIZONTAL_PADDING * 2;
   const chartWidth = Math.max(MIN_CHART_WIDTH, measuredWidth);
   const scrollChart = measuredWidth < MIN_CHART_WIDTH;
-  const ashubhaCols = measuredWidth >= BREAKPOINTS.sm;
+  const periodCols = periodGridCols(measuredWidth);
+  const periodCardW = gridItemWidth(measuredWidth, periodCols, PERIOD_CARD_GAP);
+  const planetCols = planetGridCols(measuredWidth);
+  const planetCardW = gridItemWidth(measuredWidth, planetCols, PLANET_CARD_GAP);
   const tLabel = (g: number) => dualTimeAtGhati(g, data.sunriseMin).clock;
 
   let nowG: number | null = null;
@@ -430,11 +477,11 @@ export function DayTimeline({
               const [mainName, paksha] = segText.includes(", ")
                 ? [segText.split(", ")[0]!, segText.split(", ").slice(1).join(", ")]
                 : [segText, ""];
-              const laneCount = tr.cls === "ashubha" ? Math.max(1, s.laneCount ?? 1) : 1;
+              const laneCount = tr.cls === "ashubha" || tr.cls === "shubha" ? Math.max(1, s.laneCount ?? 1) : 1;
               const laneGap = laneCount > 1 ? 1.5 : 0;
               const laneH = BAND / laneCount;
-              const bandY = tr.cls === "ashubha" ? y + (s.lane ?? 0) * laneH : y;
-              const bandH = tr.cls === "ashubha" ? laneH - laneGap : BAND;
+              const bandY = tr.cls === "ashubha" || tr.cls === "shubha" ? y + (s.lane ?? 0) * laneH : y;
+              const bandH = tr.cls === "ashubha" || tr.cls === "shubha" ? laneH - laneGap : BAND;
               const labelY = bandY + bandH / 2 + 4;
 
               return (
@@ -462,9 +509,16 @@ export function DayTimeline({
                         {segText}
                       </SvgText>
                     ) : null
-                  ) : tr.cls === "ashubha" ? (
+                  ) : tr.cls === "ashubha" || tr.cls === "shubha" ? (
                     w >= 9 ? (
-                      <SvgText x={clampX((x + x2) / 2, 8)} y={labelY} fill={C.danger} fontSize={10} fontFamily={FONT} textAnchor="middle">
+                      <SvgText
+                        x={clampX((x + x2) / 2, 8)}
+                        y={labelY}
+                        fill={tr.cls === "shubha" ? "#2ea078" : C.danger}
+                        fontSize={10}
+                        fontFamily={FONT}
+                        textAnchor="middle"
+                      >
                         {digits(si + 1)}
                       </SvgText>
                     ) : null
@@ -576,44 +630,29 @@ export function DayTimeline({
       </View>
 
       {data.ashubha.length > 0 && (
-        <View className="gap-1.5 border-t border-border px-4 py-3">
-          <Text className="text-sm font-bold text-destructive">{pick("अशुभ समय", "Inauspicious periods")}</Text>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              columnGap: 24,
-              rowGap: 4,
-            }}
-          >
-            {data.ashubha.map((a, i) => (
-              <View
-                key={`${a.startG}-${i}`}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "baseline",
-                  gap: 6,
-                  minWidth: 0,
-                  width: ashubhaCols ? "48%" : "100%",
-                }}
-              >
-                <View className="h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1">
-                  <Text className="text-xs font-bold text-white">{digits(i + 1)}</Text>
-                </View>
-                <Text
-                  className="text-sm font-semibold text-foreground"
-                  style={{ flex: 1, minWidth: 0 }}
-                  numberOfLines={2}
-                >
-                  {pick(a.detailNe, a.detailEn)}
-                </Text>
-                <Text className="shrink-0 pl-2 text-sm font-semibold text-muted-foreground">
-                  {tLabel(a.startG)} – {tLabel(a.endG)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        <PeriodCards
+          tone="danger"
+          title={pick("अशुभ समय", "Inauspicious periods")}
+          cardWidth={periodCardW}
+          items={data.ashubha.map((a, i) => ({
+            n: digits(i + 1),
+            label: pick(a.detailNe, a.detailEn),
+            time: `${tLabel(a.startG)} – ${tLabel(a.endG)}`,
+          }))}
+        />
+      )}
+
+      {data.shubha.length > 0 && (
+        <PeriodCards
+          tone="success"
+          title={pick("शुभ समय", "Auspicious periods")}
+          cardWidth={periodCardW}
+          items={data.shubha.map((s, i) => ({
+            n: digits(i + 1),
+            label: pick(s.name, s.nameEn),
+            time: `${tLabel(s.startG)} – ${tLabel(s.endG)}`,
+          }))}
+        />
       )}
 
       {p && planets.length > 0 ? (
@@ -622,27 +661,137 @@ export function DayTimeline({
             <Text className="text-sm font-bold text-foreground">{pick("ग्रह", "Planets")}</Text>
             <Text className="text-sm text-muted-foreground">{getPlanetsAnchorLabel(p, lang)}</Text>
           </View>
-          <View className="flex-row flex-wrap gap-1.5">
-            {planets.map(({ key, label, labelEn, rashiNe, rashiEn, coords }) => {
-              const name = pick(label, labelEn);
-              const rashi = rashiNe || rashiEn ? pick(rashiNe ?? "", rashiEn ?? rashiNe ?? "") : undefined;
-              return (
-                <View
-                  key={key}
-                  className="min-w-[31%] flex-1 items-center gap-0.5 rounded-lg border border-border/60 bg-foreground/5 px-2 py-1.5"
-                >
-                  <Text className="text-center text-sm font-semibold text-foreground" numberOfLines={1}>
-                    {name}
-                    {rashi ? <Text className="text-foreground">–{rashi}</Text> : null}
-                  </Text>
-                  <Text className="font-num text-center text-sm font-semibold text-foreground">{coords}</Text>
-                </View>
-              );
-            })}
+          <View className="flex-row flex-wrap" style={{ gap: PLANET_CARD_GAP }}>
+            {planets.map(
+              ({
+                key: planetKey,
+                label,
+                labelEn,
+                rashiNe,
+                rashiEn,
+                coords,
+                siderealLongitude,
+                nakshatraNe,
+                nakshatraEn,
+                pada,
+                nakshatraLordNe,
+                nakshatraLordEn,
+                nakshatraSubLordNe,
+                nakshatraSubLordEn,
+              }) => {
+                const labelL = pick(label, labelEn);
+                const isLagna = planetKey === "lagna";
+                const rashiL = pick(
+                  rashiNe ?? "—",
+                  rashiEn ?? TL_RASHI_EN[rashiNe ?? ""] ?? rashiNe ?? "—",
+                );
+                const coordText =
+                  siderealLongitude != null
+                    ? formatDegreeInRashi(siderealLongitude, rashiL)
+                    : coords;
+                const nakName =
+                  nakshatraNe || nakshatraEn
+                    ? pick(nakshatraNe ?? nakshatraEn ?? "", nakshatraEn ?? nakshatraNe ?? "")
+                    : undefined;
+                const nakWithPada =
+                  nakName && pada != null ? `${nakName} (${digits(pada)})` : nakName ?? undefined;
+                const lordL =
+                  nakshatraLordNe || nakshatraLordEn
+                    ? pick(
+                        nakshatraLordNe ?? nakshatraLordEn ?? "",
+                        nakshatraLordEn ?? nakshatraLordNe ?? "",
+                      )
+                    : undefined;
+                const subLordL =
+                  nakshatraSubLordNe || nakshatraSubLordEn
+                    ? pick(
+                        nakshatraSubLordNe ?? nakshatraSubLordEn ?? "",
+                        nakshatraSubLordEn ?? nakshatraSubLordNe ?? "",
+                      )
+                    : undefined;
+                const lordText = lordL ? (subLordL ? `${lordL}/${subLordL}` : lordL) : undefined;
+
+                return (
+                  <View
+                    key={planetKey}
+                    className="gap-0.5 rounded-lg border border-border/60 px-2 py-1.5"
+                    style={{
+                      width: planetCardW,
+                      backgroundColor: isLagna ? "rgba(11,86,90,0.12)" : "rgba(26,20,16,0.04)",
+                    }}
+                  >
+                    <View className="flex-row items-baseline justify-between gap-1.5">
+                      <Text className="shrink-0 text-sm font-bold text-foreground" numberOfLines={1}>
+                        {labelL}
+                      </Text>
+                      <Text className="min-w-0 flex-1 text-right text-sm font-semibold text-foreground" numberOfLines={1}>
+                        {coordText}
+                      </Text>
+                    </View>
+                    {(nakWithPada || lordText) && (
+                      <View className="flex-row items-baseline justify-between gap-1.5">
+                        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
+                          {nakWithPada}
+                        </Text>
+                        {lordText ? (
+                          <Text className="shrink-0 text-sm font-semibold text-secondary" numberOfLines={1}>
+                            {lordText}
+                          </Text>
+                        ) : null}
+                      </View>
+                    )}
+                  </View>
+                );
+              },
+            )}
           </View>
         </View>
       ) : null}
     </Card>
+  );
+}
+
+function PeriodCards({
+  tone,
+  title,
+  items,
+  cardWidth,
+}: {
+  tone: "danger" | "success";
+  title: string;
+  items: { n: string; label: string; time: string }[];
+  cardWidth: number;
+}) {
+  const accent = tone === "danger" ? "#e74c3c" : "#2ea078";
+  const borderColor = tone === "danger" ? "rgba(231,76,60,0.28)" : "rgba(46,160,120,0.28)";
+  const backgroundColor = tone === "danger" ? "rgba(231,76,60,0.07)" : "rgba(46,160,120,0.07)";
+
+  return (
+    <View className="gap-2 border-t border-border px-4 py-3">
+      <Text className="text-sm font-bold" style={{ color: accent }}>
+        {title}
+      </Text>
+      <View className="flex-row flex-wrap" style={{ gap: PERIOD_CARD_GAP }}>
+        {items.map((it, i) => (
+          <View
+            key={`${it.time}-${i}`}
+            className="min-w-0 gap-1.5 rounded-lg border px-2.5 py-2"
+            style={{ width: cardWidth, borderColor, backgroundColor }}
+          >
+            <View className="min-w-0 flex-row items-start gap-1.5">
+              <View
+                className="mt-px h-[17px] min-w-[17px] shrink-0 items-center justify-center rounded-full px-1"
+                style={{ backgroundColor: accent }}
+              >
+                <Text className="text-xs font-bold text-white">{it.n}</Text>
+              </View>
+              <Text className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">{it.label}</Text>
+            </View>
+            <Text className="text-sm font-semibold text-foreground">{it.time}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
