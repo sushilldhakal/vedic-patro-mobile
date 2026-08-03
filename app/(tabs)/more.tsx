@@ -1,68 +1,135 @@
-import { Linking, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { AppShell, LangToggle } from "@/components/AppShell";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { API_BASE } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { useBreakpoint } from "@/lib/responsive";
+import { useThemeColors } from "@/lib/theme-context";
+import {
+  SITEMAP_ELEMENT_IDS,
+  SITEMAP_LEARN_SLUGS,
+  SITEMAP_ROUTES,
+  SITEMAP_SAIT_CATEGORIES,
+} from "@/lib/sitemap-routes";
+import { CEREMONY_META, ELEMENT_BY_ID } from "@/lib/panchanga-elements";
+import { LEARN_TOPIC_METAS } from "@/lib/learn/learn-topics-meta";
+import type { MobileNavIcon } from "@/lib/mobile-nav";
 
-const LINKS = [
-  { ne: "वेबसाइट", en: "Website", url: "https://vedicpatro.com" },
-  { ne: "विवाह साइत", en: "Marriage muhurta", url: "https://vedicpatro.com/vivah-sait" },
-  { ne: "दैनिक क्रान्ति", en: "Daily transit", url: "https://vedicpatro.com/dainikkranti" },
-];
+function RouteRow({
+  path,
+  label,
+  icon,
+}: {
+  path: string;
+  label: string;
+  icon: MobileNavIcon;
+}) {
+  const router = useRouter();
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      onPress={() => router.push(path as never)}
+      className="flex-row items-center gap-3 border-b border-border/40 py-3 active:opacity-80"
+    >
+      <Ionicons name={icon} size={20} color={colors.secondary} />
+      <Text className="flex-1 text-sm font-medium text-foreground">{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
 
 export default function MoreScreen() {
   const { pick } = useLocale();
   const { isTablet } = useBreakpoint();
 
+  const learnExtra = SITEMAP_LEARN_SLUGS.map((slug) => {
+    const meta = LEARN_TOPIC_METAS.find((t) => t.slug === slug);
+    return {
+      path: `/learn/${slug}`,
+      label: meta ? pick(meta.titleNe, meta.titleEn) : slug,
+      icon: (meta?.icon ?? "book-outline") as MobileNavIcon,
+    };
+  });
+
+  const elementRoutes = SITEMAP_ELEMENT_IDS.map((id) => {
+    const meta = ELEMENT_BY_ID[id];
+    return {
+      path: `/panchanga/element/${id}`,
+      label: meta ? pick(meta.titleNe, meta.titleEn) : id,
+      icon: "grid-outline" as MobileNavIcon,
+    };
+  });
+
+  const saitRoutes = SITEMAP_SAIT_CATEGORIES.map((id) => {
+    const meta = CEREMONY_META.find((c) => c.id === id);
+    const path = id === "vivah" ? "/vivah-sait" : `/sait/${id}`;
+    return {
+      path,
+      label: meta ? pick(meta.titleNe, meta.titleEn) : id,
+      icon: "heart-outline" as MobileNavIcon,
+    };
+  });
+
   return (
     <AppShell
       title={pick("थप", "More")}
-      subtitle={pick("वैदिक पात्रो मोबाइल", "Vedic Patro Mobile")}
+      subtitle={pick("सबै पृष्ठ · vedicpatro.com sitemap", "All pages · sitemap parity")}
       headerRight={<LangToggle />}
     >
       <View className={isTablet ? "flex-row flex-wrap gap-4" : "gap-4"}>
         <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
           <Text className="mb-2 text-base font-semibold text-foreground">
-            {pick("यस एपमा", "In this app")}
+            {pick("मुख्य", "Main")}
           </Text>
-          <Text className="text-sm leading-6 text-muted-foreground">
-            {pick(
-              "पात्रो, दैनिक पञ्चाङ्ग, बिदा सूची, र AD/BS रूपान्तर — सबै vedicpatro.com API बाट। फोन, ट्याबलेट, iPad र Android ट्याबलेटमा responsive layout।",
-              "Calendar, daily panchanga, holidays, and AD/BS converter — all powered by the vedicpatro.com API. Responsive on phone, tablet, iPad, and Android tablets.",
-            )}
-          </Text>
-        </Card>
-
-        <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
-          <Text className="mb-2 text-base font-semibold text-foreground">
-            {pick("API", "API")}
-          </Text>
-          <Text className="mb-3 font-mono text-xs text-muted-foreground">{API_BASE}</Text>
-          <Text className="text-sm text-muted-foreground">
-            {pick("सर्वर:", "Server:")} vedicpatro.com
-          </Text>
-        </Card>
-
-        <Card className={isTablet ? "w-full" : ""}>
-          <Text className="mb-3 text-base font-semibold text-foreground">
-            {pick("वेबमा खोल्नुहोस्", "Open on web")}
-          </Text>
-          {LINKS.map((link) => (
-            <Button
-              key={link.url}
-              label={pick(link.ne, link.en)}
-              variant="outline"
-              className="mb-2"
-              onPress={() => Linking.openURL(link.url)}
+          {SITEMAP_ROUTES.map((r) => (
+            <RouteRow
+              key={r.path}
+              path={r.path}
+              label={pick(r.ne, r.en)}
+              icon={r.icon}
             />
           ))}
         </Card>
 
+        <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
+          <Text className="mb-2 text-base font-semibold text-foreground">
+            {pick("पञ्चाङ्ग तत्त्व", "Panchanga elements")}
+          </Text>
+          {elementRoutes.map((r) => (
+            <RouteRow key={r.path} path={r.path} label={r.label} icon={r.icon} />
+          ))}
+        </Card>
+
+        <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
+          <Text className="mb-2 text-base font-semibold text-foreground">
+            {pick("सिकाइ लेख", "Learn articles")}
+          </Text>
+          <RouteRow
+            path="/learn/history"
+            label={pick("इतिहास", "History")}
+            icon="time-outline"
+          />
+          {learnExtra.map((r) => (
+            <RouteRow key={r.path} path={r.path} label={r.label} icon={r.icon} />
+          ))}
+        </Card>
+
+        <Card className={isTablet ? "w-full" : ""}>
+          <Text className="mb-2 text-base font-semibold text-foreground">
+            {pick("शुभ साइत", "Ceremony muhurta")}
+          </Text>
+          {saitRoutes.map((r) => (
+            <RouteRow key={r.path} path={r.path} label={r.label} icon={r.icon} />
+          ))}
+        </Card>
+
         <Card>
-          <Text className="text-sm text-muted-foreground">
-            {pick("संस्करण 1.0.0 · Mukta + Fira Code fonts", "Version 1.0.0 · Mukta + Fira Code fonts")}
+          <Text className="mb-1 text-sm font-semibold text-foreground">API</Text>
+          <Text className="font-mono text-xs text-muted-foreground">{API_BASE}</Text>
+          <Text className="mt-2 text-xs text-muted-foreground">
+            {pick("संस्करण 1.1.0 · Android & iOS (Expo)", "Version 1.1.0 · Android & iOS (Expo)")}
           </Text>
         </Card>
       </View>

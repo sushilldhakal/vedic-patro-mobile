@@ -1,9 +1,15 @@
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { CalendarDay } from "@/lib/api";
+import { CalendarMoonPhaseIcon } from "@/components/panchanga/CalendarMoonPhaseIcon";
+import { FestivalListSheet } from "@/components/home/FestivalListSheet";
 import { useLocale } from "@/lib/i18n";
-import { useThemeColors } from "@/lib/theme-context";
-import { nepaliTextStyle } from "@/lib/nepali-text";
+import { getSecondaryCellDate } from "@/lib/local-calendar";
+import { nepaliDayNumberStyle, nepaliLineHeight, nepaliTextStyle } from "@/lib/nepali-text";
+import { civilIsoDayOfMonth } from "@/lib/patro-day";
 import { useBreakpoint } from "@/lib/responsive";
+import { useThemeColors } from "@/lib/theme-context";
+import { tithiIndexFromCalendarDay } from "@/lib/tithi-wheel-data";
 import {
   CALENDAR_GRID_GAP,
   calendarColStyle,
@@ -11,7 +17,6 @@ import {
   useCalendarGridWidth,
 } from "./calendar-grid-layout";
 
-const WEEKDAYS_NE = ["आइतवार", "सोमवार", "मंगलवार", "बुधवार", "बिहीवार", "शुक्रवार", "शनिवार"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["आइत", "सोम", "मंगल", "बुध", "बिही", "शुक्र", "शनि"];
 
@@ -21,8 +26,18 @@ function chunk<T>(items: T[], size: number): T[][] {
   return rows;
 }
 
-function fmtAdDay(iso: string): number {
-  return new Date(`${iso}T12:00:00`).getDate();
+type PakshaPhase = "shukla" | "krishna";
+
+function getPakshaPhase(day: CalendarDay): PakshaPhase | undefined {
+  if (day.paksha === "shukla" || day.paksha_ne?.includes("शुक्ल")) return "shukla";
+  if (day.paksha === "krishna" || day.paksha_ne?.includes("कृष्ण")) return "krishna";
+  return undefined;
+}
+
+function moonPhaseTitle(phase: PakshaPhase | undefined, isEn: boolean): string | undefined {
+  if (phase === "shukla") return isEn ? "Shukla paksha (waxing moon)" : "शुक्ल पक्ष";
+  if (phase === "krishna") return isEn ? "Krishna paksha (waning moon)" : "कृष्ण पक्ष";
+  return undefined;
 }
 
 type Props = {
@@ -32,6 +47,7 @@ type Props = {
   publicHolidayDates?: Set<string>;
   onSelectDay?: (day: CalendarDay) => void;
   isEnriching?: boolean;
+  primaryDate?: "bs" | "ad";
 };
 
 export function BsCalendarGrid({
@@ -41,14 +57,31 @@ export function BsCalendarGrid({
   publicHolidayDates = new Set(),
   onSelectDay,
   isEnriching,
+  primaryDate = "bs",
 }: Props) {
   const theme = useThemeColors();
   const { pick, digits, lang } = useLocale();
-  const { isTablet } = useBreakpoint();
+  const isEn = lang === "en";
+  const { isCompact, isTablet } = useBreakpoint();
   const { onLayout, colWidth } = useCalendarGridWidth();
   const col = (extra?: object) => calendarColStyle(colWidth, extra);
   const metaSize = isTablet ? 12 : 10;
   const metaTextStyle = lang === "en" ? undefined : nepaliTextStyle(metaSize);
+  const tithiRowMinH = lang === "en" ? 14 : nepaliLineHeight(metaSize) + 3;
+  const dayNumSize = isCompact ? 22 : isTablet ? 30 : 24;
+  const dayNumStyle =
+    lang === "en"
+      ? {
+          fontSize: dayNumSize,
+          lineHeight: dayNumSize + (isCompact ? 4 : 6),
+        }
+      : nepaliDayNumberStyle(dayNumSize);
+  const cellMinH = isCompact ? 84 : isTablet ? 104 : 96;
+
+  const [festivalDialog, setFestivalDialog] = useState<{
+    day: CalendarDay;
+    festivals: string[];
+  } | null>(null);
 
   const cells: (CalendarDay | null)[] = [...days];
   while (cells.length % 7 !== 0) cells.push(null);
@@ -56,150 +89,219 @@ export function BsCalendarGrid({
   const weekdayLabels = lang === "en" ? WEEKDAYS_EN : WEEKDAYS_SHORT;
 
   return (
-    <View
-      onLayout={onLayout}
-      className="overflow-hidden rounded-xl border border-border shadow-sm"
-      style={{ backgroundColor: theme.border, gap: CALENDAR_GRID_GAP }}
-    >
-      <View style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
-        {weekdayLabels.map((label, i) => {
-          const weekend = i === 0 || i === 6;
-          return (
-            <View
-              key={label}
-              style={col({ backgroundColor: theme.surfaceInset })}
-              className="items-center px-1 py-2 md:py-2"
-            >
-              <Text
-                className="font-bold uppercase tracking-wide"
-                style={[
-                  {
-                    color: weekend && lang !== "en" ? theme.danger : theme.text,
-                    fontSize: isTablet ? 14 : 12,
-                  },
-                  lang === "en" ? undefined : nepaliTextStyle(isTablet ? 14 : 12),
-                ]}
-              >
-                {label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-
-      {rows.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
-          {row.map((day, colIndex) => {
-            const cellIndex = rowIndex * 7 + colIndex;
-
-            if (!day) {
-              return (
-                <View
-                  key={`empty-${cellIndex}`}
-                  style={col({
-                    minHeight: 96,
-                    backgroundColor: theme.surfaceMuted,
-                  })}
-                />
-              );
-            }
-
-            const isOutside = day.outsideMonth === true;
-            const isToday = day.date_ad === todayAd;
-            const isSelected = day.date_ad === selectedAd && !isToday;
-            const isWeekend = colIndex === 0 || colIndex === 6;
-            const isPublicHoliday = !isOutside && publicHolidayDates.has(day.date_ad);
-            const hasFestival = !isOutside && day.festivals.length > 0 && !isPublicHoliday;
-            const mainFest = day.festivals[0];
-            const tithi = pick(day.tithi_ne ?? day.tithi, day.tithi ?? day.tithi_ne);
-            const dayColor =
-              !isOutside && (isWeekend || isPublicHoliday)
-                ? theme.danger
-                : isOutside
-                  ? theme.textMuted
-                  : theme.text;
-
-            let bg: string = theme.card;
-            if (isOutside) bg = theme.surfaceMuted;
-            else if (isToday) bg = theme.surfaceToday;
-            else if (isPublicHoliday) bg = theme.surfaceTintDanger;
-
+    <>
+      <View
+        onLayout={onLayout}
+        className="overflow-hidden rounded-xl border border-border shadow-sm"
+        style={{ backgroundColor: theme.border, gap: CALENDAR_GRID_GAP }}
+      >
+        <View style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
+          {weekdayLabels.map((label, i) => {
+            const weekend = i === 0 || i === 6;
             return (
-              <Pressable
-                key={day.date_ad}
-                onPress={() => onSelectDay?.(day)}
-                style={col({
-                  minHeight: 96,
-                  backgroundColor: bg,
-                })}
-                className="relative p-1 active:opacity-90 md:min-h-[104px] md:p-2"
+              <View
+                key={label}
+                style={col({ backgroundColor: theme.surfaceInset })}
+                className="items-center px-1 py-2"
               >
-                {isSelected ? <View style={selectionRingStyle(theme.primary)} /> : null}
-
-                <View className="flex-row items-start justify-between gap-1">
-                  {tithi ? (
-                    <Text
-                      numberOfLines={1}
-                      className="min-w-0 flex-1 text-left font-bold"
-                      style={{ color: theme.text, fontSize: metaSize, ...metaTextStyle }}
-                    >
-                      {tithi}
-                    </Text>
-                  ) : isEnriching && !isOutside ? (
-                    <View className="h-1.5 w-6 rounded-full bg-muted-foreground/25" />
-                  ) : (
-                    <View className="min-w-0 flex-1" />
-                  )}
-                  <Text
-                    className="font-num-bold shrink-0 text-right font-bold"
-                    style={{ color: theme.text, fontSize: metaSize, lineHeight: metaSize + 2 }}
-                  >
-                    {digits(fmtAdDay(day.date_ad))}
-                  </Text>
-                </View>
-
-                <View className="flex-1 items-center justify-center py-1">
-                  {isToday ? (
-                    <View className="mb-0.5 rounded-full bg-secondary px-1.5 py-0.5">
-                      <Text className="text-[10px] font-bold text-secondary-foreground">
-                        {pick("आज", "Today")}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Text
-                    className="font-num-bold font-bold"
-                    style={{
-                      color: dayColor,
-                      opacity: isOutside ? 0.65 : 1,
-                      fontSize: isTablet ? 30 : 24,
-                      lineHeight: isTablet ? 32 : 26,
-                    }}
-                  >
-                    {digits(day.day)}
-                  </Text>
-                </View>
-
-                {mainFest && !isOutside ? (
-                  <Text
-                    numberOfLines={2}
-                    className="text-center font-bold"
-                    style={{
-                      color: isPublicHoliday ? theme.danger : theme.text,
-                      fontSize: metaSize,
-                      ...metaTextStyle,
-                    }}
-                  >
-                    {mainFest}
-                  </Text>
-                ) : null}
-                {hasFestival && !mainFest ? (
-                  <View className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-accent" />
-                ) : null}
-              </Pressable>
+                <Text
+                  className="font-bold uppercase tracking-wide"
+                  style={[
+                    {
+                      color: weekend && lang !== "en" ? theme.danger : theme.text,
+                      fontSize: isTablet ? 14 : 12,
+                    },
+                    lang === "en" ? undefined : nepaliTextStyle(isTablet ? 14 : 12),
+                  ]}
+                >
+                  {label}
+                </Text>
+              </View>
             );
           })}
         </View>
-      ))}
-    </View>
+
+        {rows.map((row, rowIndex) => (
+          <View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
+            {row.map((day, colIndex) => {
+              const cellIndex = rowIndex * 7 + colIndex;
+
+              if (!day) {
+                return (
+                  <View
+                    key={`empty-${cellIndex}`}
+                    style={col({ minHeight: cellMinH, backgroundColor: theme.surfaceMuted })}
+                  />
+                );
+              }
+
+              const isOutside = day.outsideMonth === true;
+              const isToday = day.date_ad === todayAd;
+              const isSelected = day.date_ad === selectedAd && !isToday;
+              const isWeekend = colIndex === 0 || colIndex === 6;
+              const isPublicHoliday = !isOutside && publicHolidayDates.has(day.date_ad);
+              const festivals = !isOutside ? day.festivals.filter(Boolean) : [];
+              const hasFestival = festivals.length > 0 && !isPublicHoliday;
+              const mainFest = festivals[0];
+              const festCount = festivals.length;
+              const extraFestCount = festivals.length > 2 ? festivals.length - 2 : 0;
+              const mobileBsFestCompact = primaryDate === "bs" && festCount > 0 && isCompact;
+
+              const tithi = pick(day.tithi_ne ?? day.tithi, day.tithi ?? day.tithi_ne);
+              const tithiIdx = tithiIndexFromCalendarDay(day);
+              const moonTitle = moonPhaseTitle(getPakshaPhase(day), isEn);
+              const adDayNum = civilIsoDayOfMonth(day.date_ad);
+              const primaryDayNum = primaryDate === "ad" ? adDayNum : day.day;
+              const secondary = getSecondaryCellDate(day, primaryDate, lang, cellIndex === 0);
+              const secondaryLabel = digits(secondary.day);
+
+              let bg: string = theme.card;
+              if (isOutside) bg = theme.surfaceMuted;
+              else if (isToday) bg = theme.surfaceToday;
+              else if (isPublicHoliday) bg = theme.surfaceTintDanger;
+              else if (mobileBsFestCompact) bg = theme.surfaceTintDanger;
+
+              const dayColor =
+                !isOutside && (isWeekend || isPublicHoliday)
+                  ? theme.danger
+                  : isOutside
+                    ? theme.textMuted
+                    : theme.text;
+
+              const openFestivals = () => setFestivalDialog({ day, festivals });
+
+              return (
+                <Pressable
+                  key={day.date_ad}
+                  onPress={() => onSelectDay?.(day)}
+                  style={col({ minHeight: cellMinH, backgroundColor: bg })}
+                  className="relative px-1 pb-1 pt-2 active:opacity-90 md:min-h-[104px] md:p-2"
+                >
+                  {isSelected ? <View style={selectionRingStyle(theme.primary)} /> : null}
+
+                  {tithiIdx != null ? (
+                    <View
+                      pointerEvents="none"
+                      style={{ position: "absolute", top: 2, right: 2, zIndex: 2 }}
+                    >
+                      <CalendarMoonPhaseIcon tithiIndex={tithiIdx} size={isCompact ? 14 : 16} title={moonTitle} />
+                    </View>
+                  ) : null}
+
+                  <View
+                    className="w-full flex-row items-start justify-center"
+                    style={{ minHeight: tithiRowMinH, paddingRight: tithiIdx != null ? 14 : 0 }}
+                  >
+                    {tithi ? (
+                      <Text
+                        numberOfLines={1}
+                        className="min-w-0 flex-1 text-center font-semibold"
+                        style={{
+                          color: theme.text,
+                          fontSize: metaSize,
+                          ...metaTextStyle,
+                        }}
+                      >
+                        {tithi}
+                      </Text>
+                    ) : isEnriching && !isOutside ? (
+                      <View className="mx-auto h-1.5 w-6 rounded-full bg-muted-foreground/25" />
+                    ) : (
+                      <View className="min-w-0 flex-1" />
+                    )}
+                  </View>
+
+                  <View className="flex-1 items-center justify-center gap-0.5 py-0.5">
+                    {isToday ? (
+                      <View className="rounded-full bg-secondary px-1.5 py-0.5">
+                        <Text
+                          className="text-[10px] font-bold text-secondary-foreground"
+                          style={lang === "en" ? undefined : nepaliTextStyle(10)}
+                        >
+                          {pick("आज", "Today")}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <View className="flex-row flex-wrap items-baseline justify-center gap-x-1">
+                      <Text
+                        className={lang === "en" ? "font-num-bold font-semibold" : "font-semibold"}
+                        style={{
+                          color: dayColor,
+                          opacity: isOutside ? 0.65 : 1,
+                          ...dayNumStyle,
+                        }}
+                      >
+                        {digits(primaryDayNum)}
+                      </Text>
+                      <Text
+                        className={lang === "en" ? "font-num font-semibold text-muted-foreground" : "font-semibold text-muted-foreground"}
+                        style={
+                          lang === "en"
+                            ? { fontSize: secondary.monthLabel ? 10 : metaSize }
+                            : nepaliDayNumberStyle(secondary.monthLabel ? 10 : metaSize)
+                        }
+                      >
+                        {secondaryLabel}
+                      </Text>
+                      {extraFestCount > 0 && primaryDate !== "bs" && !isCompact ? (
+                        <Pressable
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            openFestivals();
+                          }}
+                          className="rounded-full bg-secondary px-1 py-px"
+                        >
+                          <Text className="font-num text-[10px] font-bold text-secondary-foreground">
+                            +{digits(extraFestCount)}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {mobileBsFestCompact ? (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        openFestivals();
+                      }}
+                      className="mx-auto mt-auto rounded-full bg-secondary px-1.5 py-0.5"
+                    >
+                      <Text className="font-num text-[10px] font-bold text-secondary-foreground">
+                        +{digits(festCount)}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {mainFest && !isOutside && !mobileBsFestCompact ? (
+                    <Text
+                      numberOfLines={isCompact ? 2 : 2}
+                      className="text-center font-semibold"
+                      style={{
+                        color: isPublicHoliday ? theme.danger : theme.text,
+                        fontSize: metaSize,
+                        ...metaTextStyle,
+                      }}
+                    >
+                      {mainFest}
+                    </Text>
+                  ) : null}
+                  {hasFestival && !mainFest ? (
+                    <View className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-accent" />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+
+      <FestivalListSheet
+        visible={festivalDialog !== null}
+        day={festivalDialog?.day ?? null}
+        festivals={festivalDialog?.festivals ?? []}
+        onClose={() => setFestivalDialog(null)}
+      />
+    </>
   );
 }

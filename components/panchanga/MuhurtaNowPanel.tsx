@@ -85,7 +85,7 @@ export function EphemerisModeBanner({ p, clock }: Props) {
   return (
     <View className="rounded-xl border border-secondary/30 bg-secondary/10 px-4 py-3">
       <Text className="text-sm font-semibold text-foreground">
-        {pick("समय-आधारित पञ्चाङ्ग", "Ephemeris mode")}
+        {pick("समय-आधारित पञ्चाङ्ग", "Time-based reading")}
       </Text>
       <Text className="mt-1 text-sm leading-relaxed text-foreground">
         {time

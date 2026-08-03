@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VedicPatroMark } from "@/components/branding/VedicPatroMark";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { MenuPreferences } from "@/components/navigation/MenuPreferences";
+import { MobileNavMenu } from "@/components/navigation/MobileNavMenu";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
-import { DRAWER_NAV_EXTRA, FLOATING_NAV, isNavActive, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
+import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-
-const NAV = [...FLOATING_NAV, ...DRAWER_NAV_EXTRA];
 
 function BrandMark({ onPress, centered }: { onPress: () => void; centered?: boolean }) {
   const { pick } = useLocale();
@@ -35,7 +33,6 @@ export function AppHeader() {
   const { pick } = useLocale();
   const colors = useThemeColors();
   const router = useRouter();
-  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -58,7 +55,6 @@ export function AppHeader() {
         }}
         className="min-h-16 flex-row items-center py-2"
       >
-        {/* Left — hamburger */}
         <View className="flex-1 flex-row justify-start">
           <Pressable
             onPress={() => setMenuOpen(true)}
@@ -69,15 +65,12 @@ export function AppHeader() {
           </Pressable>
         </View>
 
-        {/* Center — brand */}
         <View className="shrink-0">
           <BrandMark onPress={() => go("/")} centered />
         </View>
 
-        {/* Right — theme + language + account */}
-        <View className="flex-1 flex-row items-center justify-end gap-2">
-          <ThemeSwitcher />
-          <LanguageSwitcher />
+        {/* Web mobile: account only in header; language/theme in drawer footer */}
+        <View className="flex-1 flex-row items-center justify-end">
           <AccountMenu />
         </View>
       </View>
@@ -86,7 +79,6 @@ export function AppHeader() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigate={go}
-        pathname={pathname}
       />
     </View>
   );
@@ -96,12 +88,10 @@ function NavDrawer({
   open,
   onClose,
   onNavigate,
-  pathname,
 }: {
   open: boolean;
   onClose: () => void;
   onNavigate: (href: string) => void;
-  pathname: string;
 }) {
   const { pick } = useLocale();
   const colors = useThemeColors();
@@ -132,7 +122,7 @@ function NavDrawer({
 
   if (!mounted) return null;
 
-  const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-320, 0] });
+  const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-340, 0] });
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
@@ -145,20 +135,20 @@ function NavDrawer({
           top: 0,
           bottom: 0,
           left: 0,
-          width: 300,
+          width: Math.min(340, 320),
           paddingTop: insets.top,
+          paddingBottom: insets.bottom,
           transform: [{ translateX }],
           backgroundColor: colors.card,
         }}
         className="border-r border-border"
       >
-        {/* Brand header */}
         <View
           className="flex-row items-center gap-2.5 border-b border-border py-4"
           style={{ paddingHorizontal: PAGE_HORIZONTAL_PADDING }}
         >
           <VedicPatroMark size={40} />
-          <View className="min-w-0">
+          <View className="min-w-0 flex-1">
             <Text className="text-base font-bold">
               <Text className="text-secondary">{pick("वैदिक", "Vedic")}</Text>
               <Text className="text-foreground"> {pick("पात्रो", "Patro")}</Text>
@@ -169,37 +159,16 @@ function NavDrawer({
           </View>
         </View>
 
-        {/* Nav */}
-        <ScrollView className="flex-1" contentContainerClassName="p-3 gap-1">
-          {NAV.map((item) => {
-            const active = isNavActive(pathname, item.href);
-            return (
-              <Pressable
-                key={item.href}
-                onPress={() => onNavigate(item.href)}
-                className={cn(
-                  "flex-row items-center gap-3 rounded-lg px-3 py-2.5",
-                  active ? "bg-secondary/10" : "active:bg-muted",
-                )}
-              >
-                <Ionicons
-                  name={item.icon}
-                  size={18}
-                  color={active ? colors.secondary : colors.mutedForeground}
-                />
-                <Text
-                  className={cn(
-                    "text-sm",
-                    active ? "font-semibold text-secondary" : "text-foreground",
-                  )}
-                  style={nepaliTextStyle(14)}
-                >
-                  {pick(item.ne, item.en)}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          <MobileNavMenu onNavigate={onNavigate} />
         </ScrollView>
+
+        <View
+          className="border-t border-border px-4 py-4"
+          style={{ paddingHorizontal: PAGE_HORIZONTAL_PADDING }}
+        >
+          <MenuPreferences />
+        </View>
       </Animated.View>
     </Modal>
   );

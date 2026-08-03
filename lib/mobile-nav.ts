@@ -49,8 +49,15 @@ export function isNavActive(pathname: string, href: string): boolean {
     return (
       pathname === "/kundali" ||
       pathname.startsWith("/kundali/") ||
-      pathname === "/kundali-milan"
+      pathname === "/kundali-milan" ||
+      pathname === "/jyotish/kundali-milan"
     );
+  }
+  if (href === "/learn") {
+    return pathname === "/learn" || pathname.startsWith("/learn/");
+  }
+  if (href === "/panchanga") {
+    return pathname === "/panchanga" || pathname.startsWith("/panchanga/");
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

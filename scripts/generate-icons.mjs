@@ -4,7 +4,7 @@ import { copyFile, mkdir, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import sharp from "sharp";
-import toIco from "to-ico";
+import pngToIco from "png-to-ico";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const svg = join(root, "assets/favicon.svg");
@@ -25,7 +25,7 @@ const icoSizes = [16, 32, 48];
 const icoBuffers = await Promise.all(
   icoSizes.map((size) => icon.clone().resize(size, size).png().toBuffer()),
 );
-await writeFile(join(publicDir, "favicon.ico"), await toIco(icoBuffers));
+await writeFile(join(publicDir, "favicon.ico"), await pngToIco(icoBuffers));
 
 const distWeb = join(root, "dist-web");
 try {

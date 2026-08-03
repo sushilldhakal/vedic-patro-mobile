@@ -8,9 +8,22 @@ export function nepaliLineHeight(fontSize: number): number {
 }
 
 export function nepaliTextStyle(fontSize: number): TextStyle {
+  const lineHeight = nepaliLineHeight(fontSize);
   return {
-    lineHeight: nepaliLineHeight(fontSize),
-    ...(Platform.OS === "android" ? { includeFontPadding: true } : {}),
+    lineHeight,
+    // iOS Text clips upper matras without a little headroom; Android uses font padding.
+    ...(Platform.OS === "android"
+      ? { includeFontPadding: true }
+      : { paddingTop: fontSize <= 11 ? 2 : 1 }),
+  };
+}
+
+/** Large day numbers in Nepali — use Mukta, not Fira Code (Devanagari digits clip in mono). */
+export function nepaliDayNumberStyle(fontSize: number): TextStyle {
+  return {
+    fontFamily: "Mukta_700Bold",
+    fontSize,
+    ...nepaliTextStyle(fontSize),
   };
 }
 

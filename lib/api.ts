@@ -14,7 +14,7 @@ export const API_BASE =
   Platform.OS === "web" && __DEV__ ? "/api" : CONFIGURED_API_BASE;
 export const API_VERSION = (extra.apiVersion as string) ?? "v1";
 export const DATA_BASE = `${API_BASE}/${API_VERSION}`;
-export const PANCHANGA_CACHE_VERSION = "25";
+export const PANCHANGA_CACHE_VERSION = "29";
 export const SAIT_CACHE_VERSION = "14";
 
 export interface PushkaraNavamshaHit {
@@ -526,6 +526,28 @@ export interface HolidaysResponse {
   holidays: Holiday[];
 }
 
+export interface Festival {
+  id: string;
+  name?: string;
+  name_en?: string;
+  name_ne?: string;
+  type?: string;
+  category?: string;
+  is_public_holiday?: boolean;
+  start_date?: string;
+  end_date?: string;
+  bs_start_date?: string;
+  bs_end_date?: string;
+  duration_days?: number;
+  importance?: string;
+  notes?: string;
+}
+
+export interface FestivalsResponse {
+  count: number;
+  festivals: Festival[];
+}
+
 export interface ConvertAdToBs {
   ad_date: string;
   bs_year: number;
@@ -652,9 +674,11 @@ export const panchangaKeys = {
     ["panchanga", "civil", PANCHANGA_CACHE_VERSION, date, locationKey(loc)] as const,
 };
 
+export type MonthBrowseEra = "bs" | "bbs";
+
 export const apiKeys = {
-  month: (y: number, m: number, loc?: LocationParams) =>
-    ["month", y, m, locationKey(loc)] as const,
+  month: (y: number, m: number, loc?: LocationParams, era: MonthBrowseEra = "bs") =>
+    ["month", era, y, m, locationKey(loc)] as const,
   panchanga: (date: string, era: string, loc?: LocationParams) =>
     ["panchanga", date, era, locationKey(loc)] as const,
   today: (loc?: LocationParams) => ["panchanga", "today", locationKey(loc)] as const,
@@ -663,15 +687,18 @@ export const apiKeys = {
   convertBs: (d: string) => ["convert", "bs", d] as const,
   saitMonthAll: (y: number, m: number, loc?: LocationParams) =>
     ["sait", "month-all", SAIT_CACHE_VERSION, y, m, locationKey(loc)] as const,
+  festivals: (year: number) => ["festivals", "bs", year] as const,
 };
 
 export const fetchMonthCalendar = async (
   year: number,
   month: number,
   location?: LocationParams,
+  options?: { era?: MonthBrowseEra },
 ): Promise<MonthCalendar> => {
+  const era = options?.era ?? "bs";
   const data = await get<MonthCalendar>(
-    appendLocation(withCache(`/panchanga/${year}/${month}?full=true`), location),
+    appendLocation(withCache(`/panchanga/${year}/${month}?full=true&era=${era}`), location),
   );
   return {
     ...data,
@@ -745,6 +772,11 @@ export const fetchCivilTimeline = (date: string, era: "bs" | "ad" = "ad", locati
 
 export const fetchHolidays = (year: number) =>
   get<HolidaysResponse>(withCache(`/nepal/holidays?year=${year}&era=bs`));
+
+export const fetchFestivals = (year: number, language: "ne" | "en" = "ne") =>
+  get<FestivalsResponse>(
+    withCache(`/nepal/festivals?year=${year}&era=bs&language=${language}`),
+  );
 
 // ─── Gochar (planetary transits) ─────────────────────────────────────────────
 
@@ -888,6 +920,251 @@ export const fetchSaitMonthAll = async (
 
 export const fetchAdToBs = (date: string) => get<ConvertAdToBs>(`/convert/ad-to-bs/${date}`);
 export const fetchBsToAd = (date: string) => get<ConvertBsToAd>(`/convert/bs-to-ad/${date}`);
+
+// ─── Graha, elements, seasons, sait detail (extended API) ───────────────────
+
+const GRAHA_CACHE_VERSION = "3";
+
+function buildEraQuery(era: "bs" | "ad" | "bbs" = "bs", year?: number): string {
+  const params = new URLSearchParams({ era, language: era === "ad" ? "en" : "ne" });
+  if (year != null) params.set("year", String(year));
+  return params.toString();
+}
+
+function withGrahaCache(path: string): string {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}gv=${GRAHA_CACHE_VERSION}`;
+}
+
+export interface GrahaSthitiRow {
+  graha: string;
+  name_ne: string;
+  symbol: string;
+  rekhamsha: string;
+  rashi_ne: string;
+  nakshatra: string;
+  nakshatra_ne: string;
+  pada: number;
+  full_degree: number;
+  speed_deg_day: number;
+  is_retrograde: boolean;
+  is_combust: boolean;
+}
+
+export interface GrahaSthitiResponse {
+  date_ad: string;
+  date_bs: string;
+  rows: GrahaSthitiRow[];
+}
+
+export interface AstaStamp {
+  date?: string;
+  date_ad?: string;
+  date_bs?: string | null;
+  time_short: string;
+}
+
+export interface GrahaAstaPeriod {
+  graha: string;
+  graha_ne: string;
+  start: AstaStamp | null;
+  end: AstaStamp | null;
+  duration_days: number | null;
+  hemisphere?: "east" | "west" | null;
+}
+
+export interface GrahaAstaResponse {
+  bs_year?: number;
+  ad_year?: number;
+  periods: GrahaAstaPeriod[];
+}
+
+export interface GrahaVakriPeriod {
+  graha: string;
+  graha_ne: string;
+  start: AstaStamp | null;
+  end: AstaStamp | null;
+}
+
+export interface GrahaVakriResponse {
+  bs_year?: number;
+  periods: GrahaVakriPeriod[];
+}
+
+export interface EclipseEvent {
+  date_ad?: string;
+  date_bs?: string;
+  type_ne?: string;
+  type_en?: string;
+  maximum_time_local_short?: string;
+  visible_ne?: string;
+  visible_en?: string;
+}
+
+export interface EclipseYearResponse {
+  bs_year?: number;
+  events: EclipseEvent[];
+}
+
+export interface PanchakPeriodResponse {
+  start: { date_ad?: string; time_short?: string; time_ne?: string };
+  end: { date_ad?: string; time_short?: string; time_ne?: string };
+  duration_ne?: string;
+  duration_en?: string;
+}
+
+export interface PanchakYearResponse {
+  count: number;
+  periods: PanchakPeriodResponse[];
+}
+
+export type ElementKind = "span" | "table";
+
+export interface ElementDayResponse {
+  element: string;
+  label_ne: string;
+  label_en: string;
+  date_ad: string;
+  data: unknown;
+}
+
+export interface SunYearDay {
+  date_ad: string;
+  day_bs?: number;
+  sunrise?: string;
+  sunset?: string;
+  day_length_min?: number;
+}
+
+export interface SunYearResponse {
+  year: number;
+  era: string;
+  days: SunYearDay[];
+}
+
+export interface TropicalSeasonSegment {
+  name_ne?: string;
+  name_en?: string;
+  start_ad?: string;
+  end_ad?: string;
+}
+
+export interface TropicalSeasonsResponse {
+  segments: TropicalSeasonSegment[];
+}
+
+export interface SaitDetailDay {
+  bs_month: number;
+  bs_day: number;
+  gregorian: string;
+  weekday_ne: string;
+  weekday_en: string;
+  window_start: string;
+  window_end: string;
+  tithi_ne: string;
+  nakshatra_ne: string;
+}
+
+export interface SaitDetailResponse {
+  bs_year: number;
+  category: string;
+  category_label_ne: string;
+  days: SaitDetailDay[];
+}
+
+export const grahaDetailKeys = {
+  sthiti: (dateKey: string, era: string, location?: LocationParams) =>
+    ["graha", "sthiti", dateKey, era, locationCacheKey(location)] as const,
+  asta: (year: number, location?: LocationParams, era = "bs") =>
+    ["graha", "asta", era, year, locationCacheKey(location)] as const,
+  vakri: (year: number, location?: LocationParams, era = "bs") =>
+    ["graha", "vakri", era, year, locationCacheKey(location)] as const,
+  eclipse: (kind: "solar" | "lunar", year: number, location?: LocationParams, era = "bs") =>
+    ["graha", "eclipse", kind, era, year, locationCacheKey(location)] as const,
+};
+
+export const elementKeys = {
+  day: (name: string, date: string, location?: LocationParams) =>
+    ["element", "day", name, date, locationCacheKey(location)] as const,
+};
+
+export const panchakKeys = {
+  year: (year: number, location?: LocationParams, era = "bs") =>
+    ["panchak", era, year, locationCacheKey(location)] as const,
+};
+
+export const sunTimesKeys = {
+  year: (year: number, era: string, location?: LocationParams) =>
+    ["sun-times", "year", era, year, locationCacheKey(location)] as const,
+};
+
+export const seasonsKeys = {
+  tropical: (location?: LocationParams) => ["seasons", "tropical", locationCacheKey(location)] as const,
+};
+
+export const saitDetailKey = (year: number, category: string, location?: LocationParams) =>
+  ["sait", "detail", SAIT_CACHE_VERSION, year, category, locationCacheKey(location)] as const;
+
+export const fetchGrahaSthiti = (dateKey: string, location?: LocationParams, era: "bs" | "ad" = "ad") =>
+  get<GrahaSthitiResponse>(
+    appendLocation(withGrahaCache(`/nepal/graha-sthiti/${dateKey}?era=${era}`), location),
+  );
+
+export const fetchGrahaAstaYear = (year: number, location?: LocationParams, era: "bs" | "ad" = "bs") =>
+  get<GrahaAstaResponse>(
+    appendLocation(
+      withGrahaCache(`/nepal/graha-asta/year/${year}?${buildEraQuery(era, year)}`),
+      location,
+    ),
+  );
+
+export const fetchGrahaVakriYear = (year: number, location?: LocationParams, era: "bs" | "ad" = "bs") =>
+  get<GrahaVakriResponse>(
+    appendLocation(
+      withGrahaCache(`/nepal/graha-vakri/year/${year}?${buildEraQuery(era, year)}`),
+      location,
+    ),
+  );
+
+export const fetchEclipseYear = (
+  kind: "solar" | "lunar",
+  year: number,
+  location?: LocationParams,
+  era: "bs" | "ad" = "bs",
+) =>
+  get<EclipseYearResponse>(
+    appendLocation(
+      withGrahaCache(`/nepal/eclipse/${kind}/year/${year}?${buildEraQuery(era, year)}`),
+      location,
+    ),
+  );
+
+export const fetchPanchakYear = (year: number, location?: LocationParams, era: "bs" | "ad" = "bs") =>
+  get<PanchakYearResponse>(
+    appendLocation(`/nepal/panchak/year/${year}?${buildEraQuery(era, year)}`, location),
+  );
+
+export const fetchElementDay = (name: string, dateAd: string, location?: LocationParams) =>
+  get<ElementDayResponse>(
+    appendLocation(withCache(`/panchanga/element/${name}/day/${dateAd}?era=ad`), location),
+  );
+
+export const fetchYearSunTimes = (
+  year: number,
+  era: "bs" | "ad" = "bs",
+  location?: LocationParams,
+) =>
+  get<SunYearResponse>(
+    appendLocation(`/panchanga/year/${year}/sun?${buildEraQuery(era, year)}`, location),
+  );
+
+export const fetchTropicalSeasons = (location?: LocationParams) =>
+  get<TropicalSeasonsResponse>(appendLocation("/seasons/tropical", location));
+
+export const fetchSaitDetail = (year: number, category: string, location?: LocationParams) =>
+  get<SaitDetailResponse>(
+    withSaitCache(appendLocation(`/nepal/sait/${year}/${category}/detail`, location)),
+  );
 
 export function timeShort(v: PanchangaDay["sunrise"]): string {
   if (!v) return "—";

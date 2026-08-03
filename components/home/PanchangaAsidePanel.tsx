@@ -68,7 +68,7 @@ export function PanchangaAsidePanel({
         <Text className="flex-1 text-lg font-bold text-foreground">
           {isSelectedToday ? pick("आजको पञ्चाङ्ग", "Today's Panchanga") : pick("पञ्चाङ्ग", "Panchanga")}
         </Text>
-        <Pressable onPress={() => router.push("/panchanga")}>
+        <Pressable onPress={() => router.push({ pathname: "/panchanga", params: { date: selectedAd } })}>
           <Text className="text-xs text-secondary">{pick("पूरा विवरण →", "Full detail →")}</Text>
         </Pressable>
       </View>

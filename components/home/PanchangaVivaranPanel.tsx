@@ -187,7 +187,7 @@ export function PanchangaVivaranPanel({ p, selectedDay, bsYear, bsMonth, loading
                   style={{ backgroundColor: colors.surfaceInset }}
                 >
                   <Text className="shrink-0 text-xs font-semibold leading-tight text-foreground">
-                    {pick("सूर्यक्रान्ति", "Suryakranti")}
+                    {pick("देशान्तर", "Deshaantar")}
                   </Text>
                   <Text className="font-num text-xs font-semibold text-foreground">
                     {deshaantar}
@@ -200,7 +200,7 @@ export function PanchangaVivaranPanel({ p, selectedDay, bsYear, bsMonth, loading
                   style={{ backgroundColor: colors.surfaceInset }}
                 >
                   <Text className="shrink-0 text-xs font-semibold leading-tight text-foreground">
-                    {pick("वेलान्तर", "Belaantar")}
+                    {pick("बेलान्तर", "Belaantar")}
                   </Text>
                   <Text className="font-num text-xs font-semibold text-foreground">
                     {belaantar}

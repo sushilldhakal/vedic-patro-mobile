@@ -27,7 +27,7 @@ export const KUNDALI_SIDEBAR_SECTIONS: KundaliSidebarSection[] = [
       },
       {
         id: "kundali-milan",
-        href: "/kundali-milan",
+        href: "/jyotish/kundali-milan",
         labelNe: "कुण्डली मिलान",
         labelEn: "Chart matching",
       },

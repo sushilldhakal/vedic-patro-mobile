@@ -179,17 +179,17 @@ export function formatPatroBelaantar(c?: SolarCorrection): string | undefined {
   if (!c || c.minutes == null || c.seconds == null) return undefined;
   const mm = toNepaliDigits(c.minutes);
   const ss = toNepaliDigits(String(c.seconds).padStart(2, "0"));
-  const prefix = c.sign === "rin" ? "(-) " : "(+) ";
+  const prefix = c.sign === "rin" ? "-" : "+";
   return `${prefix}${mm}:${ss}`;
 }
 
-/** Patro label सूर्यक्रान्ति — maps to देशान्तर correction. */
+/** Patro label देशान्तर — longitude correction from the zone meridian. */
 export function formatPatroDeshaantar(c?: SolarCorrection): string | undefined {
   if (!c || c.minutes == null || c.seconds == null) return undefined;
   const mm = toNepaliDigits(c.minutes);
   const ss = toNepaliDigits(String(c.seconds).padStart(2, "0"));
-  if (c.sign === "rin") return `(-) ${mm}:${ss}`;
-  return `उ ${mm}:${ss}`;
+  const prefix = c.sign === "rin" ? "-" : "+";
+  return `${prefix}${mm}:${ss}`;
 }
 
 export function getPanchangaDetail(p: PanchangaDay) {
@@ -2127,6 +2127,14 @@ export function getShraddhaLabel(tithiNameNe?: string | null, lang?: string): st
   return `${tithiNameNe} श्राद्ध`;
 }
 
+function hasNamedPurnimaFestival(labels: string[]): boolean {
+  return labels.some((label) => {
+    const trimmed = label.trim();
+    if (trimmed === "पूर्णिमा" || trimmed === "Purnima") return false;
+    return /पूर्णिमा|पुन्ही|purnima/i.test(trimmed);
+  });
+}
+
 export function getDinVisheshLabels(
   p: PanchangaDay,
   dayFestivals: string[],
@@ -2146,7 +2154,12 @@ export function getDinVisheshLabels(
   const aaushi = isEn ? "Amavasya" : "औंसी";
   const ekadashi = isEn ? "Ekadashi" : "एकादशी";
 
-  if (markers?.is_purnima && !labels.includes(purnima) && !labels.includes("पूर्णिमा")) {
+  if (
+    markers?.is_purnima &&
+    !hasNamedPurnimaFestival(labels) &&
+    !labels.includes(purnima) &&
+    !labels.includes("पूर्णिमा")
+  ) {
     labels.push(purnima);
   }
   if (markers?.is_Aaushi && !labels.includes(aaushi) && !labels.includes("औंसी")) {
