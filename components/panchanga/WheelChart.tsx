@@ -12,9 +12,16 @@ import Svg, {
   Rect,
   Stop,
   Text as SvgText,
+  TSpan,
 } from "react-native-svg";
 import { MoonPhaseIcon } from "./MoonPhaseIcon";
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
+import {
+  NAKSHATRA_GLYPHS,
+  RASHI_GLYPHS,
+  WheelGlyph,
+} from "@/components/panchanga/WheelGlyph";
+import { useLocale } from "@/lib/i18n";
 import { getBSMonthLength } from "@/lib/bs-calendar";
 import {
   bsMonthsForWheel,
@@ -27,7 +34,7 @@ import {
   type WheelTweaks,
   WHEEL_RASHIS,
 } from "@/lib/wheel-data";
-import { KARANA_SEQ, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
+import { KARANA_SEQ, karanaColor, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
 import { nepaliSvgTextCenter } from "@/lib/nepali-text";
 
 const DEG = Math.PI / 180;
@@ -37,46 +44,78 @@ const CY = 500;
 const ORBIT_SCALE = 0.58;
 
 const R_YOGA_I = 140;
-const R_YOGA_O = 158;
+const R_YOGA_O = 178; // shared boundary with rashi inner / core
 const R_KAR_I = 303;
 const R_KAR_O = 327;
 const R_TIT_I = 263;
 const R_TIT_O = 303;
 
-const W_RIM = "rgba(143,191,193,0.35)";
-const W_SEP = "rgba(143,191,193,0.18)";
-const W_ACCENT = "#4ecdc4";
-const W_INK = "#c8e0e2";
-const W_INK_DIM = "rgba(200,224,226,0.65)";
-const W_INK_FAINT = "rgba(200,224,226,0.45)";
-const W_BAND = "#0d2a2c";
-const W_BAND_ALT = "#0a2224";
-const W_RASHI = "#0f3234";
-const W_RASHI_ALT = "#0c282a";
-const W_PADA = "#0a2426";
-const W_PADA_ALT = "#081e20";
+// Resolved `.pn-wheel` custom properties from the web stylesheet. react-native-svg
+// cannot read CSS vars, so the exact computed values are inlined here — keep them
+// in step with the `.pn-wheel` block in global.css / the web's index.css.
+/** var(--w-rim) — color-mix(#a9d4d4 50%, transparent) */
+const W_RIM = "rgba(169,212,212,0.5)";
+/** var(--w-sep) — color-mix(#8fbfc1 42%, transparent) */
+const W_SEP = "rgba(143,191,193,0.42)";
+/** var(--w-sep-soft) — color-mix(#8fbfc1 16%, transparent) */
+const W_SEP_SOFT = "rgba(143,191,193,0.16)";
+/** var(--w-accent) — var(--brand-vermilion) */
+const W_ACCENT = "#c62828";
+/** var(--w-ink) */
+const W_INK = "#eaf3f1";
+/** var(--w-ink-dim) */
+const W_INK_DIM = "#a7c4c3";
+/** var(--w-ink-faint) */
+const W_INK_FAINT = "#84a3a2";
+/** var(--w-band) — color-mix(brand-green 30%, #0a1618) */
+const W_BAND = "#153520";
+/** var(--w-band-alt) — color-mix(brand-green 44%, #0b181a) */
+const W_BAND_ALT = "#1a4425";
+/** var(--w-rashi) — color-mix(brand-green 22%, #091315) */
+const W_RASHI = "#112a1b";
+/** var(--w-rashi-alt) — color-mix(brand-green 34%, #0a1518) */
+const W_RASHI_ALT = "#163821";
+/** var(--w-pada) */
+const W_PADA = "#0d2024";
+/** var(--w-pada-alt) */
+const W_PADA_ALT = "#112a2f";
 const FONT = "Mukta_600SemiBold";
 
+/**
+ * react-native-svg types `onPress` as an unsatisfiable intersection; it works
+ * fine at runtime. Same shim the Avakahada wheel uses.
+ */
+const press = (fn: () => void) => fn as never;
+
+/**
+ * Glyph box sizes. Both are "contain" fits, so these are the longer side of the
+ * artwork, not its apparent weight — the rashi band (178–263) has more radial
+ * room to spare than the nakshatra band, whose glyph shares 345–423 with a name
+ * that runs to two stacked rows in English.
+ */
+const RASHI_GLYPH_SIZE = 30;
+const NAK_GLYPH_SIZE = 26;
+
 /** color-mix(in srgb, var(--w-accent) 26%, var(--w-band-alt)) */
-const SEG_HOT = "#1c4e4e";
+const SEG_HOT = "#473d26";
 /** color-mix(in srgb, var(--w-accent) 40%, var(--w-band-alt)) */
-const SEG_SEL = "#256664";
+const SEG_SEL = "#5f3926";
 /** color-mix(in srgb, var(--w-accent) 18%, transparent) */
-const SEG_NOW_FILL = "rgba(78,205,196,0.18)";
+const SEG_NOW_FILL = "rgba(198,40,40,0.18)";
 /** color-mix(in srgb, #8fbfc1 14%, transparent) */
 const ORBIT_STROKE = "rgba(143,191,193,0.14)";
 /** color-mix(in srgb, #a07de8 38%, #10063a) */
-const YOGA_CUR = "#71477c";
+const YOGA_CUR = "#47337c";
 /** color-mix(in srgb, #7c5cbf 22%, #08041a) */
 const YOGA_ALT = "#22173e";
 /** color-mix(in srgb, #6448a8 16%, #06031a) */
-const YOGA_BASE = "#150e30";
+const YOGA_BASE = "#150e31";
 /** color-mix(in srgb, var(--w-accent) 28%, #0d2428) */
-const TITHI_CUR = "#1f5354";
+const TITHI_CUR = "#412528";
 /** color-mix(in srgb, #2d8a86 26%, #0a1a1e) */
 const TITHI_SHUKLA = "#133739";
 /** color-mix(in srgb, #2d8a86 14%, #060e10) */
-const TITHI_KRISHNA = "#0b1f20";
+const TITHI_KRISHNA = "#0b1f21";
 
 const R = {
   rimOuter: 497,
@@ -278,18 +317,46 @@ function segRashiFill(opts: { alt?: boolean; hot?: boolean; sel?: boolean }): st
   return opts.alt ? W_RASHI_ALT : W_RASHI;
 }
 
+/** Split a ring label on whitespace so each word gets its own radial row. */
+function labelRows(label: string): string[] {
+  return label.trim().split(/\s+/).filter(Boolean);
+}
+
 interface RingLabelProps {
   L: number;
   r: number;
   spin: number;
   size?: number;
   fill?: string;
-  children: ReactNode;
+  children?: ReactNode;
+  /** Halo behind the glyph — mirrors the web classes' `paint-order: stroke fill`. */
+  stroke?: string;
+  strokeWidth?: number;
+  /**
+   * Stack the label radially instead of running it along the ring. Long English
+   * names ("Uttara Bhadrapada") overrun their segment's arc on one line, so they
+   * get split a word per row.
+   */
+  rows?: readonly string[];
 }
 
-function RingLabel({ L, r, spin, size, fill = W_INK, children }: RingLabelProps) {
+function RingLabel({
+  L,
+  r,
+  spin,
+  size,
+  fill = W_INK,
+  children,
+  rows,
+  stroke,
+  strokeWidth,
+}: RingLabelProps) {
   const a = normDeg(L + spin);
   const flip = a > 90 && a < 270;
+  // Flipping rotates the stack too, so reverse the rows to keep reading order.
+  const stack = rows && rows.length > 1 ? (flip ? [...rows].reverse() : rows) : null;
+  const fontSize = size ?? 11;
+
   return (
     <G transform={`rotate(${-(L + spin)} ${CX} ${CY})`}>
       <SvgText
@@ -297,12 +364,23 @@ function RingLabel({ L, r, spin, size, fill = W_INK, children }: RingLabelProps)
         y={CY - r}
         textAnchor="middle"
         fill={fill}
-        fontSize={size ?? 11}
+        fontSize={fontSize}
         fontFamily={FONT}
+        {...(stroke ? { stroke, strokeWidth: strokeWidth ?? 0.4, paintOrder: "stroke" } : {})}
         {...nepaliSvgTextCenter}
         {...(flip ? { transform: `rotate(180 ${CX} ${CY - r})` } : {})}
       >
-        {children}
+        {stack
+          ? stack.map((row, i) => (
+              <TSpan
+                key={`${row}-${i}`}
+                x={CX}
+                dy={i === 0 ? -0.55 * (stack.length - 1) * fontSize : 1.1 * fontSize}
+              >
+                {row}
+              </TSpan>
+            ))
+          : (children ?? rows?.[0])}
       </SvgText>
     </G>
   );
@@ -343,6 +421,7 @@ function WheelChartImpl({
   pan,
   onPan,
 }: WheelChartProps) {
+  const { pick } = useLocale();
   const [lineTarget, setLineTarget] = useState(1);
   const viewRef = useRef<View>(null);
   const layoutRef = useRef<LayoutMetrics>({ w: 0, h: 0, pageX: 0, pageY: 0 });
@@ -626,20 +705,33 @@ function WheelChartImpl({
           key={`ns${i}`}
           d={arcSeg(L0, L1, R.nakIn, R.nakOut)}
           fill={segNakFill({ alt: i % 2 === 1, hot: isHot, sel: isSel })}
-          stroke={W_SEP}
+          stroke={W_SEP_SOFT}
           strokeWidth={0.6}
         />,
       );
+      // The name used to sit alone at the band's midpoint; it moves in to
+      // R.nakName so the glyph can take R.nakIcon, the slot already reserved for
+      // it out near the rim. Both stay — the icon reads at a glance, the name is
+      // what you actually look up.
+      const [nx, ny] = pol(Lm, R.nakIcon);
+      const nakInk = isSel || isHot ? W_ACCENT : W_INK;
       nakDecor.push(
-        <RingLabel
-          key={`ni${i}`}
-          L={Lm}
-          r={(R.nakIn + R.nakOut) / 2}
-          spin={spin}
-          fill={isSel || isHot ? W_ACCENT : W_INK}
-        >
-          {ico.ne}
-        </RingLabel>,
+        <G key={`ni${i}`}>
+          <WheelGlyph
+            art={NAKSHATRA_GLYPHS[i]}
+            size={NAK_GLYPH_SIZE}
+            cx={nx}
+            cy={ny}
+            color={nakInk}
+          />
+          <RingLabel
+            L={Lm}
+            r={R.nakName}
+            spin={spin}
+            fill={nakInk}
+            rows={labelRows(pick(ico.ne, ico.en))}
+          />
+        </G>,
       );
     }
 
@@ -657,27 +749,27 @@ function WheelChartImpl({
           key={`rs${i}`}
           d={arcSeg(L0, L1, R.rashiIn, R.rashiOut)}
           fill={segRashiFill({ alt: i % 2 === 1, hot: isHot, sel: isSel })}
-          stroke={W_SEP}
+          stroke={W_SEP_SOFT}
           strokeWidth={0.6}
         />,
       );
       const [gx, gy] = pol(Lm, R.rashiGlyph);
       rashiDecor.push(
         <G key={`rd${i}`}>
-          <SvgText
-            x={gx}
-            y={gy}
-            textAnchor="middle"
-            alignmentBaseline="middle"
-            fill={W_INK}
-            fontSize={27}
-            fontFamily={FONT}
-          >
-            {rs.sym}
-          </SvgText>
-          <RingLabel L={Lm} r={R.rashiName} spin={spin} fill={isSel || isHot ? W_ACCENT : W_INK}>
-            {rs.ne}
-          </RingLabel>
+          <WheelGlyph
+            art={RASHI_GLYPHS[i]}
+            size={RASHI_GLYPH_SIZE}
+            cx={gx}
+            cy={gy}
+            color={isSel || isHot ? W_ACCENT : W_INK}
+          />
+          <RingLabel
+            L={Lm}
+            r={R.rashiName}
+            spin={spin}
+            fill={isSel || isHot ? W_ACCENT : W_INK}
+            rows={labelRows(pick(rs.ne, rs.en))}
+          />
         </G>,
       );
     }
@@ -693,7 +785,7 @@ function WheelChartImpl({
             <Path
               d={arcSeg(L0, L1, R.padaIn, R.padaOut)}
               fill={Math.floor(i / 4) % 2 === 1 ? W_PADA_ALT : W_PADA}
-              stroke={W_SEP}
+              stroke={W_SEP_SOFT}
               strokeWidth={0.4}
             />
             <RingLabel L={Lm} r={R.padaNum} spin={spin} fill={W_INK_DIM}>
@@ -760,7 +852,7 @@ function WheelChartImpl({
       const [x1, y1] = pol(i * 30, 12);
       const [x2, y2] = pol(i * 30, R.rimOuter - 2);
       rashiRays.push(
-        <Line key={`ray${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={W_SEP} strokeWidth={0.9} opacity={0.9} />,
+        <Line key={`ray${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={W_SEP_SOFT} strokeWidth={0.9} opacity={0.9} />,
       );
     }
 
@@ -773,7 +865,7 @@ function WheelChartImpl({
       : [];
 
     return { nakSegs, nakDecor, rashiSegs, rashiDecor, padaCells, dayTicks, hits, rashiRays, gregLabels };
-  }, [spin, hover, sel, bsYear, tw, pol, arcSeg]);
+  }, [spin, hover, sel, bsYear, tw, pol, arcSeg, pick]);
 
   const dataLayers = useMemo(() => {
     const sunRashiIdx = Math.floor(normDeg(sunLon) / 30);
@@ -908,9 +1000,10 @@ function WheelChartImpl({
           <Path
             key={`kar${k}`}
             d={arcSeg(L0, L1, R_KAR_I, R_KAR_O)}
-            fill={segRashiFill({ alt: k % 2 === 1, sel: isCur })}
-            stroke={isCur ? W_ACCENT : W_SEP}
-            strokeWidth={isCur ? 1.7 : 0.6}
+            fill={karanaColor(kd)}
+            stroke={isCur ? W_ACCENT : "rgba(0,0,0,0.32)"}
+            strokeWidth={isCur ? 1.7 : 0.4}
+            opacity={isCur ? 1 : 0.78}
           />,
         );
         innerRings.push(
@@ -920,7 +1013,8 @@ function WheelChartImpl({
             r={(R_KAR_I + R_KAR_O) / 2}
             spin={spin}
             size={isCur ? 9 : 7.5}
-            fill={isCur ? W_ACCENT : "#ffffff"}
+            fill={isCur ? W_ACCENT : "rgba(0,0,0,0.82)"}
+            stroke={isCur ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)"}
           >
             {kName.length > 4 ? kName.slice(0, 4) : kName}
           </RingLabel>,
@@ -939,7 +1033,7 @@ function WheelChartImpl({
             <Path
               d={arcSeg(L0, L1, R_TIT_I, R_TIT_O)}
               fill={isCur ? TITHI_CUR : shukla ? TITHI_SHUKLA : TITHI_KRISHNA}
-              stroke={isCur ? W_ACCENT : W_SEP}
+              stroke={isCur ? W_ACCENT : "rgba(143,191,193,0.18)"}
               strokeWidth={isCur ? 1.7 : 0.5}
             />
             <RingLabel
@@ -948,6 +1042,7 @@ function WheelChartImpl({
               spin={spin}
               size={isCur ? 12 : 9.5}
               fill={isCur ? W_ACCENT : W_INK}
+              stroke={isCur ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.55)"}
             >
               {tName.length > 6 ? tName.slice(0, 6) : tName}
             </RingLabel>
@@ -1155,9 +1250,7 @@ function WheelChartImpl({
           cy={py}
           r={planetHitRadius(i)}
           fill="transparent"
-          onPress={() => {
-            setLineTarget(i);
-          }}
+          onPress={press(() => setLineTarget(i))}
         />
       );
     });
