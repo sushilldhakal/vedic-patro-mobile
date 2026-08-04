@@ -1052,3 +1052,12 @@ export function formatElementStampDisplay(stamp: ElementStamp, lang?: string): s
   }
   return normalizeLang(lang) === "en" ? `${timeOut} on ${dateOut}` : `${timeOut} · ${dateOut}`;
 }
+
+/** `साउन १२, २०८३` — BS month + day + year, Nepali digits. */
+export function formatBsMonthDayPatro(
+  bsYear: number,
+  bsMonth: number,
+  bsDay: number,
+): string {
+  return `${BS_MONTHS_NE[bsMonth - 1]} ${toNepaliDigits(bsDay)}, ${toNepaliDigits(bsYear)}`;
+}

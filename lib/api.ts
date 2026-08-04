@@ -558,13 +558,21 @@ export interface ConvertAdToBs {
   bs_year: number;
   bs_month: number;
   bs_day: number;
-  bs_month_name?: string;
-  bs_month_name_ne?: string;
+  bs_date: string;
+  bs_month_name: string;
+  bs_month_name_ne: string;
+  weekday: string;
 }
 
 export interface ConvertBsToAd {
   bs_date: string;
+  bs_year: number;
+  bs_month: number;
+  bs_day: number;
+  bs_month_name: string;
+  bs_month_name_ne: string;
   ad_date: string;
+  weekday: string;
 }
 
 export interface CivilTimelineSeg {
@@ -1038,15 +1046,28 @@ export interface EclipseYearResponse {
   events: EclipseEvent[];
 }
 
+export interface PanchakMomentResponse {
+  date_ad: string;
+  bs_year: number;
+  bs_month: number;
+  bs_day: number;
+  time_en: string;
+  time_ne: string;
+  time_short?: string;
+}
+
 export interface PanchakPeriodResponse {
-  start: { date_ad?: string; time_short?: string; time_ne?: string };
-  end: { date_ad?: string; time_short?: string; time_ne?: string };
-  duration_ne?: string;
-  duration_en?: string;
+  start: PanchakMomentResponse;
+  end: PanchakMomentResponse;
+  duration_ne: string;
+  duration_en: string;
 }
 
 export interface PanchakYearResponse {
+  bs_year?: number;
+  ad_year?: number;
   count: number;
+  gregorian_range?: { start: string; end: string };
   periods: PanchakPeriodResponse[];
 }
 
