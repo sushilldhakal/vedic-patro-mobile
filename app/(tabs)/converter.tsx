@@ -170,7 +170,7 @@ export default function ConverterScreen() {
               {adResult.bs_date}
             </Text>
           </View>
-          <View className="flex-row flex-wrap justify-between gap-3">
+          <View className="flex-row flex-wrap gap-3">
             <StatCard width={tileWidth} highlight label={pick("विक्रम मिति", "BS date")} value={adResult.bs_date} />
             <StatCard width={tileWidth} label={pick("विक्रम वर्ष", "BS year")} value={digits(adResult.bs_year)} />
             <StatCard
@@ -200,7 +200,7 @@ export default function ConverterScreen() {
               {bsResult.ad_date}
             </Text>
           </View>
-          <View className="flex-row flex-wrap justify-between gap-3">
+          <View className="flex-row flex-wrap gap-3">
             <StatCard width={tileWidth} highlight label={pick("ईस्वी मिति", "AD date")} value={bsResult.ad_date} />
             <StatCard width={tileWidth} label={pick("विक्रम मिति", "BS date")} value={bsResult.bs_date} />
             <StatCard

@@ -30,7 +30,7 @@ function toAdStr(d: Date): string {
 export default function GocharScreen() {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
-  const { isTablet } = useBreakpoint();
+  const { width } = useBreakpoint();
   const { location, setLocation } = usePanchangaLocation();
   const tz = resolveTimeZone(undefined, location.params.timezone);
   const todayAd = todayAdStringInTimezone(new Date(), tz);
@@ -92,7 +92,7 @@ export default function GocharScreen() {
             onSelectPlanet={setSelectedPlanet}
           />
 
-          <View className={isTablet ? "flex-row gap-6" : "gap-6"}>
+          <View className={width >= 1024 ? "flex-row gap-6" : "gap-6"}>
             <GocharIngressSection
               events={ingressQ.data?.events ?? []}
               refDateAd={dateAd}

@@ -155,7 +155,7 @@ export default function GrahaAstaScreen() {
           {pick("लोड हुँदै…", "Loading…")}
         </Text>
       ) : query.data ? (
-        <View className="mt-2 flex-row flex-wrap justify-between">
+        <View className="mt-2 flex-row flex-wrap">
           {GRAHA_ORDER.map((g) => {
             const periods = byGraha.get(g) ?? [];
             return (

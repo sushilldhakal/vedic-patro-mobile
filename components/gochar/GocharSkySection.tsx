@@ -73,7 +73,7 @@ export function GocharSkySection({
         </Text>
       </View>
 
-      <View className="flex-row flex-wrap justify-between gap-2.5 p-3">
+      <View className="flex-row flex-wrap gap-2.5 p-3">
         {GRAHA_DETAIL_ORDER.map((key) => {
           const g = gochar[key];
           if (!g) return null;

@@ -82,7 +82,7 @@ export function SaitRulesSection({
           ) : null}
 
           {rules && rules.length > 0 ? (
-            <View className="flex-row flex-wrap justify-between gap-3">
+            <View className="flex-row flex-wrap gap-3">
               {rules.map((r, i) => (
                 <View
                   key={r.id ?? i}

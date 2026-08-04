@@ -35,7 +35,7 @@ function PanchakPeriodCard({
 }) {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
-  const { isTablet } = useBreakpoint();
+  const { width: screenWidth } = useBreakpoint();
   const en = lang === "en";
   const variety = panchakVarietyFromStartAd(period.start.ad);
 
@@ -84,7 +84,7 @@ function PanchakPeriodCard({
         ) : null}
       </View>
 
-      <View className={isTablet ? "flex-row gap-4" : "gap-4"}>
+      <View className={screenWidth >= 640 ? "flex-row gap-4" : "gap-4"}>
         <Boundary
           label={pick("सुरु हुने मिति", "Start")}
           bs={bsStart}
@@ -206,7 +206,7 @@ export default function PanchakPatroScreen() {
               {pick(`${yearLabel} का पञ्चक अवधिहरू`, `Panchak windows for ${yearLabel}`)}
             </Text>
           </View>
-          <View className="flex-row flex-wrap justify-between gap-3">
+          <View className="flex-row flex-wrap gap-3">
             {periods.map((period, i) => (
               <PanchakPeriodCard
                 key={`${period.start.ad}-${period.end.ad}`}

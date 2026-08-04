@@ -166,7 +166,7 @@ const COLUMNS: {
 export default function AvakahadaScreen() {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
-  const { isTablet } = useBreakpoint();
+  const { width, isTablet } = useBreakpoint();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "index",
@@ -334,7 +334,7 @@ export default function AvakahadaScreen() {
         <Text className="text-xl font-bold text-foreground" style={nepaliTextStyle(20)}>
           {pick("भौमदोष (मङ्गली) विचार", "Bhoomadosha (Mangal) considerations")}
         </Text>
-        <View className={isTablet ? "flex-row gap-3" : "gap-3"}>
+        <View className={width >= 640 ? "flex-row gap-3" : "gap-3"}>
           <View className="flex-1 rounded-xl border border-border p-4">
             <Text className="mb-2 text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
               {pick("नामाक्षर वर्ग र शत्रु वर्ग", "Name-syllable groups and enemy groups")}

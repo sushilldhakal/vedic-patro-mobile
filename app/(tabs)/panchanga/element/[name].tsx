@@ -118,7 +118,7 @@ function SpanList({ spans }: { spans: ElementSpan[] }) {
   const width = useGridWidth(1, 2, 3);
 
   return (
-    <View className="flex-row flex-wrap justify-between gap-2.5">
+    <View className="flex-row flex-wrap gap-2.5">
       {spans.map((s, i) => (
         <Card key={`${s.name}-${i}`} style={{ width: width as never }} className="gap-2 p-3">
           <View className="flex-row items-baseline justify-between gap-2">
@@ -228,7 +228,7 @@ function ChoghadiyaTableView({ data, sunrise }: { data: AnyRow[]; sunrise?: stri
           </Text>
         ))}
       </View>
-      <View className="flex-row flex-wrap justify-between gap-1.5">
+      <View className="flex-row flex-wrap gap-1.5">
         {data.map((it, i) => {
           const nameNe = String(it.name_ne ?? it.name ?? "—");
           const tone = choghadiyaTone(nameNe, it.bad as boolean | undefined);
@@ -286,7 +286,7 @@ function TableView({
             <Text className="font-bold text-foreground">{anchor}</Text>
           </Text>
         ) : null}
-        <View className="flex-row flex-wrap justify-between gap-1.5">
+        <View className="flex-row flex-wrap gap-1.5">
           {rows.map((r, i) => {
             const good = r.tone === "good" || r.quality === "शुभ";
             const bad = r.tone === "bad" || r.quality === "अशुभ";
@@ -322,7 +322,7 @@ function TableView({
       );
     }
     return (
-      <View className="flex-row flex-wrap justify-between gap-1.5">
+      <View className="flex-row flex-wrap gap-1.5">
         {rows.map((it, i) => {
           const label =
             lang === "en"

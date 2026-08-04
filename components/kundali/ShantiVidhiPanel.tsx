@@ -146,7 +146,7 @@ export function ShantiVidhiPanel({
 }) {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
-  const { isTablet, width } = useBreakpoint();
+  const { width } = useBreakpoint();
   const [selectedKey, setSelectedKey] = useState("saturn");
   const [nowMs] = useState(() => Date.now());
   const graha = useMemo(
@@ -171,9 +171,9 @@ export function ShantiVidhiPanel({
 
   // Web uses sm:grid-cols-2 for the recommendation/tile grids and
   // grid-cols-3 / sm:grid-cols-5 / lg:grid-cols-9 for the graha selector.
-  const cardWidth = isTablet ? "49%" : "100%";
-  const tileWidth = width >= 1024 ? "24%" : isTablet ? "49%" : "100%";
-  const selectorCols = width >= 1024 ? 9 : isTablet ? 5 : 3;
+  const cardWidth = width >= 640 ? "49%" : "100%";
+  const tileWidth = width >= 1024 ? "24%" : width >= 640 ? "49%" : "100%";
+  const selectorCols = width >= 1024 ? 9 : width >= 640 ? 5 : 3;
   const selectorWidth = `${(100 / selectorCols - 1.5).toFixed(2)}%`;
 
   const daanItems = lang === "en" ? graha.daanEn ?? graha.daan : graha.daan;
@@ -193,7 +193,7 @@ export function ShantiVidhiPanel({
           </Text>
         </View>
       ) : (
-        <View className="flex-row flex-wrap justify-between gap-3">
+        <View className="flex-row flex-wrap gap-3">
           <RecommendationCard
             width={cardWidth}
             heading={pick("वर्तमान महादशा (विंशोत्तरी)", "Current Mahadasha (Vimshottari)")}
@@ -331,7 +331,7 @@ export function ShantiVidhiPanel({
           </View>
 
           {/* tiles */}
-          <View className="flex-row flex-wrap justify-between gap-3">
+          <View className="flex-row flex-wrap gap-3">
             <InfoTile
               width={tileWidth}
               icon="leaf-outline"

@@ -112,7 +112,7 @@ export function SaitCeremonyLayout({
                     {pick(`${digits(monthDays.length)} दिन`, `${monthDays.length} days`)}
                   </Text>
                 </View>
-                <View className="flex-row flex-wrap justify-between gap-3">
+                <View className="flex-row flex-wrap gap-3">
                   {monthDays.map((d) => (
                     <SaitDayCard
                       key={`${d.bs_month}-${d.bs_day}-${d.window_start}`}

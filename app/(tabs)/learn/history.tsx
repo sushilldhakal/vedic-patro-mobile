@@ -140,7 +140,7 @@ export default function LearnHistoryScreen() {
           <Ionicons name="open-outline" size={13} color={colors.mutedForeground} />
         </Pressable>
 
-        <View className="mt-8 flex-row flex-wrap justify-between gap-3">
+        <View className="mt-8 flex-row flex-wrap gap-3">
           {HISTORY_MILESTONES.map((m) => (
             <View
               key={m.label}

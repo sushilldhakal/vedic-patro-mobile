@@ -155,7 +155,7 @@ export function GocharPlanetDeepDive({
           ) : null}
         </View>
 
-        <View className="mt-4 flex-row flex-wrap justify-between gap-3">
+        <View className="mt-4 flex-row flex-wrap gap-3">
           <Detail width={detailWidth} label={pick("राशि", "Sign")} value={`${rashi} ${deg}`} />
           <Detail
             width={detailWidth}
