@@ -14,14 +14,61 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vedicpatro.mobile"
+      "bundleIdentifier": "com.vedicpatro.mobile",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "vedicpatro"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "fb1044570391345268"
+            ]
+          }
+        ],
+        "LSApplicationQueriesSchemes": [
+          "fbapi",
+          "fb-messenger-share-api",
+          "fbauth2",
+          "fbshareextension"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#073f43"
       },
-      "package": "com.vedicpatro.mobile"
+      "package": "com.vedicpatro.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "vedicpatro"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "fb1044570391345268"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -63,7 +110,8 @@
       "router": {},
       "eas": {
         "projectId": "875bd091-9544-4881-9b60-7a268c11a7ac"
-      }
+      },
+      "googleIosReversedClientId": ""
     }
   }
 }
