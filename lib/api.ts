@@ -1571,3 +1571,349 @@ export const fetchShadbala = (moment: InstantQuery, location?: LocationParams) =
       location,
     ),
   );
+
+// ─── Kundali detail — full server-computed jyotish payload ───────────────────
+// All astrology math (vargas, ashtakavarga, bhava bala, yuddha, yogas,
+// avakahada, dasha tree, birth kalas) is computed by the API; the client
+// only renders these blocks.
+
+export interface DmsParts {
+  rashiNum: number;
+  deg: number;
+  min: number;
+  sec: number;
+}
+
+export type GrahaRelation = "self" | "friend" | "enemy" | "neutral";
+
+export type GrahaDignity =
+  | "exalted"
+  | "moolatrikona"
+  | "own"
+  | "friend_house"
+  | "neutral_house"
+  | "enemy_house"
+  | "debilitated";
+
+export interface VargaChartEntry {
+  key: string;
+  vargaRashi: number;
+  dms: DmsParts;
+  nakshatraIndex: number;
+  pada: number;
+  nakshatraLord: string;
+  subLord: string;
+  ownerKey: string;
+  relation: GrahaRelation | null;
+  dignity: GrahaDignity | null;
+  retrograde?: boolean;
+}
+
+export interface VargaCharts {
+  divisions: number[];
+  points: Record<string, { longitude: number; retrograde?: boolean }>;
+  /** Keyed by division as a string ("1", "9", …). */
+  entries: Record<string, VargaChartEntry[]>;
+  ownedRashis: Record<string, number[]>;
+}
+
+export interface AshtakavargaSignRow {
+  rashi: number;
+  rashiEn: string;
+  rashiNe: string;
+  bindus: Record<string, number>;
+  sarvashtaka: number;
+}
+
+export interface ShodhyaPindaRow {
+  target: string;
+  rashiPinda: number;
+  grahaPinda: number;
+  shodhyaPinda: number;
+}
+
+export interface AshtakavargaData {
+  raw: AshtakavargaSignRow[];
+  reduced: AshtakavargaSignRow[];
+  shodhyaPinda: ShodhyaPindaRow[];
+  signs: Record<string, number>;
+}
+
+export interface BhavaBalaHouse {
+  house: number;
+  madhyaLongitude: number;
+  lordKey: string;
+  lordName: string;
+  bhavadhipati: number;
+  disha: number;
+  drishti: number;
+  totalVirupas: number;
+  totalPinda: number;
+  rupas: number;
+  percent: number;
+}
+
+export interface BhavaBalaData {
+  houses: BhavaBalaHouse[];
+  strongest: BhavaBalaHouse;
+  weakest: BhavaBalaHouse;
+  /** Mean house-strength % across houses ruled by each graha. */
+  rulershipPercent: Record<string, number>;
+  referenceVirupas: number;
+}
+
+export interface YuddhaWar {
+  winner: string;
+  loser: string;
+  yuddhaVirupas: number;
+  separationDeg: number;
+}
+
+export interface YuddhaData {
+  wars: YuddhaWar[];
+  byPlanet: Record<string, number>;
+}
+
+export interface KundaliYoga {
+  key: string;
+  nameEn: string;
+  nameNe: string;
+  nature: "auspicious" | "inauspicious" | "mixed" | "caution";
+  present: boolean;
+  descEn: string;
+  descNe: string;
+}
+
+/** One row of the static B. V. Raman combinations catalog. */
+export interface YogaReferenceEntry {
+  yogaId: string;
+  name: string;
+  nameNe: string;
+  definition: string;
+  definitionNe: string;
+  result: string;
+  resultNe: string;
+  source: string;
+  part: string;
+}
+
+export interface YogaReferenceResponse {
+  source: string;
+  part: string;
+  count: number;
+  combinations: YogaReferenceEntry[];
+}
+
+/**
+ * Version of the yoga-reference payload. Bump whenever the catalog data or its
+ * shape changes so the CDN mints a fresh object instead of serving a stale
+ * response (the endpoint is cached ~1 day). v2 added the Nepali fields.
+ */
+export const YOGA_REFERENCE_VERSION =
+  (extra.yogaReferenceVersion as string) ?? "2";
+
+/** The full 162-combination reference catalog (Raman, Part I). CDN-cached. */
+export function fetchYogaReference(): Promise<YogaReferenceResponse> {
+  return get<YogaReferenceResponse>(
+    `/kundali/yogas/reference?v=${YOGA_REFERENCE_VERSION}`,
+  );
+}
+
+export interface BilingualValue {
+  ne: string;
+  en: string;
+}
+
+export interface JanmaAvakahadaData {
+  nakshatra: BilingualValue;
+  nakshatraIndex: number;
+  pada: number;
+  rashiPaya: BilingualValue;
+  nakshatraPaya: BilingualValue;
+  tattva: BilingualValue;
+  yunja: BilingualValue;
+  vashya: BilingualValue;
+  tara: BilingualValue;
+  gana: BilingualValue;
+  akshara: BilingualValue;
+  nadi: BilingualValue;
+  asana: BilingualValue;
+  yoni: BilingualValue;
+  jati: BilingualValue;
+}
+
+export interface GhadiPalaVipala {
+  ghadi: number;
+  pala: number;
+  vipala: number;
+}
+
+export interface KundaliBirthMeta {
+  birthClock: string;
+  isDayBirth: boolean | null;
+  ishtaKala: GhadiPalaVipala | null;
+  ahoratriIshtaKala: GhadiPalaVipala | null;
+  choghadiyaAtBirth: {
+    nameNe: string;
+    nameEn?: string;
+    quality: "शुभ" | "अशुभ" | "सामान्य";
+    bad: boolean;
+  } | null;
+  solarCorrectionMinutes: number;
+  moonNakshatra: { index: number; number: number; pada: number } | null;
+  yoga: { index: number; number: number } | null;
+}
+
+export interface DashaTreeNode {
+  lord: string;
+  lord_ne: string;
+  start: string;
+  end: string;
+  children?: DashaTreeNode[];
+}
+
+export interface DashaTreeResponse extends VimshottariResponse {
+  tree: DashaTreeNode[];
+  tree_depth: number;
+  system?: string;
+  cycle_years?: number;
+  tribhaga?: number;
+}
+
+export interface UpagrahaDetailRow {
+  key: string;
+  name?: string;
+  name_ne?: string;
+  longitude: number;
+  dms: DmsParts;
+  nakshatraIndex: number;
+  pada: number;
+  nakshatraLord: string;
+}
+
+/** Vimshopaka Bala — 20-point divisional strength. */
+export type VimshopakaGrade = "full" | "mediocre" | "little" | "incapable";
+
+export interface VimshopakaClassification {
+  key: string;
+  label: string;
+  label_ne: string;
+  divisions: number[];
+}
+
+export interface VimshopakaPlanet {
+  key: string;
+  name: string;
+  name_ne: string;
+  /** classification key → { score (0–20), grade }. */
+  scores: Record<string, { score: number; grade: VimshopakaGrade }>;
+}
+
+export interface VimshopakaData {
+  classifications: VimshopakaClassification[];
+  planets: VimshopakaPlanet[];
+  max_score: number;
+  method: string;
+}
+
+export interface KundaliDetailResponse {
+  panchanga: PanchangaDay;
+  shadbala: ShadbalaResponse;
+  dasha: DashaTreeResponse | null;
+  tribhagiDasha: DashaTreeResponse | null;
+  yoginiDasha: DashaTreeResponse | null;
+  yuddha: YuddhaData;
+  bhavaBala: BhavaBalaData | null;
+  vimshopaka: VimshopakaData | null;
+  ashtakavarga: AshtakavargaData | null;
+  yogas: KundaliYoga[];
+  vargaCharts: VargaCharts;
+  upagrahas: UpagrahaDetailRow[];
+  avakahada: JanmaAvakahadaData | null;
+  birthMeta: KundaliBirthMeta;
+  combustion: Record<string, boolean | null>;
+  lagnaRashi: number | null;
+  ayanamsha: string;
+  location?: Record<string, unknown>;
+  birth_instant: string;
+}
+
+export interface DashaTreeNode {
+  lord: string;
+  lord_ne: string;
+  start: string;
+  end: string;
+  children?: DashaTreeNode[];
+}
+
+export interface DashaTreeResponse extends VimshottariResponse {
+  tree: DashaTreeNode[];
+  tree_depth: number;
+  system?: string;
+  cycle_years?: number;
+  tribhaga?: number;
+}
+
+export interface KundaliDetailResponse {
+  panchanga: PanchangaDay;
+  shadbala: ShadbalaResponse;
+  dasha: DashaTreeResponse | null;
+  tribhagiDasha: DashaTreeResponse | null;
+  yoginiDasha: DashaTreeResponse | null;
+  yuddha: YuddhaData;
+  bhavaBala: BhavaBalaData | null;
+  vimshopaka: VimshopakaData | null;
+  ashtakavarga: AshtakavargaData | null;
+  yogas: KundaliYoga[];
+  vargaCharts: VargaCharts;
+  upagrahas: UpagrahaDetailRow[];
+  avakahada: JanmaAvakahadaData | null;
+  birthMeta: KundaliBirthMeta;
+  combustion: Record<string, boolean | null>;
+  lagnaRashi: number | null;
+  ayanamsha: string;
+  location?: Record<string, unknown>;
+  birth_instant: string;
+}
+
+export const kundaliDetailKeys = {
+  atTime: (moment: InstantQuery, location?: LocationParams, ayanamsha?: string) =>
+    [
+      "kundali",
+      "detail",
+      instantCacheKey(moment),
+      locationCacheKey(location),
+      ayanamsha ?? "lahiri",
+    ] as const,
+};
+
+export const fetchKundaliDetail = (
+  moment: InstantQuery,
+  location?: LocationParams,
+  options?: { ayanamsha?: string },
+) => {
+  const params = appendInstantParams(new URLSearchParams(), moment);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  return get<KundaliDetailResponse>(
+    appendLocation(`/kundali/detail?${params.toString()}`, location),
+  );
+};
+
+export type DashaSystem = "vimshottari" | "tribhagi" | "yogini";
+
+export const dashaExpandKeys = {
+  span: (lord: string, start: string, end: string, system = "vimshottari") =>
+    ["dasha", "expand", lord, start, end, system] as const,
+};
+
+export const fetchDashaChildren = (
+  lord: string,
+  start: string,
+  end: string,
+  system: DashaSystem = "vimshottari",
+) => {
+  const params = new URLSearchParams({ lord, start, end, system });
+  return get<{ lord: string; system: string; children: DashaTreeNode[] }>(
+    `/kundali/dasha/expand?${params.toString()}`,
+  );
+};
