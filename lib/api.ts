@@ -1917,3 +1917,117 @@ export const fetchDashaChildren = (
     `/kundali/dasha/expand?${params.toString()}`,
   );
 };
+
+// ─── Kundali milan (ashtakuta matching) ──────────────────────────────────────
+
+export type KutaId =
+  | "varna"
+  | "vashya"
+  | "tara"
+  | "yoni"
+  | "maitri"
+  | "gana"
+  | "bhakuta"
+  | "nadi";
+
+export interface KutaRow {
+  id: KutaId;
+  max: number;
+  obtained: number;
+  boyValue: string;
+  girlValue: string;
+  areaOfLife: string;
+  areaOfLifeNe: string;
+  info: string;
+  infoNe: string;
+}
+
+export interface MilanDoshaRow {
+  id: "nadi" | "bhakuta" | "gana" | "tara" | "yoni" | "varna";
+  labelEn: string;
+  labelNe: string;
+  present: boolean;
+}
+
+export interface AshtakutaResult {
+  kutas: KutaRow[];
+  totalObtained: number;
+  totalMax: 36;
+  recommendation: "excellent" | "very_good" | "middling" | "inauspicious";
+  recommendationLabel: string;
+  recommendationLabelNe: string;
+  nadiDosha: boolean;
+  nadiDoshaAdvisory?: string | null;
+  nadiDoshaAdvisoryNe?: string | null;
+  bhakutaUnfavorable: boolean;
+  doshaAnalysis: MilanDoshaRow[];
+  notes: string[];
+  notesNe: string[];
+}
+
+export interface MilanPerson {
+  moonLongitude: number;
+  moonRashiNum: number;
+  moonRashiNe: string;
+  moonRashiEn: string;
+  nakshatraIndex: number;
+  nakshatraNe: string;
+  nakshatraEn: string;
+  pada: number;
+  birth_instant: string;
+  location?: Record<string, unknown>;
+}
+
+export interface KundaliMilanResponse {
+  result: AshtakutaResult;
+  boy: MilanPerson;
+  girl: MilanPerson;
+  ayanamsha: string;
+  lang: string;
+}
+
+export interface MilanPersonQuery {
+  /** Birth moment: a civil day in some era plus the local clock. */
+  moment: InstantQuery;
+  lat?: number;
+  lon?: number;
+  timezone?: string;
+}
+
+export const milanKeys = {
+  match: (
+    boy: MilanPersonQuery,
+    girl: MilanPersonQuery,
+    ayanamsha?: string,
+    lang?: string,
+  ) =>
+    [
+      "kundali",
+      "milan",
+      instantCacheKey(boy.moment),
+      `${boy.lat ?? ""},${boy.lon ?? ""},${boy.timezone ?? ""}`,
+      instantCacheKey(girl.moment),
+      `${girl.lat ?? ""},${girl.lon ?? ""},${girl.timezone ?? ""}`,
+      ayanamsha ?? "lahiri",
+      lang ?? "ne",
+    ] as const,
+};
+
+export const fetchKundaliMilan = (
+  boy: MilanPersonQuery,
+  girl: MilanPersonQuery,
+  options?: { ayanamsha?: string; lang?: string },
+) => {
+  const params = new URLSearchParams();
+  appendInstantParams(params, boy.moment, "boy_");
+  appendInstantParams(params, girl.moment, "girl_");
+  if (boy.lat != null) params.set("boy_lat", String(boy.lat));
+  if (boy.lon != null) params.set("boy_lon", String(boy.lon));
+  if (boy.timezone) params.set("boy_timezone", boy.timezone);
+  if (girl.lat != null) params.set("girl_lat", String(girl.lat));
+  if (girl.lon != null) params.set("girl_lon", String(girl.lon));
+  if (girl.timezone) params.set("girl_timezone", girl.timezone);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  if (options?.lang) params.set("lang", options.lang);
+  return get<KundaliMilanResponse>(`/kundali/milan?${params.toString()}`);
+};
