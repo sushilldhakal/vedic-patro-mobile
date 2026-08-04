@@ -1242,6 +1242,127 @@ export const seasonsKeys = {
   tropical: (location?: LocationParams) => ["seasons", "tropical", locationCacheKey(location)] as const,
 };
 
+export type SaitSuitability = "favourable" | "neutral" | "avoid";
+
+export type SaitShuddhiTone = "good" | "shanti" | "avoid";
+
+/** One planet's Graha Śuddhi: its house from the native's janma rāśi. */
+export interface SaitShuddhiPlanet {
+  planet: "sun" | "moon" | "guru" | "shukra";
+  house: number;
+  tone: SaitShuddhiTone;
+  rashi_ne: string;
+  rashi_en: string;
+}
+
+/** Graha Śuddhi over the ceremony's relevant planets (bratabandha, griha-aarambha). */
+export interface SaitShuddhi {
+  tone: SaitShuddhiTone;
+  planets: SaitShuddhiPlanet[];
+}
+
+/** Kumbha Chakra limb for a gṛha-praveśa entry day (Sun→day nakṣatra count). */
+export interface SaitKumbha {
+  count: number;
+  sun_nakshatra: number;
+  zone: string;
+  zone_ne: string;
+  zone_en: string;
+  effect_ne: string;
+  effect_en: string;
+  tone: SaitShuddhiTone;
+}
+
+/** Agni-mukha — the graha that receives the oblation (agni-jurne). */
+export interface SaitAgniMukha {
+  count: number;
+  sun_nakshatra: number;
+  planet: string;
+  planet_ne: string;
+  planet_en: string;
+  benefic: boolean;
+  tone: SaitShuddhiTone;
+}
+
+/** Annaprāśana age-month check (needs the child's birth date + gender). */
+export interface SaitAnnaMonth {
+  ordinal_month: number;
+  gender: "male" | "female";
+  matches: boolean;
+  tone: SaitShuddhiTone;
+}
+
+export interface SaitPersonalizeDay {
+  bs_month: number;
+  bs_day: number;
+  suitability: SaitSuitability;
+  tara_num: number;
+  tara_tone: string;
+  tara_ne: string;
+  chandra_num: number;
+  chandra_tone: string;
+  moon_house: number;
+  /** Graha Śuddhi (bratabandha, griha-aarambha); null for other ceremonies. */
+  shuddhi?: SaitShuddhi | null;
+  /** Kumbha Chakra (griha-pravesh); null for other ceremonies. */
+  kumbha?: SaitKumbha | null;
+  /** Agni-mukha (agni-jurne); null for other ceremonies. */
+  agni_mukha?: SaitAgniMukha | null;
+  /** Annaprāśana age-month (annaprasan, when gender+birth known); else null. */
+  anna_month?: SaitAnnaMonth | null;
+  transit_nakshatra_ne: string;
+  transit_nakshatra_en: string;
+  transit_rashi_ne: string;
+  transit_rashi_en: string;
+}
+
+export interface SaitPersonalizeResponse {
+  bs_year: number;
+  category: string;
+  janma: { nakshatra: number; rashi: number };
+  counts: { favourable: number; neutral: number; avoid: number };
+  days: SaitPersonalizeDay[];
+}
+
+export const saitPersonalizeKey = (
+  year: number,
+  category: string,
+  location: LocationParams | undefined,
+  birthDatetime: string,
+  birthTz: string,
+  gender?: string | null,
+) =>
+  [
+    "sait",
+    "personalize",
+    SAIT_CACHE_VERSION,
+    year,
+    category,
+    locationCacheKey(location),
+    birthDatetime,
+    birthTz,
+    gender ?? "",
+  ] as const;
+
+/**
+ * Annotate the year's general dates with a native verdict from a birth moment.
+ * `birthDatetime` is a naive local ISO (`YYYY-MM-DDTHH:MM`) read in `birthTz`.
+ */
+export const fetchSaitPersonalize = (
+  year: number,
+  category: string,
+  location: LocationParams | undefined,
+  birthDatetime: string,
+  birthTz: string,
+  gender?: string | null,
+) => {
+  let path = appendLocation(`/nepal/sait/${year}/${category}/personalize`, location);
+  const params = new URLSearchParams({ birth: birthDatetime, birth_tz: birthTz });
+  if (gender) params.set("gender", gender);
+  path = `${path}${path.includes("?") ? "&" : "?"}${params.toString()}`;
+  return get<SaitPersonalizeResponse>(path);
+};
+
 export const saitDetailKey = (year: number, category: string, location?: LocationParams) =>
   ["sait", "detail", SAIT_CACHE_VERSION, year, category, locationCacheKey(location)] as const;
 

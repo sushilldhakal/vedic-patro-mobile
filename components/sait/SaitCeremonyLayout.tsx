@@ -8,7 +8,7 @@ import { BsYearPicker } from "@/components/pickers/BsYearMonthPicker";
 import { SaitDayCard } from "@/components/sait/SaitDayCard";
 import { SaitRulesSection, type SaitRule } from "@/components/sait/SaitRulesSection";
 import { Text } from "@/components/ui/Text";
-import type { SaitDetailDay } from "@/lib/api";
+import type { SaitDetailDay, SaitPersonalizeDay, SaitSuitability } from "@/lib/api";
 import { BS_MONTH_NAMES } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -31,6 +31,9 @@ export function SaitCeremonyLayout({
   rules,
   engineVersion,
   days = [],
+  profileControl,
+  suitabilityByDay,
+  personalizeByDay,
   loading,
   emptyLabel,
   countLabel,
@@ -45,6 +48,12 @@ export function SaitCeremonyLayout({
   rules?: SaitRule[] | null;
   engineVersion?: string;
   days?: SaitDetailDay[];
+  /** Profile picker + legend, shown below the year/location row. */
+  profileControl?: React.ReactNode;
+  /** Native verdict per `${bs_month}-${bs_day}`, overlaid on the day cards. */
+  suitabilityByDay?: Map<string, SaitSuitability>;
+  /** Full per-day annotation (same key) for the card's reason lines. */
+  personalizeByDay?: Map<string, SaitPersonalizeDay>;
   loading: boolean;
   emptyLabel?: string;
   countLabel?: (count: number, year: number) => string;
@@ -85,6 +94,15 @@ export function SaitCeremonyLayout({
       <LocationSelector location={location} onLocationChange={onLocationChange} />
       <BsYearPicker year={year} onYearChange={onYearChange} />
 
+      {profileControl ? (
+        <View
+          style={{ backgroundColor: colors.surfaceInset, borderColor: colors.border }}
+          className="mb-3 gap-2 rounded-xl border p-3"
+        >
+          {profileControl}
+        </View>
+      ) : null}
+
       {!loading && days.length > 0 ? (
         <Text className="mb-3 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
           {countText}
@@ -113,13 +131,18 @@ export function SaitCeremonyLayout({
                   </Text>
                 </View>
                 <View className="flex-row flex-wrap gap-3">
-                  {monthDays.map((d) => (
-                    <SaitDayCard
-                      key={`${d.bs_month}-${d.bs_day}-${d.window_start}`}
-                      d={d}
-                      width={cardWidth}
-                    />
-                  ))}
+                  {monthDays.map((d) => {
+                    const key = `${d.bs_month}-${d.bs_day}`;
+                    return (
+                      <SaitDayCard
+                        key={`${key}-${d.window_start}`}
+                        d={d}
+                        width={cardWidth}
+                        suitability={suitabilityByDay?.get(key)}
+                        personalize={personalizeByDay?.get(key)}
+                      />
+                    );
+                  })}
                 </View>
               </View>
             );

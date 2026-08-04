@@ -1,9 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SaitCeremonyLayout } from "@/components/sait/SaitCeremonyLayout";
+import { SaitProfilePicker } from "@/components/sait/SaitProfilePicker";
+import { SuitabilityLegend } from "@/components/sait/SaitSuitability";
 import { useBsYear } from "@/components/pickers/BsYearMonthPicker";
 import { fetchSaitDetail, saitDetailKey } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { SAIT_RULES_CONTENT } from "@/lib/sait-rules-content";
+import { useSaitPersonalize } from "@/lib/sait-personalize";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 
 export default function VivahSaitScreen() {
@@ -11,6 +14,7 @@ export default function VivahSaitScreen() {
   const { location, setLocation } = usePanchangaLocation();
   const { year, setYear } = useBsYear();
   const content = SAIT_RULES_CONTENT.vivah;
+  const personalize = useSaitPersonalize(year, "vivah", location.params);
 
   const detailQuery = useQuery({
     queryKey: saitDetailKey(year, "vivah", location.params),
@@ -34,6 +38,19 @@ export default function VivahSaitScreen() {
       rules={content.rules}
       engineVersion={detailQuery.data?.engine_version}
       days={detailQuery.data?.days ?? []}
+      profileControl={
+        <>
+          <SaitProfilePicker
+            selectedId={personalize.selectedProfile?.id ?? null}
+            onSelect={personalize.setSelectedProfile}
+          />
+          {personalize.selectedProfile ? (
+            <SuitabilityLegend counts={personalize.counts} />
+          ) : null}
+        </>
+      }
+      suitabilityByDay={personalize.suitabilityByDay}
+      personalizeByDay={personalize.personalizeByDay}
       loading={detailQuery.isLoading && !detailQuery.data}
       emptyLabel={pick(
         "यस वर्ष विवाहको साइत भेटिएन।",
