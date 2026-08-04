@@ -45,3 +45,94 @@ export function buildBhavaChart(
 
   return houses;
 }
+
+/** Rashi gender + modality, indexed 0–11. Mirrors the web RASHI_QUALITIES. */
+export const RASHI_QUALITIES: { ne: string; en: string }[] = [
+  { ne: "पुं, चर", en: "Mas, Movable" },
+  { ne: "स्त्री, स्थिर", en: "Fem, Fixed" },
+  { ne: "पुं, द्विस्वभाव", en: "Mas, Common" },
+  { ne: "स्त्री, चर", en: "Fem, Movable" },
+  { ne: "पुं, स्थिर", en: "Mas, Fixed" },
+  { ne: "स्त्री, द्विस्वभाव", en: "Fem, Common" },
+  { ne: "पुं, चर", en: "Mas, Movable" },
+  { ne: "स्त्री, स्थिर", en: "Fem, Fixed" },
+  { ne: "पुं, द्विस्वभाव", en: "Mas, Common" },
+  { ne: "स्त्री, चर", en: "Fem, Movable" },
+  { ne: "पुं, स्थिर", en: "Mas, Fixed" },
+  { ne: "स्त्री, द्विस्वभाव", en: "Fem, Common" },
+];
+
+/**
+ * Graha-drishti offsets (house-distance from the aspecting planet) beyond the
+ * universal 7th aspect every planet casts. Mirrors the server's SPECIAL_ASPECTS
+ * table (engine/vedic/interpretation.py).
+ */
+const SPECIAL_ASPECT_HOUSES: Record<string, number[]> = {
+  mars: [4, 7, 8],
+  jupiter: [5, 7, 9],
+  saturn: [3, 7, 10],
+  rahu: [5, 7, 9],
+  ketu: [5, 7, 9],
+};
+
+function aspectHousesFor(key: string): number[] {
+  return SPECIAL_ASPECT_HOUSES[key] ?? [7];
+}
+
+/** Kendra (Q) / trikona (T) marker for a house number. */
+function houseBadge(house: number): "Q" | "T" | undefined {
+  if ([1, 4, 7, 10].includes(house)) return "Q";
+  if ([1, 5, 9].includes(house)) return "T";
+  return undefined;
+}
+
+export interface BhavaTableRow {
+  house: number;
+  badge?: "Q" | "T";
+  residents: BhavaPlanetEntry[];
+  owner?: string;
+  rashi: number;
+  rashiNe: string;
+  aspectedBy: string[];
+}
+
+/**
+ * Per-house table: residents, rashi owner (lord), rashi qualities and which
+ * planets cast a graha-drishti onto that house — everything already derivable
+ * from data the API returns for the chart.
+ */
+export function buildBhavaTable(
+  lagnaRashi: number,
+  planetRashis: { key: string; labelNe: string; rashi: number }[],
+  ownedRashis: Record<string, number[]>,
+  rashiNeFromNumber: (rashi?: number) => string | undefined,
+): BhavaTableRow[] {
+  const houses = buildBhavaChart(lagnaRashi, planetRashis, rashiNeFromNumber);
+
+  const rashiOwner = new Map<number, string>();
+  for (const [ownerKey, rashis] of Object.entries(ownedRashis)) {
+    for (const rashi of rashis) rashiOwner.set(rashi, ownerKey);
+  }
+
+  const planetHouse = new Map<string, number>();
+  for (const planet of planetRashis) {
+    planetHouse.set(planet.key, rashiToHouse(planet.rashi, lagnaRashi));
+  }
+
+  return houses.map((h) => {
+    const aspectedBy: string[] = [];
+    for (const [key, fromHouse] of planetHouse) {
+      const distance = ((h.house - fromHouse + 12) % 12) + 1;
+      if (aspectHousesFor(key).includes(distance)) aspectedBy.push(key);
+    }
+    return {
+      house: h.house,
+      badge: houseBadge(h.house),
+      residents: h.planets,
+      owner: rashiOwner.get(h.rashi),
+      rashi: h.rashi,
+      rashiNe: h.rashiNe,
+      aspectedBy,
+    };
+  });
+}

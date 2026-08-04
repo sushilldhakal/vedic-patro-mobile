@@ -182,6 +182,22 @@ export async function apiForgotPassword(email: string): Promise<string> {
   return body.message ?? "If that email exists, a reset link has been sent";
 }
 
+export async function apiResetPassword(token: string, password: string): Promise<void> {
+  const res = await raw("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+}
+
+export async function apiVerifyEmail(token: string): Promise<void> {
+  const res = await raw("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+}
+
 export const apiResendVerification = () =>
   authFetch<{ message: string }>("/auth/resend-verification", { method: "POST" });
 

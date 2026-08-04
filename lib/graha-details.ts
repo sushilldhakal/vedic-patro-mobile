@@ -9,6 +9,10 @@ export type GrahaKey =
   | "rahu"
   | "ketu";
 
+export const GRAHA_DETAIL_ORDER: GrahaKey[] = [
+  "sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn", "rahu", "ketu",
+];
+
 export const GRAHA_NAME: Record<GrahaKey, { ne: string; en: string }> = {
   sun: { ne: "सूर्य", en: "Sun" },
   moon: { ne: "चन्द्र", en: "Moon" },

@@ -1,5 +1,10 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import {
+  appendInstantParams,
+  instantCacheKey,
+  type InstantQuery,
+} from "@/lib/instant-query";
 
 const extra = Constants.expoConfig?.extra ?? {};
 // Canonical host (www) — the apex `vedicpatro.com` 301-redirects to www, which
@@ -514,14 +519,25 @@ export interface PanchangaDay {
 }
 
 export interface Holiday {
-  name?: string;
+  id: string;
+  name_en?: string;
   name_ne?: string;
-  date_ad?: string;
-  date_bs?: string;
+  start_date: string;
+  end_date: string;
+  bs_start_date?: string;
+  bs_end_date?: string;
+  duration_days?: number;
+  type?: string;
+  category?: string;
+  importance?: string;
   is_public_holiday?: boolean;
+  notes?: string;
 }
 
 export interface HolidaysResponse {
+  bs_year?: number;
+  era?: string;
+  gregorian_range?: { start: string; end: string };
   count: number;
   holidays: Holiday[];
 }
@@ -544,6 +560,9 @@ export interface Festival {
 }
 
 export interface FestivalsResponse {
+  bs_year?: number;
+  era?: string;
+  gregorian_range?: { start: string; end: string };
   count: number;
   festivals: Festival[];
 }
@@ -553,13 +572,21 @@ export interface ConvertAdToBs {
   bs_year: number;
   bs_month: number;
   bs_day: number;
-  bs_month_name?: string;
-  bs_month_name_ne?: string;
+  bs_date: string;
+  bs_month_name: string;
+  bs_month_name_ne: string;
+  weekday: string;
 }
 
 export interface ConvertBsToAd {
   bs_date: string;
+  bs_year: number;
+  bs_month: number;
+  bs_day: number;
+  bs_month_name: string;
+  bs_month_name_ne: string;
   ad_date: string;
+  weekday: string;
 }
 
 export interface CivilTimelineSeg {
@@ -687,7 +714,8 @@ export const apiKeys = {
   convertBs: (d: string) => ["convert", "bs", d] as const,
   saitMonthAll: (y: number, m: number, loc?: LocationParams) =>
     ["sait", "month-all", SAIT_CACHE_VERSION, y, m, locationKey(loc)] as const,
-  festivals: (year: number) => ["festivals", "bs", year] as const,
+  festivals: (year: number, language: "ne" | "en" = "ne") =>
+    ["festivals", "bs", year, language] as const,
 };
 
 export const fetchMonthCalendar = async (
@@ -939,25 +967,41 @@ function withGrahaCache(path: string): string {
 export interface GrahaSthitiRow {
   graha: string;
   name_ne: string;
+  name_vedic?: string;
   symbol: string;
+  /** `21° कन्या 53′ 14″` — degree in sign with Nepali rashi name. */
   rekhamsha: string;
   rashi_ne: string;
   nakshatra: string;
   nakshatra_ne: string;
   pada: number;
+  pada_ne?: string;
+  nakshatra_lord_ne?: string;
+  sub_lord_ne?: string;
   full_degree: number;
+  /** `04° द. 45′ 02″` — signed ecliptic latitude (शर), north/south. */
+  shara?: string;
+  shara_deg?: number;
   speed_deg_day: number;
   is_retrograde: boolean;
   is_combust: boolean;
+  right_ascension?: number;
+  declination?: number;
 }
 
 export interface GrahaSthitiResponse {
   date_ad: string;
   date_bs: string;
+  timezone?: string;
+  sunrise_local?: string;
   rows: GrahaSthitiRow[];
 }
 
+/** A localized timestamp for an asta / vakri period boundary. */
 export interface AstaStamp {
+  iso?: string;
+  jd?: number;
+  /** Era-rendered day label from {@link jd} (EraMiddleware). */
   date?: string;
   date_ad?: string;
   date_bs?: string | null;
@@ -976,19 +1020,30 @@ export interface GrahaAstaPeriod {
 export interface GrahaAstaResponse {
   bs_year?: number;
   ad_year?: number;
+  gregorian_range?: { start: string; end: string };
+  grahas?: string[];
   periods: GrahaAstaPeriod[];
 }
 
-export interface GrahaVakriPeriod {
+/** One yearly वक्री/मार्गी motion-station event. */
+export interface GrahaVakriEvent {
   graha: string;
   graha_ne: string;
-  start: AstaStamp | null;
-  end: AstaStamp | null;
+  motion?: string;
+  is_retrograde?: boolean;
+  label_ne?: string;
+  entry_time_local?: string;
+  entry_time_local_short?: string;
+  entry_jd?: number;
+  /** Era-rendered civil day label from {@link entry_jd} (EraMiddleware). */
+  entry_jd_date?: string;
 }
 
 export interface GrahaVakriResponse {
   bs_year?: number;
-  periods: GrahaVakriPeriod[];
+  gregorian_range?: { start: string; end: string };
+  grahas?: string[];
+  events: GrahaVakriEvent[];
 }
 
 export interface EclipseEvent {
@@ -1006,40 +1061,99 @@ export interface EclipseYearResponse {
   events: EclipseEvent[];
 }
 
+export interface PanchakMomentResponse {
+  date_ad: string;
+  bs_year: number;
+  bs_month: number;
+  bs_day: number;
+  time_en: string;
+  time_ne: string;
+  time_short?: string;
+}
+
 export interface PanchakPeriodResponse {
-  start: { date_ad?: string; time_short?: string; time_ne?: string };
-  end: { date_ad?: string; time_short?: string; time_ne?: string };
-  duration_ne?: string;
-  duration_en?: string;
+  start: PanchakMomentResponse;
+  end: PanchakMomentResponse;
+  duration_ne: string;
+  duration_en: string;
 }
 
 export interface PanchakYearResponse {
+  bs_year?: number;
+  ad_year?: number;
   count: number;
+  gregorian_range?: { start: string; end: string };
   periods: PanchakPeriodResponse[];
 }
 
 export type ElementKind = "span" | "table";
+
+export interface ElementStamp {
+  iso: string;
+  weekday: string;
+  date_label: string;
+  time_label: string;
+  display: string;
+}
+
+export interface ElementSpan {
+  number: number;
+  name: string;
+  name_ne: string;
+  begins: ElementStamp;
+  ends: ElementStamp;
+  paksha?: string;
+  progress?: number;
+}
+
+export interface ElementSpansResponse {
+  element: string;
+  kind: "span";
+  label_ne: string;
+  label_en: string;
+  timezone: string;
+  window: { start: string; end: string };
+  spans: ElementSpan[];
+}
+
+export interface ElementSpanRange {
+  era: "bs" | "ad" | "bbs";
+  year: number;
+  month: number;
+}
 
 export interface ElementDayResponse {
   element: string;
   label_ne: string;
   label_en: string;
   date_ad: string;
+  /** Local sunrise for the day — ghati-based rows are anchored to it. */
+  sunrise?: string;
   data: unknown;
 }
 
 export interface SunYearDay {
+  day: number;
   date_ad: string;
-  day_bs?: number;
   sunrise?: string;
   sunset?: string;
-  day_length_min?: number;
+  aayan?: string;
+  aayan_ne?: string;
+  ayana_mark?: "उ" | "द";
+}
+
+export interface SunYearMonth {
+  month_bs: number;
+  month_name: string;
+  month_name_ne: string;
+  month_start_ad: string;
+  month_length: number;
+  calendar: SunYearDay[];
 }
 
 export interface SunYearResponse {
-  year: number;
-  era: string;
-  days: SunYearDay[];
+  year_bs: number;
+  months: SunYearMonth[];
 }
 
 export interface TropicalSeasonSegment {
@@ -1056,19 +1170,35 @@ export interface TropicalSeasonsResponse {
 export interface SaitDetailDay {
   bs_month: number;
   bs_day: number;
+  bs_month_name_ne: string;
   gregorian: string;
-  weekday_ne: string;
   weekday_en: string;
+  weekday_ne: string;
   window_start: string;
   window_end: string;
+  tithi_num?: number;
+  tithi_en: string;
   tithi_ne: string;
+  paksha?: string;
+  paksha_ne?: string;
+  nakshatra_num?: number;
+  nakshatra_en: string;
   nakshatra_ne: string;
+  yoga_en?: string;
+  yoga_ne?: string;
+  karana_en?: string;
+  karana_ne?: string;
+  lagna_en?: string;
+  lagna_ne?: string;
+  lunar_month_en?: string | null;
+  lunar_month_ne?: string | null;
 }
 
 export interface SaitDetailResponse {
   bs_year: number;
   category: string;
   category_label_ne: string;
+  engine_version?: string;
   days: SaitDetailDay[];
 }
 
@@ -1086,6 +1216,16 @@ export const grahaDetailKeys = {
 export const elementKeys = {
   day: (name: string, date: string, location?: LocationParams) =>
     ["element", "day", name, date, locationCacheKey(location)] as const,
+  spans: (name: string, range: ElementSpanRange, location?: LocationParams) =>
+    [
+      "element",
+      "spans",
+      name,
+      range.era,
+      range.year,
+      range.month,
+      locationCacheKey(location),
+    ] as const,
 };
 
 export const panchakKeys = {
@@ -1100,6 +1240,127 @@ export const sunTimesKeys = {
 
 export const seasonsKeys = {
   tropical: (location?: LocationParams) => ["seasons", "tropical", locationCacheKey(location)] as const,
+};
+
+export type SaitSuitability = "favourable" | "neutral" | "avoid";
+
+export type SaitShuddhiTone = "good" | "shanti" | "avoid";
+
+/** One planet's Graha Śuddhi: its house from the native's janma rāśi. */
+export interface SaitShuddhiPlanet {
+  planet: "sun" | "moon" | "guru" | "shukra";
+  house: number;
+  tone: SaitShuddhiTone;
+  rashi_ne: string;
+  rashi_en: string;
+}
+
+/** Graha Śuddhi over the ceremony's relevant planets (bratabandha, griha-aarambha). */
+export interface SaitShuddhi {
+  tone: SaitShuddhiTone;
+  planets: SaitShuddhiPlanet[];
+}
+
+/** Kumbha Chakra limb for a gṛha-praveśa entry day (Sun→day nakṣatra count). */
+export interface SaitKumbha {
+  count: number;
+  sun_nakshatra: number;
+  zone: string;
+  zone_ne: string;
+  zone_en: string;
+  effect_ne: string;
+  effect_en: string;
+  tone: SaitShuddhiTone;
+}
+
+/** Agni-mukha — the graha that receives the oblation (agni-jurne). */
+export interface SaitAgniMukha {
+  count: number;
+  sun_nakshatra: number;
+  planet: string;
+  planet_ne: string;
+  planet_en: string;
+  benefic: boolean;
+  tone: SaitShuddhiTone;
+}
+
+/** Annaprāśana age-month check (needs the child's birth date + gender). */
+export interface SaitAnnaMonth {
+  ordinal_month: number;
+  gender: "male" | "female";
+  matches: boolean;
+  tone: SaitShuddhiTone;
+}
+
+export interface SaitPersonalizeDay {
+  bs_month: number;
+  bs_day: number;
+  suitability: SaitSuitability;
+  tara_num: number;
+  tara_tone: string;
+  tara_ne: string;
+  chandra_num: number;
+  chandra_tone: string;
+  moon_house: number;
+  /** Graha Śuddhi (bratabandha, griha-aarambha); null for other ceremonies. */
+  shuddhi?: SaitShuddhi | null;
+  /** Kumbha Chakra (griha-pravesh); null for other ceremonies. */
+  kumbha?: SaitKumbha | null;
+  /** Agni-mukha (agni-jurne); null for other ceremonies. */
+  agni_mukha?: SaitAgniMukha | null;
+  /** Annaprāśana age-month (annaprasan, when gender+birth known); else null. */
+  anna_month?: SaitAnnaMonth | null;
+  transit_nakshatra_ne: string;
+  transit_nakshatra_en: string;
+  transit_rashi_ne: string;
+  transit_rashi_en: string;
+}
+
+export interface SaitPersonalizeResponse {
+  bs_year: number;
+  category: string;
+  janma: { nakshatra: number; rashi: number };
+  counts: { favourable: number; neutral: number; avoid: number };
+  days: SaitPersonalizeDay[];
+}
+
+export const saitPersonalizeKey = (
+  year: number,
+  category: string,
+  location: LocationParams | undefined,
+  birthDatetime: string,
+  birthTz: string,
+  gender?: string | null,
+) =>
+  [
+    "sait",
+    "personalize",
+    SAIT_CACHE_VERSION,
+    year,
+    category,
+    locationCacheKey(location),
+    birthDatetime,
+    birthTz,
+    gender ?? "",
+  ] as const;
+
+/**
+ * Annotate the year's general dates with a native verdict from a birth moment.
+ * `birthDatetime` is a naive local ISO (`YYYY-MM-DDTHH:MM`) read in `birthTz`.
+ */
+export const fetchSaitPersonalize = (
+  year: number,
+  category: string,
+  location: LocationParams | undefined,
+  birthDatetime: string,
+  birthTz: string,
+  gender?: string | null,
+) => {
+  let path = appendLocation(`/nepal/sait/${year}/${category}/personalize`, location);
+  const params = new URLSearchParams({ birth: birthDatetime, birth_tz: birthTz });
+  if (gender) params.set("gender", gender);
+  path = `${path}${path.includes("?") ? "&" : "?"}${params.toString()}`;
+  return get<SaitPersonalizeResponse>(path);
 };
 
 export const saitDetailKey = (year: number, category: string, location?: LocationParams) =>
@@ -1158,6 +1419,23 @@ export const fetchYearSunTimes = (
     appendLocation(`/panchanga/year/${year}/sun?${buildEraQuery(era, year)}`, location),
   );
 
+/** Span-kind elements (tithi, nakshatra, yoga, karana…) over a whole month. */
+export const fetchElementSpans = (
+  name: string,
+  range: ElementSpanRange,
+  location?: LocationParams,
+) => {
+  // The era middleware turns era + year + month into the JD span server-side.
+  const query = new URLSearchParams({
+    era: range.era,
+    year: String(range.year),
+    month: String(range.month),
+  });
+  return get<ElementSpansResponse>(
+    appendLocation(withCache(`/panchanga/element/${name}/spans?${query.toString()}`), location),
+  );
+};
+
 export const fetchTropicalSeasons = (location?: LocationParams) =>
   get<TropicalSeasonsResponse>(appendLocation("/seasons/tropical", location));
 
@@ -1171,3 +1449,585 @@ export function timeShort(v: PanchangaDay["sunrise"]): string {
   if (typeof v === "string") return v.slice(0, 5);
   return v.local_time_short?.slice(0, 5) ?? "—";
 }
+
+// ─── Vimshottari dasha ───────────────────────────────────────────────────────
+
+export interface VimshottariPeriod {
+  lord: string;
+  lord_ne: string;
+  start: string;
+  end: string;
+  years: number;
+}
+
+export interface VimshottariResponse {
+  ayanamsha: string;
+  moon_longitude: number;
+  nakshatra_index: number;
+  mahadasha_lord: string;
+  mahadasha_lord_ne: string;
+  balance_years: number;
+  balance_label: string;
+  sequence: VimshottariPeriod[];
+  query_instant?: string;
+}
+
+export const vimshottariKeys = {
+  atTime: (moment: InstantQuery, location?: LocationParams, ayanamsha?: string) =>
+    [
+      "vimshottari",
+      instantCacheKey(moment),
+      locationCacheKey(location),
+      ayanamsha ?? "lahiri",
+    ] as const,
+};
+
+export const fetchVimshottari = (
+  moment: InstantQuery,
+  location?: LocationParams,
+  options?: { ayanamsha?: string; cycles?: number },
+) => {
+  const params = appendInstantParams(new URLSearchParams(), moment);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  if (options?.cycles != null) params.set("cycles", String(options.cycles));
+  return get<VimshottariResponse>(
+    appendLocation(`/kundali/vimshottari?${params.toString()}`, location),
+  );
+};
+
+// ─── Shadbala ────────────────────────────────────────────────────────────────
+
+export type ShadbalaStatus =
+  | "Exceptional"
+  | "Strong"
+  | "Adequate"
+  | "Borderline"
+  | "Weak";
+
+export interface ShadbalaBreakdown {
+  sthana: number;
+  dig: number;
+  kala: number;
+  cheshta: number;
+  naisargika: number;
+  drik: number;
+}
+
+export interface ShadbalaSubBalas {
+  sthana: Record<string, number>;
+  kala: Record<string, number>;
+}
+
+export interface ShadbalaPlanet {
+  key: string;
+  name: string;
+  name_ne: string;
+  total_virupas: number;
+  rupas: number;
+  required: number;
+  ratio: number;
+  status: ShadbalaStatus;
+  top_bala: string;
+  weakest_bala: string;
+  breakdown: ShadbalaBreakdown;
+  sub_balas?: ShadbalaSubBalas;
+  ishta_phala?: number;
+  kashta_phala?: number;
+}
+
+export interface ShadbalaSummaryRef {
+  key: string;
+  name: string;
+  name_ne: string;
+  status: ShadbalaStatus;
+  ratio: number;
+}
+
+export interface ShadbalaResponse {
+  planets: ShadbalaPlanet[];
+  summary: {
+    strongest: ShadbalaSummaryRef;
+    weakest: ShadbalaSummaryRef;
+    average_rupas: number;
+    average_virupas: number;
+    meeting_threshold: number;
+    total_planets: number;
+    counts: Record<ShadbalaStatus, number>;
+  };
+  method: string;
+  location?: Record<string, unknown>;
+  query_instant?: string;
+}
+
+export const shadbalaKeys = {
+  atTime: (moment: InstantQuery, location?: LocationParams) =>
+    ["shadbala", "at-time", instantCacheKey(moment), locationCacheKey(location)] as const,
+};
+
+export const fetchShadbala = (moment: InstantQuery, location?: LocationParams) =>
+  get<ShadbalaResponse>(
+    appendLocation(
+      `/shadbala?${appendInstantParams(new URLSearchParams(), moment).toString()}`,
+      location,
+    ),
+  );
+
+// ─── Kundali detail — full server-computed jyotish payload ───────────────────
+// All astrology math (vargas, ashtakavarga, bhava bala, yuddha, yogas,
+// avakahada, dasha tree, birth kalas) is computed by the API; the client
+// only renders these blocks.
+
+export interface DmsParts {
+  rashiNum: number;
+  deg: number;
+  min: number;
+  sec: number;
+}
+
+export type GrahaRelation = "self" | "friend" | "enemy" | "neutral";
+
+export type GrahaDignity =
+  | "exalted"
+  | "moolatrikona"
+  | "own"
+  | "friend_house"
+  | "neutral_house"
+  | "enemy_house"
+  | "debilitated";
+
+export interface VargaChartEntry {
+  key: string;
+  vargaRashi: number;
+  dms: DmsParts;
+  nakshatraIndex: number;
+  pada: number;
+  nakshatraLord: string;
+  subLord: string;
+  ownerKey: string;
+  relation: GrahaRelation | null;
+  dignity: GrahaDignity | null;
+  retrograde?: boolean;
+}
+
+export interface VargaCharts {
+  divisions: number[];
+  points: Record<string, { longitude: number; retrograde?: boolean }>;
+  /** Keyed by division as a string ("1", "9", …). */
+  entries: Record<string, VargaChartEntry[]>;
+  ownedRashis: Record<string, number[]>;
+}
+
+export interface AshtakavargaSignRow {
+  rashi: number;
+  rashiEn: string;
+  rashiNe: string;
+  bindus: Record<string, number>;
+  sarvashtaka: number;
+}
+
+export interface ShodhyaPindaRow {
+  target: string;
+  rashiPinda: number;
+  grahaPinda: number;
+  shodhyaPinda: number;
+}
+
+export interface AshtakavargaData {
+  raw: AshtakavargaSignRow[];
+  reduced: AshtakavargaSignRow[];
+  shodhyaPinda: ShodhyaPindaRow[];
+  signs: Record<string, number>;
+}
+
+export interface BhavaBalaHouse {
+  house: number;
+  madhyaLongitude: number;
+  lordKey: string;
+  lordName: string;
+  bhavadhipati: number;
+  disha: number;
+  drishti: number;
+  totalVirupas: number;
+  totalPinda: number;
+  rupas: number;
+  percent: number;
+}
+
+export interface BhavaBalaData {
+  houses: BhavaBalaHouse[];
+  strongest: BhavaBalaHouse;
+  weakest: BhavaBalaHouse;
+  /** Mean house-strength % across houses ruled by each graha. */
+  rulershipPercent: Record<string, number>;
+  referenceVirupas: number;
+}
+
+export interface YuddhaWar {
+  winner: string;
+  loser: string;
+  yuddhaVirupas: number;
+  separationDeg: number;
+}
+
+export interface YuddhaData {
+  wars: YuddhaWar[];
+  byPlanet: Record<string, number>;
+}
+
+export interface KundaliYoga {
+  key: string;
+  nameEn: string;
+  nameNe: string;
+  nature: "auspicious" | "inauspicious" | "mixed" | "caution";
+  present: boolean;
+  descEn: string;
+  descNe: string;
+}
+
+/** One row of the static B. V. Raman combinations catalog. */
+export interface YogaReferenceEntry {
+  yogaId: string;
+  name: string;
+  nameNe: string;
+  definition: string;
+  definitionNe: string;
+  result: string;
+  resultNe: string;
+  source: string;
+  part: string;
+}
+
+export interface YogaReferenceResponse {
+  source: string;
+  part: string;
+  count: number;
+  combinations: YogaReferenceEntry[];
+}
+
+/**
+ * Version of the yoga-reference payload. Bump whenever the catalog data or its
+ * shape changes so the CDN mints a fresh object instead of serving a stale
+ * response (the endpoint is cached ~1 day). v2 added the Nepali fields.
+ */
+export const YOGA_REFERENCE_VERSION =
+  (extra.yogaReferenceVersion as string) ?? "2";
+
+/** The full 162-combination reference catalog (Raman, Part I). CDN-cached. */
+export function fetchYogaReference(): Promise<YogaReferenceResponse> {
+  return get<YogaReferenceResponse>(
+    `/kundali/yogas/reference?v=${YOGA_REFERENCE_VERSION}`,
+  );
+}
+
+export interface BilingualValue {
+  ne: string;
+  en: string;
+}
+
+export interface JanmaAvakahadaData {
+  nakshatra: BilingualValue;
+  nakshatraIndex: number;
+  pada: number;
+  rashiPaya: BilingualValue;
+  nakshatraPaya: BilingualValue;
+  tattva: BilingualValue;
+  yunja: BilingualValue;
+  vashya: BilingualValue;
+  tara: BilingualValue;
+  gana: BilingualValue;
+  akshara: BilingualValue;
+  nadi: BilingualValue;
+  asana: BilingualValue;
+  yoni: BilingualValue;
+  jati: BilingualValue;
+}
+
+export interface GhadiPalaVipala {
+  ghadi: number;
+  pala: number;
+  vipala: number;
+}
+
+export interface KundaliBirthMeta {
+  birthClock: string;
+  isDayBirth: boolean | null;
+  ishtaKala: GhadiPalaVipala | null;
+  ahoratriIshtaKala: GhadiPalaVipala | null;
+  choghadiyaAtBirth: {
+    nameNe: string;
+    nameEn?: string;
+    quality: "शुभ" | "अशुभ" | "सामान्य";
+    bad: boolean;
+  } | null;
+  solarCorrectionMinutes: number;
+  moonNakshatra: { index: number; number: number; pada: number } | null;
+  yoga: { index: number; number: number } | null;
+}
+
+export interface DashaTreeNode {
+  lord: string;
+  lord_ne: string;
+  start: string;
+  end: string;
+  children?: DashaTreeNode[];
+}
+
+export interface DashaTreeResponse extends VimshottariResponse {
+  tree: DashaTreeNode[];
+  tree_depth: number;
+  system?: string;
+  cycle_years?: number;
+  tribhaga?: number;
+}
+
+export interface UpagrahaDetailRow {
+  key: string;
+  name?: string;
+  name_ne?: string;
+  longitude: number;
+  dms: DmsParts;
+  nakshatraIndex: number;
+  pada: number;
+  nakshatraLord: string;
+}
+
+/** Vimshopaka Bala — 20-point divisional strength. */
+export type VimshopakaGrade = "full" | "mediocre" | "little" | "incapable";
+
+export interface VimshopakaClassification {
+  key: string;
+  label: string;
+  label_ne: string;
+  divisions: number[];
+}
+
+export interface VimshopakaPlanet {
+  key: string;
+  name: string;
+  name_ne: string;
+  /** classification key → { score (0–20), grade }. */
+  scores: Record<string, { score: number; grade: VimshopakaGrade }>;
+}
+
+export interface VimshopakaData {
+  classifications: VimshopakaClassification[];
+  planets: VimshopakaPlanet[];
+  max_score: number;
+  method: string;
+}
+
+export interface KundaliDetailResponse {
+  panchanga: PanchangaDay;
+  shadbala: ShadbalaResponse;
+  dasha: DashaTreeResponse | null;
+  tribhagiDasha: DashaTreeResponse | null;
+  yoginiDasha: DashaTreeResponse | null;
+  yuddha: YuddhaData;
+  bhavaBala: BhavaBalaData | null;
+  vimshopaka: VimshopakaData | null;
+  ashtakavarga: AshtakavargaData | null;
+  yogas: KundaliYoga[];
+  vargaCharts: VargaCharts;
+  upagrahas: UpagrahaDetailRow[];
+  avakahada: JanmaAvakahadaData | null;
+  birthMeta: KundaliBirthMeta;
+  combustion: Record<string, boolean | null>;
+  lagnaRashi: number | null;
+  ayanamsha: string;
+  location?: Record<string, unknown>;
+  birth_instant: string;
+}
+
+export interface DashaTreeNode {
+  lord: string;
+  lord_ne: string;
+  start: string;
+  end: string;
+  children?: DashaTreeNode[];
+}
+
+export interface DashaTreeResponse extends VimshottariResponse {
+  tree: DashaTreeNode[];
+  tree_depth: number;
+  system?: string;
+  cycle_years?: number;
+  tribhaga?: number;
+}
+
+export interface KundaliDetailResponse {
+  panchanga: PanchangaDay;
+  shadbala: ShadbalaResponse;
+  dasha: DashaTreeResponse | null;
+  tribhagiDasha: DashaTreeResponse | null;
+  yoginiDasha: DashaTreeResponse | null;
+  yuddha: YuddhaData;
+  bhavaBala: BhavaBalaData | null;
+  vimshopaka: VimshopakaData | null;
+  ashtakavarga: AshtakavargaData | null;
+  yogas: KundaliYoga[];
+  vargaCharts: VargaCharts;
+  upagrahas: UpagrahaDetailRow[];
+  avakahada: JanmaAvakahadaData | null;
+  birthMeta: KundaliBirthMeta;
+  combustion: Record<string, boolean | null>;
+  lagnaRashi: number | null;
+  ayanamsha: string;
+  location?: Record<string, unknown>;
+  birth_instant: string;
+}
+
+export const kundaliDetailKeys = {
+  atTime: (moment: InstantQuery, location?: LocationParams, ayanamsha?: string) =>
+    [
+      "kundali",
+      "detail",
+      instantCacheKey(moment),
+      locationCacheKey(location),
+      ayanamsha ?? "lahiri",
+    ] as const,
+};
+
+export const fetchKundaliDetail = (
+  moment: InstantQuery,
+  location?: LocationParams,
+  options?: { ayanamsha?: string },
+) => {
+  const params = appendInstantParams(new URLSearchParams(), moment);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  return get<KundaliDetailResponse>(
+    appendLocation(`/kundali/detail?${params.toString()}`, location),
+  );
+};
+
+export type DashaSystem = "vimshottari" | "tribhagi" | "yogini";
+
+export const dashaExpandKeys = {
+  span: (lord: string, start: string, end: string, system = "vimshottari") =>
+    ["dasha", "expand", lord, start, end, system] as const,
+};
+
+export const fetchDashaChildren = (
+  lord: string,
+  start: string,
+  end: string,
+  system: DashaSystem = "vimshottari",
+) => {
+  const params = new URLSearchParams({ lord, start, end, system });
+  return get<{ lord: string; system: string; children: DashaTreeNode[] }>(
+    `/kundali/dasha/expand?${params.toString()}`,
+  );
+};
+
+// ─── Kundali milan (ashtakuta matching) ──────────────────────────────────────
+
+export type KutaId =
+  | "varna"
+  | "vashya"
+  | "tara"
+  | "yoni"
+  | "maitri"
+  | "gana"
+  | "bhakuta"
+  | "nadi";
+
+export interface KutaRow {
+  id: KutaId;
+  max: number;
+  obtained: number;
+  boyValue: string;
+  girlValue: string;
+  areaOfLife: string;
+  areaOfLifeNe: string;
+  info: string;
+  infoNe: string;
+}
+
+export interface MilanDoshaRow {
+  id: "nadi" | "bhakuta" | "gana" | "tara" | "yoni" | "varna";
+  labelEn: string;
+  labelNe: string;
+  present: boolean;
+}
+
+export interface AshtakutaResult {
+  kutas: KutaRow[];
+  totalObtained: number;
+  totalMax: 36;
+  recommendation: "excellent" | "very_good" | "middling" | "inauspicious";
+  recommendationLabel: string;
+  recommendationLabelNe: string;
+  nadiDosha: boolean;
+  nadiDoshaAdvisory?: string | null;
+  nadiDoshaAdvisoryNe?: string | null;
+  bhakutaUnfavorable: boolean;
+  doshaAnalysis: MilanDoshaRow[];
+  notes: string[];
+  notesNe: string[];
+}
+
+export interface MilanPerson {
+  moonLongitude: number;
+  moonRashiNum: number;
+  moonRashiNe: string;
+  moonRashiEn: string;
+  nakshatraIndex: number;
+  nakshatraNe: string;
+  nakshatraEn: string;
+  pada: number;
+  birth_instant: string;
+  location?: Record<string, unknown>;
+}
+
+export interface KundaliMilanResponse {
+  result: AshtakutaResult;
+  boy: MilanPerson;
+  girl: MilanPerson;
+  ayanamsha: string;
+  lang: string;
+}
+
+export interface MilanPersonQuery {
+  /** Birth moment: a civil day in some era plus the local clock. */
+  moment: InstantQuery;
+  lat?: number;
+  lon?: number;
+  timezone?: string;
+}
+
+export const milanKeys = {
+  match: (
+    boy: MilanPersonQuery,
+    girl: MilanPersonQuery,
+    ayanamsha?: string,
+    lang?: string,
+  ) =>
+    [
+      "kundali",
+      "milan",
+      instantCacheKey(boy.moment),
+      `${boy.lat ?? ""},${boy.lon ?? ""},${boy.timezone ?? ""}`,
+      instantCacheKey(girl.moment),
+      `${girl.lat ?? ""},${girl.lon ?? ""},${girl.timezone ?? ""}`,
+      ayanamsha ?? "lahiri",
+      lang ?? "ne",
+    ] as const,
+};
+
+export const fetchKundaliMilan = (
+  boy: MilanPersonQuery,
+  girl: MilanPersonQuery,
+  options?: { ayanamsha?: string; lang?: string },
+) => {
+  const params = new URLSearchParams();
+  appendInstantParams(params, boy.moment, "boy_");
+  appendInstantParams(params, girl.moment, "girl_");
+  if (boy.lat != null) params.set("boy_lat", String(boy.lat));
+  if (boy.lon != null) params.set("boy_lon", String(boy.lon));
+  if (boy.timezone) params.set("boy_timezone", boy.timezone);
+  if (girl.lat != null) params.set("girl_lat", String(girl.lat));
+  if (girl.lon != null) params.set("girl_lon", String(girl.lon));
+  if (girl.timezone) params.set("girl_timezone", girl.timezone);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  if (options?.lang) params.set("lang", options.lang);
+  return get<KundaliMilanResponse>(`/kundali/milan?${params.toString()}`);
+};

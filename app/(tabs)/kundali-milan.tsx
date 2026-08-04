@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,10 +18,14 @@ import { PROFILES_QUERY_KEY, useProfilesQuery } from "@/lib/kundali/profiles-que
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
-import { useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { KundaliMilanResult } from "@/components/kundali/KundaliMilanResult";
+import { fetchKundaliMilan, milanKeys, type MilanPersonQuery } from "@/lib/api";
+import { instantFromCivilIso } from "@/lib/instant-query";
+import { profileChartParams } from "@/lib/kundali/profile-chart";
 
 export default function KundaliMilanScreen() {
-  const { pick } = useLocale();
+  const { lang, pick } = useLocale();
   const queryClient = useQueryClient();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
@@ -30,6 +34,17 @@ export default function KundaliMilanScreen() {
   const [boyProfile, setBoyProfile] = useState<Profile | null>(null);
   const [girlProfile, setGirlProfile] = useState<Profile | null>(null);
   const [pickRole, setPickRole] = useState<"boy" | "girl" | null>(null);
+
+  const boyQuery = useMemo(() => milanPersonQuery(boyProfile), [boyProfile]);
+  const girlQuery = useMemo(() => milanPersonQuery(girlProfile), [girlProfile]);
+
+  const milanQuery = useQuery({
+    queryKey: milanKeys.match(boyQuery!, girlQuery!, undefined, lang),
+    queryFn: () => fetchKundaliMilan(boyQuery!, girlQuery!, { lang }),
+    enabled: Boolean(boyQuery && girlQuery),
+    staleTime: 1000 * 60 * 10,
+    placeholderData: keepPreviousData,
+  });
 
   const openAuth = (mode: "login" | "signup") => {
     setAuthMode(mode);
@@ -94,17 +109,38 @@ export default function KundaliMilanScreen() {
             </View>
 
             {boyProfile && girlProfile ? (
-              <Card className="gap-2">
-                <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
-                  {pick("अष्टकूट मिलान", "Ashtakuta matching")}
-                </Text>
-                <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
-                  {pick(
-                    "पूर्ण मिलान परिणाम छिट्टै मोबाइलमा थपिनेछ। अहिले प्रोफाइल छनोट UI वेब जस्तै उपलब्ध छ।",
-                    "Full matching results are coming soon on mobile. Profile selection UI now matches the web layout.",
-                  )}
-                </Text>
-              </Card>
+              !boyQuery || !girlQuery ? (
+                <Card className="gap-2">
+                  <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+                    {pick(
+                      "दुवै प्रोफाइलमा जन्म मिति चाहिन्छ — खातामा गएर थप्नुहोस्।",
+                      "Both profiles need a birth date — add one in your account.",
+                    )}
+                  </Text>
+                </Card>
+              ) : milanQuery.isLoading && !milanQuery.data ? (
+                <View className="items-center rounded-xl border border-dashed border-border bg-muted/20 px-5 py-12">
+                  <ActivityIndicator />
+                  <Text className="mt-3 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+                    {pick("मिलान गणना हुँदै…", "Matching the charts…")}
+                  </Text>
+                </View>
+              ) : milanQuery.data ? (
+                <KundaliMilanResult
+                  boyName={boyProfile.full_name}
+                  girlName={girlProfile.full_name}
+                  result={milanQuery.data.result}
+                />
+              ) : (
+                <Card>
+                  <Text className="text-sm text-destructive" style={nepaliTextStyle(14)}>
+                    {pick(
+                      "मिलान ल्याउन सकिएन। पछि पुनः प्रयास गर्नुहोस्।",
+                      "Could not load the match. Please try again shortly.",
+                    )}
+                  </Text>
+                </Card>
+              )
             ) : null}
           </View>
         )}
@@ -264,4 +300,17 @@ function ProfilePickModal({
       </View>
     </Modal>
   );
+}
+
+/** A profile becomes a milan query only once it carries a usable birth moment. */
+function milanPersonQuery(profile: Profile | null): MilanPersonQuery | null {
+  if (!profile) return null;
+  const chart = profileChartParams(profile);
+  if (!chart) return null;
+  return {
+    moment: instantFromCivilIso(chart.adDate, chart.clock),
+    lat: chart.location.params.lat,
+    lon: chart.location.params.lon,
+    timezone: profile.timezone ?? chart.location.params.timezone,
+  };
 }

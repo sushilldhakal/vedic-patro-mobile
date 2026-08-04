@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
@@ -11,6 +12,7 @@ export function AccountMenu() {
   const colors = useThemeColors();
   const { pick } = useLocale();
   const { user, loading, logout } = useAuth();
+  const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -83,9 +85,21 @@ export function AccountMenu() {
           <Pressable
             onPress={() => {
               setMenuOpen(false);
-              void logout();
+              router.push("/account" as never);
             }}
             className="mx-2 mt-2 flex-row items-center gap-3 rounded-xl px-4 py-3.5 active:bg-muted"
+          >
+            <Ionicons name="person-outline" size={20} color={colors.foreground} />
+            <Text className="text-base text-foreground">
+              {pick("खाता र प्रोफाइल", "Account & profiles")}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setMenuOpen(false);
+              void logout();
+            }}
+            className="mx-2 flex-row items-center gap-3 rounded-xl px-4 py-3.5 active:bg-muted"
           >
             <Ionicons name="log-out-outline" size={20} color={colors.foreground} />
             <Text className="text-base text-foreground">{pick("लग-आउट", "Sign out")}</Text>

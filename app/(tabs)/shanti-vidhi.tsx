@@ -1,15 +1,97 @@
+import { useMemo, useState } from "react";
+import { View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { VedicWebView } from "@/components/content/VedicWebView";
+import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
+import { LocationSelector } from "@/components/panchanga/LocationSelector";
+import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
+import { defaultClockForTimezone } from "@/components/panchanga/use-panchanga-mode";
+import { Text } from "@/components/ui/Text";
+import { fetchShadbala, fetchVimshottari, shadbalaKeys, vimshottariKeys } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
+import { instantFromCivilIso } from "@/lib/instant-query";
+import { nepaliTextStyle } from "@/lib/nepali-text";
+import { useThemeColors } from "@/lib/theme-context";
+import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
+
+function toAdStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function ShantiVidhiScreen() {
   const { pick } = useLocale();
+  const colors = useThemeColors();
+  const { location, setLocation } = usePanchangaLocation();
+  const timezone = resolveTimeZone(undefined, location.params.timezone);
+  const todayAd = todayAdStringInTimezone(new Date(), timezone);
+  const [date, setDate] = useState(() => new Date(`${todayAd}T12:00:00`));
+  const [clock, setClock] = useState(() => defaultClockForTimezone(timezone));
+
+  const adDateStr = toAdStr(date);
+  // Memoised — a new object each render would re-key every dependent query.
+  const birthMoment = useMemo(
+    () => instantFromCivilIso(adDateStr, clock),
+    [adDateStr, clock],
+  );
+
+  const vimshottariQ = useQuery({
+    queryKey: vimshottariKeys.atTime(birthMoment, location.params),
+    queryFn: () => fetchVimshottari(birthMoment, location.params),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const shadbalaQ = useQuery({
+    queryKey: shadbalaKeys.atTime(birthMoment, location.params),
+    queryFn: () => fetchShadbala(birthMoment, location.params),
+    staleTime: 1000 * 60 * 5,
+  });
+
   return (
     <AppShell
-      title={pick("शान्ति विधि", "Shanti vidhi")}
-      subtitle={pick("ग्रह शान्ति विधान", "Planetary peace rites")}
+      title={pick("शान्ति विधि", "Shanti Vidhi")}
+      subtitle={pick(
+        "नवग्रह शान्ति — जन्म कुण्डलीबाट सिफारिस र पूर्ण सन्दर्भ तालिका",
+        "Navagraha shanti — recommendations from your chart plus the full reference table",
+      )}
+      headerRight={<Ionicons name="flame-outline" size={26} color={colors.secondary} />}
     >
-      <VedicWebView path="/shanti-vidhi" />
+      <View className="overflow-hidden rounded-2xl border border-border">
+        <View className="flex-row items-center gap-1.5 border-b border-border px-4 py-3">
+          <Ionicons name="person-outline" size={16} color={colors.secondary} />
+          <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
+            {pick("जन्म विवरण", "Birth details")}
+          </Text>
+          <Text
+            className="ml-auto text-xs text-muted-foreground"
+            style={nepaliTextStyle(12)}
+            numberOfLines={1}
+          >
+            {pick("मिति · समय · स्थान", "Date · time · place")}
+          </Text>
+        </View>
+
+        <View className="gap-4 p-4">
+          <LocationSelector location={location} onLocationChange={setLocation} />
+          <PanchangaDateNav
+            date={date}
+            onDateChange={setDate}
+            todayAd={todayAd}
+            clock={clock}
+            onClockChange={setClock}
+          />
+
+          <ShantiVidhiPanel
+            vimshottari={vimshottariQ.data}
+            shadbala={shadbalaQ.data}
+            isError={vimshottariQ.isError && shadbalaQ.isError}
+          />
+        </View>
+      </View>
     </AppShell>
   );
 }

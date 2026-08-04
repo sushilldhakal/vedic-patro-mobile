@@ -1,4 +1,4 @@
-import type { CalendarDay, PanchangaDay } from "@/lib/api";
+import type { CalendarDay, ElementStamp, PanchangaDay } from "@/lib/api";
 import { adToBS, BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import type { AppLanguage } from "@/lib/i18n";
@@ -1034,4 +1034,61 @@ export function getInauspiciousWindows(p: PanchangaDay): InauspiciousWindow[] {
   }
 
   return out;
+}
+
+/**
+ * Element span boundary — `10:42 · Baishakh 12` (ne) / `10:42 on Baishakh 12`
+ * (en). Mirrors the web `formatElementStampDisplay`.
+ */
+export function formatElementStampDisplay(stamp: ElementStamp, lang?: string): string {
+  const time = formatTimeShort(stamp.time_label) ?? stamp.time_label;
+  const timeOut = formatLocaleDigits(time, lang);
+  const datePart = stamp.iso.includes("T") ? stamp.iso.split("T")[0]! : stamp.iso.slice(0, 10);
+  let dateOut: string;
+  try {
+    dateOut = formatEventDateBs(datePart, lang);
+  } catch {
+    dateOut = formatLocaleDigits(stamp.date_label, lang);
+  }
+  return normalizeLang(lang) === "en" ? `${timeOut} on ${dateOut}` : `${timeOut} · ${dateOut}`;
+}
+
+/** `साउन १२, २०८३` — BS month + day + year, Nepali digits. */
+export function formatBsMonthDayPatro(
+  bsYear: number,
+  bsMonth: number,
+  bsDay: number,
+): string {
+  return `${BS_MONTHS_NE[bsMonth - 1]} ${toNepaliDigits(bsDay)}, ${toNepaliDigits(bsYear)}`;
+}
+
+/** `साउन १२, वि.सं. २०८३` for a holiday / festival start date. */
+export function formatHolidayBsDisplay(
+  holiday: { bs_start_date?: string; start_date: string },
+  lang?: string,
+): string {
+  const fromApi = formatBsIsoDateNepali(holiday.bs_start_date, { lang });
+  if (fromApi) return fromApi;
+  const [y, m, d] = holiday.start_date.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const bs = adToBS(new Date(y, m - 1, d));
+  const isEn = normalizeLang(lang) === "en";
+  const months = isEn ? BS_MONTH_NAMES : BS_MONTHS_NE;
+  const era = isEn ? "BS" : "वि.सं.";
+  return `${months[bs.month - 1]} ${formatLocaleDigits(bs.day, lang)}, ${era} ${formatLocaleDigits(bs.year, lang)}`;
+}
+
+export type AyanaMark = "उ" | "द";
+
+/** `उ`/`द` in Nepali, `N`/`S` in English. */
+export function formatAyanaMarkShort(mark: AyanaMark | undefined, lang?: string): string | undefined {
+  if (!mark) return undefined;
+  const isEn = normalizeLang(lang) === "en";
+  if (mark === "उ") return isEn ? "N" : "उ";
+  if (mark === "द") return isEn ? "S" : "द";
+  return mark;
+}
+
+export function isAyanaNorthMark(mark: AyanaMark | undefined): boolean {
+  return mark === "उ";
 }
