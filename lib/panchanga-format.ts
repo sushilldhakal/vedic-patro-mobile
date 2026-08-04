@@ -1077,3 +1077,18 @@ export function formatHolidayBsDisplay(
   const era = isEn ? "BS" : "वि.सं.";
   return `${months[bs.month - 1]} ${formatLocaleDigits(bs.day, lang)}, ${era} ${formatLocaleDigits(bs.year, lang)}`;
 }
+
+export type AyanaMark = "उ" | "द";
+
+/** `उ`/`द` in Nepali, `N`/`S` in English. */
+export function formatAyanaMarkShort(mark: AyanaMark | undefined, lang?: string): string | undefined {
+  if (!mark) return undefined;
+  const isEn = normalizeLang(lang) === "en";
+  if (mark === "उ") return isEn ? "N" : "उ";
+  if (mark === "द") return isEn ? "S" : "द";
+  return mark;
+}
+
+export function isAyanaNorthMark(mark: AyanaMark | undefined): boolean {
+  return mark === "उ";
+}

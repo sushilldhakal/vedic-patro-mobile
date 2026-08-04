@@ -1133,17 +1133,27 @@ export interface ElementDayResponse {
 }
 
 export interface SunYearDay {
+  day: number;
   date_ad: string;
-  day_bs?: number;
   sunrise?: string;
   sunset?: string;
-  day_length_min?: number;
+  aayan?: string;
+  aayan_ne?: string;
+  ayana_mark?: "उ" | "द";
+}
+
+export interface SunYearMonth {
+  month_bs: number;
+  month_name: string;
+  month_name_ne: string;
+  month_start_ad: string;
+  month_length: number;
+  calendar: SunYearDay[];
 }
 
 export interface SunYearResponse {
-  year: number;
-  era: string;
-  days: SunYearDay[];
+  year_bs: number;
+  months: SunYearMonth[];
 }
 
 export interface TropicalSeasonSegment {

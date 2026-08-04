@@ -2222,3 +2222,18 @@ export function formatElementStampDisplay(stamp: ElementStamp, lang?: string): s
   }
   return normalizeLang(lang) === "en" ? `${timeOut} on ${dateOut}` : `${timeOut} · ${dateOut}`;
 }
+
+export type AyanaMark = "उ" | "द";
+
+/** `उ`/`द` in Nepali, `N`/`S` in English. */
+export function formatAyanaMarkShort(mark: AyanaMark | undefined, lang?: string): string | undefined {
+  if (!mark) return undefined;
+  const isEn = normalizeLang(lang) === "en";
+  if (mark === "उ") return isEn ? "N" : "उ";
+  if (mark === "द") return isEn ? "S" : "द";
+  return mark;
+}
+
+export function isAyanaNorthMark(mark: AyanaMark | undefined): boolean {
+  return mark === "उ";
+}
