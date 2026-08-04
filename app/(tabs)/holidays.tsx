@@ -1,82 +1,301 @@
-import { Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell, LangToggle } from "@/components/AppShell";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { ErrorState, LoadingState } from "@/components/ui/States";
-import { apiKeys, fetchHolidays, type Holiday } from "@/lib/api";
-import { getCurrentBs } from "@/lib/bs-calendar";
+import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { Text } from "@/components/ui/Text";
+import { apiKeys, fetchFestivals, fetchHolidays, type Festival, type Holiday } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
-import { useState } from "react";
-import { useBreakpoint } from "@/lib/responsive";
+import { nepaliTextStyle } from "@/lib/nepali-text";
+import { formatHolidayBsDisplay } from "@/lib/panchanga-format";
+import { colorWithAlpha } from "@/lib/theme";
+import { useThemeColors } from "@/lib/theme-context";
+import { cn } from "@/lib/utils";
+
+type Tab = "holidays" | "festivals";
+type SortDir = "asc" | "desc";
+
+type Row = {
+  key: string;
+  name: string;
+  bsDate: string;
+  adDate: string;
+  days: string;
+  type: string;
+  isPublic: boolean;
+};
+
+const HOLIDAY_COLUMNS = [
+  { key: "name", ne: "नाम", en: "Name", width: 200 },
+  { key: "bsDate", ne: "वि.सं. मिति", en: "BS Date", width: 160 },
+  { key: "adDate", ne: "ई.सं. मिति", en: "AD Date", width: 118 },
+  { key: "days", ne: "दिन", en: "Days", width: 62 },
+  { key: "type", ne: "प्रकार", en: "Type", width: 108 },
+] as const;
+
+const FESTIVAL_COLUMNS = [
+  { key: "name", ne: "नाम", en: "Name", width: 200 },
+  { key: "bsDate", ne: "वि.सं. मिति", en: "BS Date", width: 160 },
+  { key: "adDate", ne: "ई.सं. मिति", en: "AD Date", width: 118 },
+  { key: "type", ne: "प्रकार", en: "Type", width: 108 },
+  { key: "isPublic", ne: "सरकारी बिदा", en: "Gov't Holiday", width: 118 },
+] as const;
+
+function toRow(
+  item: Holiday | Festival,
+  lang: "ne" | "en",
+  digits: (v: string | number) => string,
+  index: number,
+): Row {
+  const start = item.start_date ?? "";
+  const name =
+    (lang === "en" ? (item.name_en ?? item.name_ne) : (item.name_ne ?? item.name_en)) ?? "—";
+  return {
+    key: `${item.id ?? name}-${start}-${index}`,
+    name,
+    bsDate: start
+      ? formatHolidayBsDisplay({ bs_start_date: item.bs_start_date, start_date: start }, lang)
+      : "—",
+    adDate: start || "—",
+    days: digits(item.duration_days ?? 1),
+    type: item.type ?? "—",
+    isPublic: Boolean(item.is_public_holiday),
+  };
+}
 
 export default function HolidaysScreen() {
-  const { pick, digits, lang } = useLocale();
-  const { isTablet } = useBreakpoint();
-  const initial = getCurrentBs();
-  const [year, setYear] = useState(initial.year);
+  const { lang, pick, digits } = useLocale();
+  const colors = useThemeColors();
+  const { year, setYear } = useBsYear();
+  const [tab, setTab] = useState<Tab>("holidays");
+  const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState<{ key: keyof Row; dir: SortDir }>({ key: "adDate", dir: "asc" });
 
-  const query = useQuery({
+  const holidaysQ = useQuery({
     queryKey: apiKeys.holidays(year),
     queryFn: () => fetchHolidays(year),
+    staleTime: 1000 * 60 * 60,
   });
 
-  const grouped = groupByMonth(query.data?.holidays ?? [], lang);
+  const festivalsQ = useQuery({
+    queryKey: apiKeys.festivals(year, lang),
+    queryFn: () => fetchFestivals(year, lang),
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const loading = tab === "holidays" ? holidaysQ.isLoading : festivalsQ.isLoading;
+  const isError = tab === "holidays" ? holidaysQ.isError : festivalsQ.isError;
+
+  const holidays = holidaysQ.data?.holidays ?? [];
+  const festivals = festivalsQ.data?.festivals ?? [];
+  const columns = tab === "holidays" ? HOLIDAY_COLUMNS : FESTIVAL_COLUMNS;
+
+  const rows = useMemo(() => {
+    const source = tab === "holidays" ? holidays : festivals;
+    const mapped = source.map((item, i) => toRow(item, lang, digits, i));
+    const q = filter.trim().toLowerCase();
+    const filtered = q
+      ? mapped.filter((r) =>
+          [r.name, r.bsDate, r.adDate, r.type].join(" ").toLowerCase().includes(q),
+        )
+      : mapped;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) => String(a[sort.key]).localeCompare(String(b[sort.key])) * dir,
+    );
+  }, [tab, holidays, festivals, lang, digits, filter, sort]);
+
+  const toggleSort = (key: keyof Row) =>
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
+    );
+
+  const tabs = [
+    { id: "holidays" as const, ne: "सरकारी बिदा", en: "Government Holidays", icon: "flag-outline" as const, count: holidays.length },
+    { id: "festivals" as const, ne: "सबै पर्वहरू", en: "All Festivals", icon: "sparkles-outline" as const, count: festivals.length },
+  ];
 
   return (
     <AppShell
-      title={pick("बिदा तथा पर्व", "Holidays & Festivals")}
-      subtitle={pick("नेपाली सार्वजनिक बिदा", "Nepal public holidays")}
+      title={pick("बिदा तथा पर्वहरू", "Holidays & Festivals")}
+      subtitle={pick(
+        "विक्रम सम्बत् वर्षका नेपालका सार्वजनिक बिदा र धार्मिक पर्वहरू",
+        "Nepal public holidays and religious festivals for a BS year",
+      )}
       headerRight={<LangToggle />}
     >
-      <Card className="mb-4 flex-row items-center justify-between">
-        <Button label="‹" variant="outline" size="sm" onPress={() => setYear((y) => y - 1)} />
-        <Text className="text-lg font-bold text-foreground">{digits(year)} BS</Text>
-        <Button label="›" variant="outline" size="sm" onPress={() => setYear((y) => y + 1)} />
-      </Card>
+      <BsYearPicker year={year} onYearChange={setYear} />
 
-      {query.isLoading ? (
-        <LoadingState />
-      ) : query.isError ? (
-        <ErrorState />
-      ) : (
-        <View className={isTablet ? "flex-row flex-wrap gap-3" : "gap-3"}>
-          {Object.entries(grouped).map(([month, items]) => (
-            <Card key={month} className={isTablet ? "min-w-[45%] flex-1" : ""}>
-              <Text className="mb-2 text-base font-semibold text-primary">{month}</Text>
-              {items.map((h, i) => (
-                <View
-                  key={`${h.date_ad}-${i}`}
-                  className="mb-2 flex-row items-start justify-between gap-2 border-b border-border/50 pb-2"
-                >
-                  <Text className="flex-1 text-sm text-foreground">
-                    {lang === "ne" ? h.name_ne || h.name : h.name || h.name_ne}
-                  </Text>
-                  <View className="items-end">
-                    <Text className="text-xs text-muted-foreground">{h.date_ad}</Text>
-                    {h.is_public_holiday ? (
-                      <Text className="text-[10px] font-semibold text-vermilion">
-                        {pick("बिदा", "Holiday")}
-                      </Text>
-                    ) : null}
-                  </View>
+      <View className="mb-4 flex-row gap-1 border-b border-border">
+        {tabs.map((item) => {
+          const active = tab === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => setTab(item.id)}
+              style={{
+                borderBottomWidth: 2,
+                borderBottomColor: active ? colors.secondary : "transparent",
+                marginBottom: -1,
+              }}
+              className="flex-row items-center gap-2 px-4 py-2.5 active:opacity-70"
+            >
+              <Ionicons
+                name={item.icon}
+                size={15}
+                color={active ? colors.secondary : colors.mutedForeground}
+              />
+              <Text
+                style={{
+                  color: active ? colors.secondary : colors.mutedForeground,
+                  ...nepaliTextStyle(13),
+                }}
+                className="text-sm font-semibold"
+              >
+                {pick(item.ne, item.en)}
+              </Text>
+              {item.count > 0 ? (
+                <View className="rounded-full bg-muted px-1.5 py-0.5">
+                  <Text className="text-xs text-muted-foreground">{digits(item.count)}</Text>
                 </View>
-              ))}
-            </Card>
-          ))}
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View className="mb-4 max-w-sm flex-row items-center gap-2 rounded-lg border border-border bg-background px-3">
+        <Ionicons name="search" size={16} color={colors.mutedForeground} />
+        <TextInput
+          value={filter}
+          onChangeText={setFilter}
+          placeholder={pick("पर्व खोज्नुहोस्…", "Search festivals…")}
+          placeholderTextColor={colors.mutedForeground}
+          style={{ flex: 1, paddingVertical: 9, color: colors.foreground, fontSize: 14 }}
+        />
+        {filter ? (
+          <Pressable onPress={() => setFilter("")} hitSlop={8}>
+            <Ionicons name="close-circle" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {isError ? (
+        <View
+          style={{
+            backgroundColor: colorWithAlpha("#c62828", 0.1),
+            borderColor: colorWithAlpha("#c62828", 0.2),
+          }}
+          className="rounded-xl border p-4"
+        >
+          <Text style={{ color: colors.destructive, ...nepaliTextStyle(14) }} className="text-sm">
+            {pick(
+              "डाटा लोड गर्न सकिएन। API लाई केही बेर लाग्न सक्छ।",
+              "Failed to load data. The API may need a moment to warm up.",
+            )}
+          </Text>
+        </View>
+      ) : loading ? (
+        <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+          {pick("लोड हुँदै…", "Loading…")}
+        </Text>
+      ) : (
+        <View className="overflow-hidden rounded-xl border border-border">
+          <ScrollView horizontal showsHorizontalScrollIndicator>
+            <View>
+              <View className="flex-row border-b border-border bg-muted/50">
+                {columns.map((col) => {
+                  const active = sort.key === col.key;
+                  return (
+                    <Pressable
+                      key={col.key}
+                      onPress={() => toggleSort(col.key as keyof Row)}
+                      style={{ width: col.width }}
+                      className="flex-row items-center gap-1 px-4 py-3 active:opacity-70"
+                    >
+                      <Text
+                        numberOfLines={2}
+                        className="shrink text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                        style={nepaliTextStyle(11)}
+                      >
+                        {pick(col.ne, col.en)}
+                      </Text>
+                      <Ionicons
+                        name={
+                          active
+                            ? sort.dir === "asc"
+                              ? "chevron-up"
+                              : "chevron-down"
+                            : "swap-vertical"
+                        }
+                        size={11}
+                        color={active ? colors.foreground : colors.mutedForeground}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {rows.length === 0 ? (
+                <View className="px-4 py-8">
+                  <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+                    {pick("कुनै नतिजा भेटिएन।", "No results found.")}
+                  </Text>
+                </View>
+              ) : (
+                rows.map((row) => (
+                  <View key={row.key} className="flex-row border-b border-border">
+                    {columns.map((col) => {
+                      if (col.key === "type") {
+                        return (
+                          <View key={col.key} style={{ width: col.width }} className="justify-center px-4 py-3">
+                            <View className="self-start rounded-full bg-muted px-2 py-0.5">
+                              <Text className="text-xs capitalize text-foreground" style={nepaliTextStyle(11)}>
+                                {row.type}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      }
+                      if (col.key === "isPublic") {
+                        return (
+                          <View key={col.key} style={{ width: col.width }} className="flex-row items-center gap-1 px-4 py-3">
+                            {row.isPublic ? (
+                              <>
+                                <Ionicons name="flag" size={11} color={colors.destructive} />
+                                <Text
+                                  style={{ color: colors.destructive, ...nepaliTextStyle(11) }}
+                                  className="text-xs font-semibold"
+                                >
+                                  {pick("हो", "Yes")}
+                                </Text>
+                              </>
+                            ) : null}
+                          </View>
+                        );
+                      }
+                      const mono = col.key === "bsDate" || col.key === "adDate";
+                      return (
+                        <Text
+                          key={col.key}
+                          style={{ width: col.width, ...nepaliTextStyle(13) }}
+                          className={cn(
+                            "px-4 py-3 text-sm text-foreground",
+                            mono && "font-num text-xs",
+                          )}
+                        >
+                          {row[col.key as keyof Row] as string}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
         </View>
       )}
     </AppShell>
   );
-}
-
-function groupByMonth(holidays: Holiday[], lang: "ne" | "en") {
-  const out: Record<string, Holiday[]> = {};
-  for (const h of holidays) {
-    const key = h.date_bs?.slice(5, 7) ?? h.date_ad?.slice(5, 7) ?? "?";
-    const label = lang === "ne" ? `महिना ${key}` : `Month ${key}`;
-    out[label] = out[label] ?? [];
-    out[label].push(h);
-  }
-  return out;
 }

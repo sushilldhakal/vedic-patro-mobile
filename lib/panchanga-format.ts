@@ -1061,3 +1061,19 @@ export function formatBsMonthDayPatro(
 ): string {
   return `${BS_MONTHS_NE[bsMonth - 1]} ${toNepaliDigits(bsDay)}, ${toNepaliDigits(bsYear)}`;
 }
+
+/** `साउन १२, वि.सं. २०८३` for a holiday / festival start date. */
+export function formatHolidayBsDisplay(
+  holiday: { bs_start_date?: string; start_date: string },
+  lang?: string,
+): string {
+  const fromApi = formatBsIsoDateNepali(holiday.bs_start_date, { lang });
+  if (fromApi) return fromApi;
+  const [y, m, d] = holiday.start_date.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const bs = adToBS(new Date(y, m - 1, d));
+  const isEn = normalizeLang(lang) === "en";
+  const months = isEn ? BS_MONTH_NAMES : BS_MONTHS_NE;
+  const era = isEn ? "BS" : "वि.सं.";
+  return `${months[bs.month - 1]} ${formatLocaleDigits(bs.day, lang)}, ${era} ${formatLocaleDigits(bs.year, lang)}`;
+}

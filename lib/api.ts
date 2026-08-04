@@ -519,14 +519,25 @@ export interface PanchangaDay {
 }
 
 export interface Holiday {
-  name?: string;
+  id: string;
+  name_en?: string;
   name_ne?: string;
-  date_ad?: string;
-  date_bs?: string;
+  start_date: string;
+  end_date: string;
+  bs_start_date?: string;
+  bs_end_date?: string;
+  duration_days?: number;
+  type?: string;
+  category?: string;
+  importance?: string;
   is_public_holiday?: boolean;
+  notes?: string;
 }
 
 export interface HolidaysResponse {
+  bs_year?: number;
+  era?: string;
+  gregorian_range?: { start: string; end: string };
   count: number;
   holidays: Holiday[];
 }
@@ -549,6 +560,9 @@ export interface Festival {
 }
 
 export interface FestivalsResponse {
+  bs_year?: number;
+  era?: string;
+  gregorian_range?: { start: string; end: string };
   count: number;
   festivals: Festival[];
 }
@@ -700,7 +714,8 @@ export const apiKeys = {
   convertBs: (d: string) => ["convert", "bs", d] as const,
   saitMonthAll: (y: number, m: number, loc?: LocationParams) =>
     ["sait", "month-all", SAIT_CACHE_VERSION, y, m, locationKey(loc)] as const,
-  festivals: (year: number) => ["festivals", "bs", year] as const,
+  festivals: (year: number, language: "ne" | "en" = "ne") =>
+    ["festivals", "bs", year, language] as const,
 };
 
 export const fetchMonthCalendar = async (
@@ -1145,19 +1160,35 @@ export interface TropicalSeasonsResponse {
 export interface SaitDetailDay {
   bs_month: number;
   bs_day: number;
+  bs_month_name_ne: string;
   gregorian: string;
-  weekday_ne: string;
   weekday_en: string;
+  weekday_ne: string;
   window_start: string;
   window_end: string;
+  tithi_num?: number;
+  tithi_en: string;
   tithi_ne: string;
+  paksha?: string;
+  paksha_ne?: string;
+  nakshatra_num?: number;
+  nakshatra_en: string;
   nakshatra_ne: string;
+  yoga_en?: string;
+  yoga_ne?: string;
+  karana_en?: string;
+  karana_ne?: string;
+  lagna_en?: string;
+  lagna_ne?: string;
+  lunar_month_en?: string | null;
+  lunar_month_ne?: string | null;
 }
 
 export interface SaitDetailResponse {
   bs_year: number;
   category: string;
   category_label_ne: string;
+  engine_version?: string;
   days: SaitDetailDay[];
 }
 
