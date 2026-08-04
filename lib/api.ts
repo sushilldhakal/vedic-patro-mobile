@@ -1025,11 +1025,47 @@ export interface PanchakYearResponse {
 
 export type ElementKind = "span" | "table";
 
+export interface ElementStamp {
+  iso: string;
+  weekday: string;
+  date_label: string;
+  time_label: string;
+  display: string;
+}
+
+export interface ElementSpan {
+  number: number;
+  name: string;
+  name_ne: string;
+  begins: ElementStamp;
+  ends: ElementStamp;
+  paksha?: string;
+  progress?: number;
+}
+
+export interface ElementSpansResponse {
+  element: string;
+  kind: "span";
+  label_ne: string;
+  label_en: string;
+  timezone: string;
+  window: { start: string; end: string };
+  spans: ElementSpan[];
+}
+
+export interface ElementSpanRange {
+  era: "bs" | "ad" | "bbs";
+  year: number;
+  month: number;
+}
+
 export interface ElementDayResponse {
   element: string;
   label_ne: string;
   label_en: string;
   date_ad: string;
+  /** Local sunrise for the day — ghati-based rows are anchored to it. */
+  sunrise?: string;
   data: unknown;
 }
 
@@ -1091,6 +1127,16 @@ export const grahaDetailKeys = {
 export const elementKeys = {
   day: (name: string, date: string, location?: LocationParams) =>
     ["element", "day", name, date, locationCacheKey(location)] as const,
+  spans: (name: string, range: ElementSpanRange, location?: LocationParams) =>
+    [
+      "element",
+      "spans",
+      name,
+      range.era,
+      range.year,
+      range.month,
+      locationCacheKey(location),
+    ] as const,
 };
 
 export const panchakKeys = {
@@ -1162,6 +1208,23 @@ export const fetchYearSunTimes = (
   get<SunYearResponse>(
     appendLocation(`/panchanga/year/${year}/sun?${buildEraQuery(era, year)}`, location),
   );
+
+/** Span-kind elements (tithi, nakshatra, yoga, karana…) over a whole month. */
+export const fetchElementSpans = (
+  name: string,
+  range: ElementSpanRange,
+  location?: LocationParams,
+) => {
+  // The era middleware turns era + year + month into the JD span server-side.
+  const query = new URLSearchParams({
+    era: range.era,
+    year: String(range.year),
+    month: String(range.month),
+  });
+  return get<ElementSpansResponse>(
+    appendLocation(withCache(`/panchanga/element/${name}/spans?${query.toString()}`), location),
+  );
+};
 
 export const fetchTropicalSeasons = (location?: LocationParams) =>
   get<TropicalSeasonsResponse>(appendLocation("/seasons/tropical", location));

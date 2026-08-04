@@ -1,4 +1,4 @@
-import type { CalendarDay, PanchangaDay } from "@/lib/api";
+import type { CalendarDay, ElementStamp, PanchangaDay } from "@/lib/api";
 import { adToBS, BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import type { AppLanguage } from "@/lib/i18n";
@@ -1034,4 +1034,21 @@ export function getInauspiciousWindows(p: PanchangaDay): InauspiciousWindow[] {
   }
 
   return out;
+}
+
+/**
+ * Element span boundary — `10:42 · Baishakh 12` (ne) / `10:42 on Baishakh 12`
+ * (en). Mirrors the web `formatElementStampDisplay`.
+ */
+export function formatElementStampDisplay(stamp: ElementStamp, lang?: string): string {
+  const time = formatTimeShort(stamp.time_label) ?? stamp.time_label;
+  const timeOut = formatLocaleDigits(time, lang);
+  const datePart = stamp.iso.includes("T") ? stamp.iso.split("T")[0]! : stamp.iso.slice(0, 10);
+  let dateOut: string;
+  try {
+    dateOut = formatEventDateBs(datePart, lang);
+  } catch {
+    dateOut = formatLocaleDigits(stamp.date_label, lang);
+  }
+  return normalizeLang(lang) === "en" ? `${timeOut} on ${dateOut}` : `${timeOut} · ${dateOut}`;
 }
