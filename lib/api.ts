@@ -944,25 +944,41 @@ function withGrahaCache(path: string): string {
 export interface GrahaSthitiRow {
   graha: string;
   name_ne: string;
+  name_vedic?: string;
   symbol: string;
+  /** `21° कन्या 53′ 14″` — degree in sign with Nepali rashi name. */
   rekhamsha: string;
   rashi_ne: string;
   nakshatra: string;
   nakshatra_ne: string;
   pada: number;
+  pada_ne?: string;
+  nakshatra_lord_ne?: string;
+  sub_lord_ne?: string;
   full_degree: number;
+  /** `04° द. 45′ 02″` — signed ecliptic latitude (शर), north/south. */
+  shara?: string;
+  shara_deg?: number;
   speed_deg_day: number;
   is_retrograde: boolean;
   is_combust: boolean;
+  right_ascension?: number;
+  declination?: number;
 }
 
 export interface GrahaSthitiResponse {
   date_ad: string;
   date_bs: string;
+  timezone?: string;
+  sunrise_local?: string;
   rows: GrahaSthitiRow[];
 }
 
+/** A localized timestamp for an asta / vakri period boundary. */
 export interface AstaStamp {
+  iso?: string;
+  jd?: number;
+  /** Era-rendered day label from {@link jd} (EraMiddleware). */
   date?: string;
   date_ad?: string;
   date_bs?: string | null;
@@ -981,19 +997,30 @@ export interface GrahaAstaPeriod {
 export interface GrahaAstaResponse {
   bs_year?: number;
   ad_year?: number;
+  gregorian_range?: { start: string; end: string };
+  grahas?: string[];
   periods: GrahaAstaPeriod[];
 }
 
-export interface GrahaVakriPeriod {
+/** One yearly वक्री/मार्गी motion-station event. */
+export interface GrahaVakriEvent {
   graha: string;
   graha_ne: string;
-  start: AstaStamp | null;
-  end: AstaStamp | null;
+  motion?: string;
+  is_retrograde?: boolean;
+  label_ne?: string;
+  entry_time_local?: string;
+  entry_time_local_short?: string;
+  entry_jd?: number;
+  /** Era-rendered civil day label from {@link entry_jd} (EraMiddleware). */
+  entry_jd_date?: string;
 }
 
 export interface GrahaVakriResponse {
   bs_year?: number;
-  periods: GrahaVakriPeriod[];
+  gregorian_range?: { start: string; end: string };
+  grahas?: string[];
+  events: GrahaVakriEvent[];
 }
 
 export interface EclipseEvent {

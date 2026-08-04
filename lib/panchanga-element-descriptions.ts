@@ -211,6 +211,20 @@ export const ELEMENT_DESCRIPTIONS: Record<
   },
 };
 
+export function descriptionBlocksFrom(
+  table: Record<string, Partial<Record<ElementDescriptionSection, { ne: string; en: string }>>>,
+  id: string,
+  lang: string,
+): { section: ElementDescriptionSection; body: string }[] {
+  const entry = table[id];
+  if (!entry) return [];
+  const key = lang.startsWith("en") ? "en" : "ne";
+  return ELEMENT_DESCRIPTION_SECTIONS.flatMap((section) => {
+    const body = entry[section]?.[key];
+    return body ? [{ section, body }] : [];
+  });
+}
+
 export function elementDescriptionBlocks(
   elementId: string,
   lang: string,
