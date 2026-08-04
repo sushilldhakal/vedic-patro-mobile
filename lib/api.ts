@@ -1,5 +1,10 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import {
+  appendInstantParams,
+  instantCacheKey,
+  type InstantQuery,
+} from "@/lib/instant-query";
 
 const extra = Constants.expoConfig?.extra ?? {};
 // Canonical host (www) — the apex `vedicpatro.com` 301-redirects to www, which
@@ -1171,3 +1176,125 @@ export function timeShort(v: PanchangaDay["sunrise"]): string {
   if (typeof v === "string") return v.slice(0, 5);
   return v.local_time_short?.slice(0, 5) ?? "—";
 }
+
+// ─── Vimshottari dasha ───────────────────────────────────────────────────────
+
+export interface VimshottariPeriod {
+  lord: string;
+  lord_ne: string;
+  start: string;
+  end: string;
+  years: number;
+}
+
+export interface VimshottariResponse {
+  ayanamsha: string;
+  moon_longitude: number;
+  nakshatra_index: number;
+  mahadasha_lord: string;
+  mahadasha_lord_ne: string;
+  balance_years: number;
+  balance_label: string;
+  sequence: VimshottariPeriod[];
+  query_instant?: string;
+}
+
+export const vimshottariKeys = {
+  atTime: (moment: InstantQuery, location?: LocationParams, ayanamsha?: string) =>
+    [
+      "vimshottari",
+      instantCacheKey(moment),
+      locationCacheKey(location),
+      ayanamsha ?? "lahiri",
+    ] as const,
+};
+
+export const fetchVimshottari = (
+  moment: InstantQuery,
+  location?: LocationParams,
+  options?: { ayanamsha?: string; cycles?: number },
+) => {
+  const params = appendInstantParams(new URLSearchParams(), moment);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  if (options?.cycles != null) params.set("cycles", String(options.cycles));
+  return get<VimshottariResponse>(
+    appendLocation(`/kundali/vimshottari?${params.toString()}`, location),
+  );
+};
+
+// ─── Shadbala ────────────────────────────────────────────────────────────────
+
+export type ShadbalaStatus =
+  | "Exceptional"
+  | "Strong"
+  | "Adequate"
+  | "Borderline"
+  | "Weak";
+
+export interface ShadbalaBreakdown {
+  sthana: number;
+  dig: number;
+  kala: number;
+  cheshta: number;
+  naisargika: number;
+  drik: number;
+}
+
+export interface ShadbalaSubBalas {
+  sthana: Record<string, number>;
+  kala: Record<string, number>;
+}
+
+export interface ShadbalaPlanet {
+  key: string;
+  name: string;
+  name_ne: string;
+  total_virupas: number;
+  rupas: number;
+  required: number;
+  ratio: number;
+  status: ShadbalaStatus;
+  top_bala: string;
+  weakest_bala: string;
+  breakdown: ShadbalaBreakdown;
+  sub_balas?: ShadbalaSubBalas;
+  ishta_phala?: number;
+  kashta_phala?: number;
+}
+
+export interface ShadbalaSummaryRef {
+  key: string;
+  name: string;
+  name_ne: string;
+  status: ShadbalaStatus;
+  ratio: number;
+}
+
+export interface ShadbalaResponse {
+  planets: ShadbalaPlanet[];
+  summary: {
+    strongest: ShadbalaSummaryRef;
+    weakest: ShadbalaSummaryRef;
+    average_rupas: number;
+    average_virupas: number;
+    meeting_threshold: number;
+    total_planets: number;
+    counts: Record<ShadbalaStatus, number>;
+  };
+  method: string;
+  location?: Record<string, unknown>;
+  query_instant?: string;
+}
+
+export const shadbalaKeys = {
+  atTime: (moment: InstantQuery, location?: LocationParams) =>
+    ["shadbala", "at-time", instantCacheKey(moment), locationCacheKey(location)] as const,
+};
+
+export const fetchShadbala = (moment: InstantQuery, location?: LocationParams) =>
+  get<ShadbalaResponse>(
+    appendLocation(
+      `/shadbala?${appendInstantParams(new URLSearchParams(), moment).toString()}`,
+      location,
+    ),
+  );
