@@ -1,33 +1,23 @@
-import { useState, type ReactNode } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native"
-import { Text } from "@/components/ui/Text"
-import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  BS_MONTH_NAMES,
-  BS_MONTHS_NE,
-  BS_SUPPORTED_END_YEAR,
-  BS_SUPPORTED_START_YEAR,
-  adToBS,
-  bsToAD,
-  getBSMonthLength,
-} from "@/lib/bs-calendar";
+import { useMemo } from "react";
+import { View } from "react-native";
+import { adToBS, bsToAD, getBSMonthLength } from "@/lib/bs-calendar";
+import type { PanchangaDay } from "@/lib/api";
+import { PatroDateNav } from "@/components/patro-date/PatroDateNav";
+import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { useLocale } from "@/lib/i18n";
-import { useBreakpoint } from "@/lib/responsive";
-import { resolveSamvatsaraForBsYear } from "@/lib/samvatsara";
-import { useThemeColors } from "@/lib/theme-context";
-import { cn } from "@/lib/utils";
-import { BsDateTimePicker } from "@/components/panchanga/BsDateTimePicker";
-import { parseClockParts } from "@/components/panchanga/use-panchanga-mode";
+import {
+  formatGregorianFromDateParts,
+  formatPatroCivilDayLabel,
+  patroHeadlineDigits,
+} from "@/lib/patro-headline-subtitle";
+import type { PatroBrowseEra } from "@/lib/patro-era";
+import type { ReactNode } from "react";
 
-function pickBsDate(onDateChange: (d: Date) => void, year: number, month: number, day: number) {
-  const safeDay = Math.min(day, getBSMonthLength(year, month));
-  onDateChange(bsToAD(year, month, safeDay));
-}
-
-function chipMonthLabel(month: number, lang: string): string {
-  if (lang === "en") return BS_MONTH_NAMES[month - 1].slice(0, 3).toUpperCase();
-  return BS_MONTHS_NE[month - 1];
+function toAdStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 type Props = {
@@ -37,14 +27,18 @@ type Props = {
   clock?: string;
   onClockChange?: (clock: string) => void;
   toolbar?: ReactNode;
+  mobileToolbar?: ReactNode;
   className?: string;
+  location?: import("@/lib/use-panchanga-location").PanchangaLocation;
+  onLocationChange?: (location: import("@/lib/use-panchanga-location").PanchangaLocation) => void;
+  era?: PatroBrowseEra;
+  onEraChange?: (era: PatroBrowseEra) => void;
+  /** Udaya day payload — drives headline (वि.सं., संवत्सर, AD) from server. */
+  wheelData?: PanchangaDay;
+  adDateStr: string;
 };
 
-const BS_YEAR_OPTIONS = Array.from(
-  { length: BS_SUPPORTED_END_YEAR - BS_SUPPORTED_START_YEAR + 1 },
-  (_, i) => BS_SUPPORTED_START_YEAR + i,
-);
-
+/** Panchanga day header — {@link PatroDateNav} mode `year-month-time` (web `PatroDayTimeNav`). */
 export function PanchangaDateNav({
   date,
   onDateChange,
@@ -52,15 +46,39 @@ export function PanchangaDateNav({
   clock,
   onClockChange,
   toolbar,
+  mobileToolbar,
   className,
+  location: locationProp,
+  onLocationChange: onLocationChangeProp,
+  era = "bs",
+  onEraChange,
+  wheelData,
+  adDateStr,
 }: Props) {
-  const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
-  const { isTablet } = useBreakpoint();
-  const { pick, digits, lang } = useLocale();
-  const bs = adToBS(date);
-  const todayBs = adToBS(new Date(`${todayAd}T12:00:00`));
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const fallback = usePanchangaLocation();
+  const location = locationProp ?? fallback.location;
+  const onLocationChange = onLocationChangeProp ?? fallback.setLocation;
+  const { lang } = useLocale();
+  const digitFn = patroHeadlineDigits(lang);
+
+  const vikram = wheelData?.date_parts?.vikram;
+  const gregorian = wheelData?.date_parts?.gregorian;
+  const fallbackBs = adToBS(date);
+
+  const navYear = vikram?.year ?? fallbackBs.year;
+  const navMonth = vikram?.month ?? fallbackBs.month;
+  const navDay = vikram?.day ?? fallbackBs.day;
+
+  const crossEraSubtitle = useMemo(() => {
+    if (gregorian?.year && gregorian.month && gregorian.day) {
+      return formatGregorianFromDateParts(gregorian, lang, digitFn);
+    }
+    const civil = wheelData?.date_ad ?? adDateStr;
+    if (civil) return formatPatroCivilDayLabel(civil.split("T")[0]!, lang, digitFn);
+    return formatPatroCivilDayLabel(toAdStr(date), lang, digitFn);
+  }, [gregorian, wheelData?.date_ad, adDateStr, date, lang, digitFn]);
+
+  const vikramEra = (vikram?.era as PatroBrowseEra | undefined) ?? era;
 
   const stepDay = (delta: number) => {
     const next = new Date(date);
@@ -68,222 +86,41 @@ export function PanchangaDateNav({
     onDateChange(next);
   };
 
-  const atMinDay = bs.year === BS_SUPPORTED_START_YEAR && bs.month === 1 && bs.day === 1;
-  const atMaxDay =
-    bs.year === BS_SUPPORTED_END_YEAR &&
-    bs.month === 12 &&
-    bs.day === getBSMonthLength(bs.year, bs.month);
-
-  const monthTitle = pick(BS_MONTHS_NE[bs.month - 1], BS_MONTH_NAMES[bs.month - 1]);
-  const samvatsara = resolveSamvatsaraForBsYear(bs.year);
-  const samvatsaraLabel = samvatsara ? pick(samvatsara.name_ne, samvatsara.name_en) : undefined;
-  const adDayLabel = bsToAD(bs.year, bs.month, bs.day).toLocaleDateString(
-    lang === "en" ? "en-US" : "ne-NP",
-    { day: "numeric", month: "short", year: "numeric" },
-  );
-
-  const showTime = Boolean(clock && onClockChange);
-  const clockSummary = showTime && clock
-    ? (() => {
-        const { hour, minute } = parseClockParts(clock);
-        return `${digits(String(hour).padStart(2, "0"))}:${digits(String(minute).padStart(2, "0"))}`;
-      })()
-    : null;
-
-  const pickerLabelCompact = clockSummary
-    ? `${digits(bs.day)} · ${clockSummary}`
-    : `${digits(bs.day)}`;
-
-  const pickerTitle = showTime ? pick("मिति र समय", "Date & time") : pick("मिति", "Date");
-
-  const pickerBody = pickerOpen ? (
-    <BsDateTimePicker
-      key={`${bs.year}-${bs.month}-${bs.day}-${clock ?? ""}`}
-      year={bs.year}
-      month={bs.month}
-      day={bs.day}
-      yearOptions={BS_YEAR_OPTIONS}
-      todayAd={todayAd}
-      onSelectDate={(y, m, d) => pickBsDate(onDateChange, y, m, d)}
-      monthAriaLabel={pick("महिना", "Month")}
-      yearAriaLabel={pick("वर्ष", "Year")}
+  return (
+    <PatroDateNav
+      className={className}
+      mode="year-month-time"
+      era={era}
+      onEraChange={onEraChange ?? (() => {})}
+      year={navYear}
+      onYearChange={(y) => {
+        const safeDay = Math.min(navDay, getBSMonthLength(y, navMonth));
+        onDateChange(bsToAD(y, navMonth, safeDay));
+      }}
+      month={navMonth}
+      onMonthChange={(m) => {
+        const safeDay = Math.min(navDay, getBSMonthLength(navYear, m));
+        onDateChange(bsToAD(navYear, m, safeDay));
+      }}
+      day={navDay}
+      onDayChange={(d) => onDateChange(bsToAD(navYear, navMonth, d))}
+      onSelectDate={(y, m, d) => {
+        const safeDay = Math.min(d, getBSMonthLength(y, m));
+        onDateChange(bsToAD(y, m, safeDay));
+      }}
       clock={clock}
       onClockChange={onClockChange}
-      hourAriaLabel={pick("घण्टा", "Hour")}
-      minuteAriaLabel={pick("मिनेट", "Minute")}
-      showTime={showTime}
-      onDone={() => setPickerOpen(false)}
+      todayAd={todayAd}
+      location={location}
+      onLocationChange={onLocationChange}
+      onToday={() => onDateChange(new Date(`${todayAd}T12:00:00`))}
+      onPrev={() => stepDay(-1)}
+      onNext={() => stepDay(1)}
+      crossEraSubtitle={crossEraSubtitle}
+      vikramEra={vikramEra}
+      samvatsara={wheelData?.samvatsara as import("@/lib/samvatsara").SamvatsaraPayload | undefined}
+      toolbar={toolbar}
+      mobileToolbar={mobileToolbar}
     />
-  ) : null;
-
-  const pickerHeader = (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}
-    >
-      <Pressable onPress={() => setPickerOpen(false)} hitSlop={8} style={{ minWidth: 72 }}>
-        <Text style={{ fontSize: 16, color: colors.mutedForeground }}>
-          {pick("रद्द", "Cancel")}
-        </Text>
-      </Pressable>
-      <Text
-        style={{
-          flex: 1,
-          textAlign: "center",
-          fontSize: 16,
-          fontWeight: "600",
-          color: colors.foreground,
-        }}
-        numberOfLines={1}
-      >
-        {pickerTitle}
-      </Text>
-      <View style={{ minWidth: 72 }} />
-    </View>
-  );
-
-  return (
-    <>
-      <View className={cn("mb-4 flex-row items-start gap-2.5", className)}>
-        <Pressable
-          onPress={() => onDateChange(new Date(`${todayAd}T12:00:00`))}
-          accessibilityLabel={pick("आज", "Today")}
-          className="shrink-0 overflow-hidden rounded-[10px] border border-border bg-card shadow-sm active:opacity-90"
-        >
-          <View className="bg-secondary px-2 py-1">
-            <Text className="text-center text-[11px] font-bold tracking-wide text-secondary-foreground">
-              {chipMonthLabel(todayBs.month, lang)}
-            </Text>
-          </View>
-          <View className="min-w-[2.75rem] items-center justify-center px-2 py-1">
-            <Text className="font-num text-base font-bold text-foreground">{digits(todayBs.day)}</Text>
-          </View>
-        </Pressable>
-
-        <View className="min-w-0 flex-1">
-          <View className="flex-row items-start justify-between gap-2">
-            <View className="min-w-0 flex-1 flex-row flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-              <Text className="text-lg font-bold leading-tight text-foreground md:text-xl">
-                {monthTitle}{" "}
-                <Text className="font-num font-bold text-secondary">{digits(bs.year)}</Text>
-              </Text>
-              {samvatsaraLabel ? (
-                <Text className="text-lg font-semibold leading-tight text-foreground/90 md:text-xl">
-                  {samvatsaraLabel}
-                </Text>
-              ) : null}
-              <Text className="text-base font-medium leading-snug text-muted-foreground md:text-lg">
-                {adDayLabel}
-              </Text>
-            </View>
-            {toolbar ? <View className="shrink-0">{toolbar}</View> : null}
-          </View>
-
-          <View className="-mt-1 flex-row items-center gap-1">
-            <StepBtn disabled={atMinDay} onPress={() => stepDay(-1)} icon="chevron-back" />
-            <Pressable
-              onPress={() => setPickerOpen(true)}
-              accessibilityLabel={
-                showTime
-                  ? pick("मिति र समय बदल्नुहोस्", "Change date and time")
-                  : pick("मिति बदल्नुहोस्", "Change date")
-              }
-              className="h-[30px] max-w-[min(100%,10.5rem)] shrink flex-row items-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted"
-            >
-              <Ionicons name="calendar-outline" size={14} color={colors.secondary} />
-              <Text numberOfLines={1} className="font-num text-sm font-semibold text-foreground">
-                {pickerLabelCompact}
-              </Text>
-              <Ionicons name="chevron-down" size={14} color={colors.mutedForeground} />
-            </Pressable>
-            <StepBtn disabled={atMaxDay} onPress={() => stepDay(1)} icon="chevron-forward" />
-          </View>
-        </View>
-      </View>
-
-      <Modal
-        visible={pickerOpen}
-        animationType={isTablet ? "fade" : "slide"}
-        transparent={isTablet}
-        onRequestClose={() => setPickerOpen(false)}
-      >
-        {isTablet ? (
-          <Pressable
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              paddingHorizontal: 24,
-              backgroundColor: "rgba(0,0,0,0.45)",
-            }}
-            onPress={() => setPickerOpen(false)}
-          >
-            <View
-              style={{
-                width: "100%",
-                maxWidth: 360,
-                maxHeight: "85%",
-                borderRadius: 16,
-                overflow: "hidden",
-                backgroundColor: colors.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              {pickerHeader}
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                {pickerBody}
-              </ScrollView>
-            </View>
-          </Pressable>
-        ) : (
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: colors.card,
-              paddingTop: insets.top,
-              paddingBottom: Math.max(insets.bottom, 12),
-            }}
-          >
-            {pickerHeader}
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {pickerBody}
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
-    </>
-  );
-}
-
-function StepBtn({
-  onPress,
-  disabled,
-  icon,
-}: {
-  onPress: () => void;
-  disabled?: boolean;
-  icon: "chevron-back" | "chevron-forward";
-}) {
-  const colors = useThemeColors();
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      accessibilityRole="button"
-      className={cn(
-        "h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-border bg-card active:bg-muted",
-        disabled && "opacity-40",
-      )}
-    >
-      <Ionicons name={icon} size={16} color={colors.foreground} />
-    </Pressable>
   );
 }

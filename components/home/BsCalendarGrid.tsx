@@ -10,6 +10,7 @@ import { civilIsoDayOfMonth } from "@/lib/patro-day";
 import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { tithiIndexFromCalendarDay } from "@/lib/tithi-wheel-data";
+import { cn } from "@/lib/utils";
 import {
   CALENDAR_GRID_GAP,
   calendarColStyle,
@@ -62,21 +63,21 @@ export function BsCalendarGrid({
   const theme = useThemeColors();
   const { pick, digits, lang } = useLocale();
   const isEn = lang === "en";
-  const { isCompact, isTablet } = useBreakpoint();
+  const { isCompact, isPhone, isTablet } = useBreakpoint();
   const { onLayout, colWidth } = useCalendarGridWidth();
   const col = (extra?: object) => calendarColStyle(colWidth, extra);
-  const metaSize = isTablet ? 12 : 10;
+  const metaSize = isPhone ? 10 : isTablet ? 12 : 10;
   const metaTextStyle = lang === "en" ? undefined : nepaliTextStyle(metaSize);
   const tithiRowMinH = lang === "en" ? 14 : nepaliLineHeight(metaSize) + 3;
-  const dayNumSize = isCompact ? 22 : isTablet ? 30 : 24;
+  const dayNumSize = isPhone ? 24 : isCompact ? 22 : isTablet ? 30 : 24;
   const dayNumStyle =
     lang === "en"
       ? {
           fontSize: dayNumSize,
-          lineHeight: dayNumSize + (isCompact ? 4 : 6),
+          lineHeight: dayNumSize + (isPhone ? 4 : isCompact ? 6 : 8),
         }
       : nepaliDayNumberStyle(dayNumSize);
-  const cellMinH = isCompact ? 84 : isTablet ? 104 : 96;
+  const cellMinH = isPhone ? 80 : isCompact ? 84 : isTablet ? 104 : 96;
 
   const [festivalDialog, setFestivalDialog] = useState<{
     day: CalendarDay;
@@ -92,7 +93,10 @@ export function BsCalendarGrid({
     <>
       <View
         onLayout={onLayout}
-        className="overflow-hidden rounded-xl border border-border shadow-sm"
+        className={cn(
+          "overflow-hidden border border-border",
+          isPhone ? "rounded-none border-x-0 shadow-none" : "rounded-xl shadow-sm",
+        )}
         style={{ backgroundColor: theme.border, gap: CALENDAR_GRID_GAP }}
       >
         <View style={{ flexDirection: "row", gap: CALENDAR_GRID_GAP }}>
@@ -102,7 +106,7 @@ export function BsCalendarGrid({
               <View
                 key={label}
                 style={col({ backgroundColor: theme.surfaceInset })}
-                className="items-center px-1 py-2"
+                className={cn("items-center py-2", isPhone ? "px-0 py-1" : "px-1 py-2")}
               >
                 <Text
                   className="font-bold uppercase tracking-wide"
@@ -152,14 +156,18 @@ export function BsCalendarGrid({
               const moonTitle = moonPhaseTitle(getPakshaPhase(day), isEn);
               const adDayNum = civilIsoDayOfMonth(day.date_ad);
               const primaryDayNum = primaryDate === "ad" ? adDayNum : day.day;
-              const secondary = getSecondaryCellDate(day, primaryDate, lang, cellIndex === 0);
-              const secondaryLabel = digits(secondary.day);
+          const secondary = getSecondaryCellDate(day, primaryDate, lang, cellIndex === 0);
+          const secondaryLabel = secondary.monthLabel
+            ? `${secondary.monthLabel} ${digits(secondary.day)}`
+            : digits(secondary.day);
+          const secondaryLabelShort = secondary.monthLabelShort
+            ? `${secondary.monthLabelShort} ${digits(secondary.day)}`
+            : digits(secondary.day);
 
               let bg: string = theme.card;
               if (isOutside) bg = theme.surfaceMuted;
               else if (isToday) bg = theme.surfaceToday;
               else if (isPublicHoliday) bg = theme.surfaceTintDanger;
-              else if (mobileBsFestCompact) bg = theme.surfaceTintDanger;
 
               const dayColor =
                 !isOutside && (isWeekend || isPublicHoliday)
@@ -175,7 +183,10 @@ export function BsCalendarGrid({
                   key={day.date_ad}
                   onPress={() => onSelectDay?.(day)}
                   style={col({ minHeight: cellMinH, backgroundColor: bg })}
-                  className="relative px-1 pb-1 pt-2 active:opacity-90 md:min-h-[104px] md:p-2"
+                  className={cn(
+                    "relative active:opacity-90",
+                    isPhone ? "px-1 pb-1 pt-2" : "px-1 pb-1 pt-2 md:min-h-[104px] md:p-2",
+                  )}
                 >
                   {isSelected ? <View style={selectionRingStyle(theme.primary)} /> : null}
 
@@ -195,7 +206,7 @@ export function BsCalendarGrid({
                     {tithi ? (
                       <Text
                         numberOfLines={1}
-                        className="min-w-0 flex-1 text-center font-semibold"
+                        className="min-w-0 flex-1 pt-0.5 text-center font-semibold"
                         style={{
                           color: theme.text,
                           fontSize: metaSize,
@@ -241,7 +252,7 @@ export function BsCalendarGrid({
                             : nepaliDayNumberStyle(secondary.monthLabel ? 10 : metaSize)
                         }
                       >
-                        {secondaryLabel}
+                        {isPhone ? secondaryLabelShort : secondaryLabel}
                       </Text>
                       {extraFestCount > 0 && primaryDate !== "bs" && !isCompact ? (
                         <Pressable

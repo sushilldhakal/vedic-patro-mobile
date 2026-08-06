@@ -125,12 +125,15 @@ export function cityToLocation(city: {
 const GENERIC_API_LOCATION_NAMES = new Set(["custom"]);
 
 export function displayLocationLabel(
-  location: PanchangaLocation,
+  location: PanchangaLocation | null | undefined,
   apiName?: string | null,
 ): string {
   const name = apiName?.trim();
   if (name && !GENERIC_API_LOCATION_NAMES.has(name.toLowerCase())) {
     return name;
+  }
+  if (!location?.label) {
+    return DEFAULT_PANCHANGA_LOCATION.label.split(",")[0] ?? "Kathmandu";
   }
   const parts = location.label.split(",").map((s) => s.trim());
   return parts[0] ?? location.label;

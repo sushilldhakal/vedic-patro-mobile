@@ -19,7 +19,7 @@ export default function TabsLayout() {
           tabBar={() => <FloatingNavBar />}
           screenOptions={{
             headerShown: false,
-            sceneStyle: { backgroundColor: "transparent" },
+            sceneStyle: { backgroundColor: "transparent", flex: 1 },
           }}
         />
       </View>

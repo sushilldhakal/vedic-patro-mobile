@@ -3,8 +3,7 @@ import { ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { PatroDateNav } from "@/components/patro-date/PatroDateNav";
 import { Text } from "@/components/ui/Text";
 import { fetchYearSunTimes, sunTimesKeys, type SunYearDay, type SunYearMonth } from "@/lib/api";
 import { BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
@@ -16,8 +15,10 @@ import {
   isAyanaNorthMark,
   toNepaliDigits,
 } from "@/lib/panchanga-format";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import { useThemeColors } from "@/lib/theme-context";
-import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { stepPatroBrowseYear } from "@/lib/patro-year-browse-step";
 
 /** Matches the web grid's fixed column widths so month headers line up. */
 const DAY_COL = 44;
@@ -65,13 +66,14 @@ export default function SuryakrantiScreen() {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
   const isEnglish = lang === "en";
-  const locationLabel = displayLocationLabel(location);
+  const apiEra: "bs" | "ad" | "bbs" =
+    era === "ad" || era === "bc" ? "ad" : era === "bbs" ? "bbs" : "bs";
 
   const query = useQuery({
-    queryKey: sunTimesKeys.year(year, "bs", location.params),
-    queryFn: () => fetchYearSunTimes(year, "bs", location.params),
+    queryKey: sunTimesKeys.year(year, apiEra, location.params),
+    queryFn: () => fetchYearSunTimes(year, apiEra, location.params),
     staleTime: 1000 * 60 * 60,
   });
 
@@ -94,15 +96,24 @@ export default function SuryakrantiScreen() {
 
   return (
     <AppShell
-      title={pick("सूर्यक्रान्ति", "Sunrise & Sunset")}
+      title={pick("सूर्य क्रान्ति", "Sun Revolution")}
       subtitle={pick(
-        `वि.सं. ${digits(year)} को वर्षभरको सूर्योदय र सूर्यास्त`,
-        `Sunrise and sunset through BS ${year}`,
+        `वार्षिक सूर्योदय–सूर्यास्त · वि.सं. ${digits(year)}`,
+        `Annual sunrise & sunset · B.S. ${year}`,
       )}
       headerRight={<Ionicons name="sunny-outline" size={26} color={colors.secondary} />}
     >
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <BsYearPicker year={year} onYearChange={setYear} />
+      <PatroDateNav
+        mode="year"
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        onPrev={() => setYear(stepPatroBrowseYear(era, year, "prev"))}
+        onNext={() => setYear(stepPatroBrowseYear(era, year, "next"))}
+      />
 
       <View className="overflow-hidden rounded-xl border border-border bg-card">
         <View className="flex-row flex-wrap gap-3 border-b border-border px-4 pb-2.5 pt-3.5">
@@ -246,26 +257,11 @@ export default function SuryakrantiScreen() {
           </Text>
         </View>
         <Text className="text-sm leading-relaxed text-muted-foreground" style={nepaliTextStyle(14)}>
-          <Text style={{ color: AYANA_NORTH }} className="font-semibold">
-            {pick("उत्तरायण", "Uttarayana")}
-          </Text>
           {pick(
-            " भनेको सूर्य उत्तरतर्फ सर्ने अवधि हो — दिन लामो हुँदै जान्छ। ",
-            " is the northward course of the Sun — days grow longer. ",
-          )}
-          <Text style={{ color: AYANA_SOUTH }} className="font-semibold">
-            {pick("दक्षिणायन", "Dakshinayana")}
-          </Text>
-          {pick(
-            " मा सूर्य दक्षिणतर्फ सर्छ र दिन छोटो हुँदै जान्छ। तालिकामा यी सङ्क्रान्ति दिनहरू उ/द चिन्हले जनाइएका छन्।",
-            " turns the Sun southward and days shorten. Those turning days are marked N/S in the grid.",
+            "प्रत्येक दिनको उ वा द सूर्योदयको बेला सूर्य कुन राशिमा छ भन्ने आधारमा तय हुन्छ — वर्षमा दुई पटक सङ्क्रान्तिमा परिवर्तन।",
+            "Each day's N or S mark follows the Sun's sign at sunrise — it changes twice a year at sankranti.",
           )}
         </Text>
-        {locationLabel ? (
-          <Text className="text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
-            {pick("स्थान", "Location")}: {locationLabel}
-          </Text>
-        ) : null}
       </View>
     </AppShell>
   );

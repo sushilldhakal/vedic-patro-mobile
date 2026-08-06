@@ -6,6 +6,7 @@ export const BREAKPOINTS = {
   xs: 400,
   sm: 640,
   md: 768,
+  calendarWide: 992,
   lg: 1024,
   xl: 1280,
 } as const;
@@ -27,6 +28,7 @@ export function useBreakpoint() {
     isPhone: bp === "phone" || bp === "largePhone",
     isTablet: bp === "tablet" || bp === "desktop",
     isCompact: width < BREAKPOINTS.md,
+    isCalendarWide: width >= BREAKPOINTS.calendarWide,
     columns: width >= BREAKPOINTS.lg ? 2 : 1,
     calendarCellSize:
       width >= BREAKPOINTS.lg

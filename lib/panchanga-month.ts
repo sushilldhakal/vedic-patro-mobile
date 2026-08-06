@@ -35,12 +35,14 @@ export function getMonthDayNakshatra(day: CalendarDay, lang: Lang): string | und
   return (lang === "en" ? en : ne) ?? en ?? ne;
 }
 
-/** First udaya lagna rashi at sunrise — shown in panchanga patro cells on web-adjacent layouts. */
-export function getMonthDayUdayaLagna(day: CalendarDay, lang: Lang): string | undefined {
-  const rows = day.panchanga?.udaya_lagna ?? day.panchanga?.lagna_spans;
-  const first = rows?.[0];
-  if (!first) return undefined;
-  const ne = first.rashi_ne ?? first.name_ne;
-  const en = first.rashi ?? first.name_en;
+export function getMonthDayYoga(day: CalendarDay, lang: Lang): string {
+  const ne = day.yoga_ne ?? day.yoga ?? "—";
+  const en = day.yoga ?? day.yoga_ne ?? "—";
+  return (lang === "en" ? en : ne) ?? en ?? ne;
+}
+
+export function getMonthDayKarana(day: CalendarDay, lang: Lang): string {
+  const ne = day.karana_ne ?? day.karana ?? "—";
+  const en = day.karana ?? day.karana_ne ?? "—";
   return (lang === "en" ? en : ne) ?? en ?? ne;
 }

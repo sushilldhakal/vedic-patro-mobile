@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, View } from "react-native"
 import { Text } from "@/components/ui/Text"
 import { useLocalSearchParams } from "expo-router";
@@ -19,6 +19,7 @@ import { formatTimeShort, getSunrise, getSunset } from "@/lib/panchanga-format";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { DayTimeline } from "@/components/panchanga/DayTimeline";
+import { DayCycleToggle, type DayCycleMode } from "@/components/panchanga/DayCycleToggle";
 import { PanchangaWheel } from "@/components/panchanga/PanchangaWheel";
 import { PanchangaAsidePanels } from "@/components/panchanga/PanchangaAsidePanels";
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
@@ -74,6 +75,7 @@ export default function PanchangaScreen() {
   const timezoneForMode = location.params.timezone ?? "Asia/Kathmandu";
   const { clock, setClock } = usePanchangaClock(timezoneForMode);
   const [clockUserAdjusted, setClockUserAdjusted] = useState(false);
+  const [dayCycleMode, setDayCycleMode] = useState<DayCycleMode>("Day-Night");
 
   useEffect(() => {
     if (typeof params.date === "string" && params.date) {
@@ -113,6 +115,21 @@ export default function PanchangaScreen() {
   const locationLabel = displayLocationLabel(location, data?.location?.name);
   const chartAd = data ? chartDateAd(data, adDateStr) : adDateStr;
   const todayAd = todayAdStringInTimezone(new Date(), effectiveTimezone);
+
+  const headerToolbar = useMemo(
+    () => (
+      <View className="flex-row items-center gap-1.5">
+        <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
+        <LocationSelector location={location} onLocationChange={setLocation} />
+      </View>
+    ),
+    [dayCycleMode, location, setLocation],
+  );
+
+  const headerMobileToolbar = useMemo(
+    () => <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />,
+    [dayCycleMode],
+  );
 
   const clockSyncedKeyRef = useRef<string | null>(null);
 
@@ -187,11 +204,12 @@ export default function PanchangaScreen() {
             date={date}
             onDateChange={setDate}
             todayAd={todayAd}
+            adDateStr={adDateStr}
+            wheelData={wheelData}
             clock={clock}
             onClockChange={handleClockChange}
-            toolbar={
-              <LocationSelector location={location} onLocationChange={setLocation} />
-            }
+            toolbar={headerToolbar}
+            mobileToolbar={headerMobileToolbar}
           />
           {ephemeris && data ? <EphemerisModeBanner p={data} clock={clock} /> : null}
           {wheelData || showWheelSkeleton ? (

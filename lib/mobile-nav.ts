@@ -24,6 +24,13 @@ export const FLOATING_NAV_BOTTOM_PADDING = 104;
 /** Standard left/right inset for page scroll content and headers. */
 export const PAGE_HORIZONTAL_PADDING = 15;
 
+/** Home header/aside inset on phone — matches web `max-md` rail (`calc(100% - 2rem)`). */
+export const HOME_PHONE_INSET = 16;
+
+export function homeContentInset(isPhone: boolean): number {
+  return isPhone ? HOME_PHONE_INSET : PAGE_HORIZONTAL_PADDING;
+}
+
 /** Panchanga main + sidebar split — matches web `xl:grid-cols-[1fr_330px]` (1280px). */
 export const PANCHANGA_SIDEBAR_SPLIT = 1280;
 export const PANCHANGA_SIDEBAR_WIDTH = 330;

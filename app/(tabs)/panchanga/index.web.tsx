@@ -19,6 +19,7 @@ import { formatTimeShort, getSunrise, getSunset } from "@/lib/panchanga-format.w
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { DayTimeline, type DayCycleMode } from "@/components/panchanga/DayTimeline";
+import { DayCycleToggle } from "@/components/panchanga/DayCycleToggle";
 import { PanchangaWheel } from "@/components/panchanga/PanchangaWheel";
 import { PanchangaAsidePanels } from "@/components/panchanga/PanchangaAsidePanels";
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
@@ -175,10 +176,18 @@ export default function PanchangaScreen() {
             date={date}
             onDateChange={setDate}
             todayAd={todayAd}
+            adDateStr={adDateStr}
+            wheelData={wheelData}
             clock={clock}
             onClockChange={handleClockChange}
             toolbar={
-              <LocationSelector location={location} onLocationChange={setLocation} />
+              <div className="flex items-center gap-1.5">
+                <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
+                <LocationSelector location={location} onLocationChange={setLocation} />
+              </div>
+            }
+            mobileToolbar={
+              <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
             }
           />
           {ephemeris && data ? <EphemerisModeBanner p={data} clock={clock} /> : null}

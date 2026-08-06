@@ -385,6 +385,21 @@ type SolarCorrection = {
   sign_ne?: string;
 };
 
+/** One day in one era. `year` is always >= 1 — the era carries the sign. */
+export type EraDateSpelling = {
+  era: import("@/lib/patro-era").PatroBrowseEra | string;
+  year: number;
+  month: number;
+  day: number;
+};
+
+/** Backend era-correct rendering of a civil day (vikram + gregorian for the same JD). */
+export type EraDateParts = EraDateSpelling & {
+  jd: number;
+  vikram: EraDateSpelling;
+  gregorian: EraDateSpelling;
+};
+
 export interface PanchangaDay {
   mode?: "ephemeris" | "udaya";
   date_bs?: string;
@@ -450,6 +465,7 @@ export interface PanchangaDay {
   }>;
   is_public_holiday?: boolean;
   bs_date?: { year: number; month: number; day: number; month_name_ne?: string };
+  date_parts?: EraDateParts;
   detail?: {
     tithi?: PanchangaAnga;
     nakshatra?: PanchangaAnga;
@@ -701,7 +717,11 @@ export const panchangaKeys = {
     ["panchanga", "civil", PANCHANGA_CACHE_VERSION, date, locationKey(loc)] as const,
 };
 
-export type MonthBrowseEra = "bs" | "bbs";
+export type MonthBrowseEra = import("@/lib/patro-era").PatroBrowseEra;
+
+function languageForBrowseEra(era: MonthBrowseEra): "en" | "ne" {
+  return era === "ad" || era === "bc" ? "en" : "ne";
+}
 
 export const apiKeys = {
   month: (y: number, m: number, loc?: LocationParams, era: MonthBrowseEra = "bs") =>
@@ -725,8 +745,15 @@ export const fetchMonthCalendar = async (
   options?: { era?: MonthBrowseEra },
 ): Promise<MonthCalendar> => {
   const era = options?.era ?? "bs";
+  const language = languageForBrowseEra(era);
+  const base =
+    era === "ad"
+      ? `/panchanga/ad/${year}/${month}`
+      : era === "bc"
+        ? `/panchanga/bc/${year}/${month}`
+        : `/panchanga/${year}/${month}`;
   const data = await get<MonthCalendar>(
-    appendLocation(withCache(`/panchanga/${year}/${month}?full=true&era=${era}`), location),
+    appendLocation(withCache(`${base}?full=true&era=${era}&language=${language}`), location),
   );
   return {
     ...data,
@@ -1047,6 +1074,7 @@ export interface GrahaVakriResponse {
 }
 
 export interface EclipseEvent {
+  date_jd_date?: string;
   date_ad?: string;
   date_bs?: string;
   type_ne?: string;
@@ -1412,7 +1440,7 @@ export const fetchElementDay = (name: string, dateAd: string, location?: Locatio
 
 export const fetchYearSunTimes = (
   year: number,
-  era: "bs" | "ad" = "bs",
+  era: "bs" | "ad" | "bbs" = "bs",
   location?: LocationParams,
 ) =>
   get<SunYearResponse>(

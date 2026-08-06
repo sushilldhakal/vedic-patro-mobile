@@ -9,6 +9,9 @@ import type { CalendarDay, LocationParams, PanchangaDay, SaitMonthAllResponse } 
 import { useLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ErrorState, LoadingState } from "@/components/ui/States";
+import { panchangaMatchesAside } from "@/lib/panchanga-aside-match";
+import type { PatroBrowseEra } from "@/lib/patro-era";
+import { isGregorianBrowseEra } from "@/lib/patro-era";
 
 const TABS = ["panchanga", "muhurta", "sait"] as const;
 type TabId = (typeof TABS)[number];
@@ -29,6 +32,7 @@ type Props = {
   saitError?: boolean;
   onSaitRetry?: () => void;
   location?: LocationParams;
+  browseEra?: PatroBrowseEra;
 };
 
 export function PanchangaAsidePanel({
@@ -47,6 +51,7 @@ export function PanchangaAsidePanel({
   saitError,
   onSaitRetry,
   location,
+  browseEra = "bs",
 }: Props) {
   const { pick } = useLocale();
   const router = useRouter();
@@ -61,6 +66,10 @@ export function PanchangaAsidePanel({
 
   const isSelectedToday = selectedAd === todayAd;
   const highlightDay = contextDay?.day;
+  const isAdCalendar = isGregorianBrowseEra(browseEra);
+  const activeP = panchangaMatchesAside(p, selectedAd, { year, month, isAdCalendar }, contextDay)
+    ? p
+    : undefined;
 
   return (
     <View className="gap-3">
@@ -76,9 +85,11 @@ export function PanchangaAsidePanel({
       <PanchangaHeroCard
         month={month}
         year={year}
+        browseEra={browseEra}
+        isAdCalendar={isAdCalendar}
         selectedAd={selectedAd}
         todayAd={todayAd}
-        p={p}
+        p={activeP}
         contextDay={contextDay}
       />
 
@@ -118,15 +129,14 @@ export function PanchangaAsidePanel({
             <LoadingState />
           ) : tab === "panchanga" ? (
             <PanchangaVivaranPanel
-              p={p}
+              p={activeP}
               selectedDay={contextDay}
-              bsYear={year}
-              bsMonth={month}
-              loading={loading}
+              selectedAd={selectedAd}
+              loading={loading && !activeP}
             />
           ) : tab === "muhurta" ? (
-            p ? (
-              <MuhurtaAsidePanel p={p} />
+            activeP ? (
+              <MuhurtaAsidePanel p={activeP} />
             ) : (
               <Text className="py-6 text-center text-sm text-muted-foreground">
                 {pick("मुहूर्त विवरण उपलब्ध छैन।", "Muhurta details unavailable.")}

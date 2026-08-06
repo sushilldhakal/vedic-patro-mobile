@@ -7,7 +7,9 @@
  *
  * Frame: right-handed, ecliptic plane = XZ, celestial north = +Y.
  * Sidereal longitude 0° (start of Mesha) points down +X and increases
- * anticlockwise viewed from north — matching how the 2D wheel is drawn.
+ * anticlockwise viewed from north — matching how the 2D wheel is drawn, and
+ * how the sky itself runs. Every camera that shows the belt is therefore kept
+ * north of the ecliptic; from the south side the same ring reads backwards.
  */
 
 import { GRAHA_DETAIL_ORDER, type GrahaKey } from "@/lib/graha-details";

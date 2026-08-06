@@ -201,4 +201,15 @@ export function topicsInCategory(categoryId: string): LearnTopicMeta[] {
   return LEARN_TOPIC_METAS.filter((t) => t.category === categoryId);
 }
 
+export function adjacentTopicMetas(slug: string): {
+  prev: LearnTopicMeta | null;
+  next: LearnTopicMeta | null;
+} {
+  const i = LEARN_TOPIC_METAS.findIndex((t) => t.slug === slug);
+  return {
+    prev: i > 0 ? LEARN_TOPIC_METAS[i - 1]! : null,
+    next: i >= 0 && i < LEARN_TOPIC_METAS.length - 1 ? LEARN_TOPIC_METAS[i + 1]! : null,
+  };
+}
+
 export const LEARN_SLUGS = new Set(LEARN_TOPIC_METAS.map((t) => t.slug));

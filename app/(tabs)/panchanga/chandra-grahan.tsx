@@ -33,7 +33,7 @@ export default function ChandraGrahanScreen() {
           <SimpleEventCard
             key={`${ev.date_ad}-${i}`}
             title={lang === "ne" ? ev.type_ne ?? "" : ev.type_en ?? ""}
-            subtitle={digits(ev.date_bs ?? ev.date_ad ?? "")}
+            subtitle={digits(ev.date_jd_date ?? ev.date_bs ?? ev.date_ad ?? "")}
             body={ev.maximum_time_local_short ? digits(ev.maximum_time_local_short) : undefined}
           />
         ))

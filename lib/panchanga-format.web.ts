@@ -176,19 +176,35 @@ export function formatPakshaShortNe(p: PanchangaDay): string | undefined {
 }
 
 export function formatPatroBelaantar(c?: SolarCorrection): string | undefined {
-  if (!c || c.minutes == null || c.seconds == null) return undefined;
-  const mm = toNepaliDigits(c.minutes);
-  const ss = toNepaliDigits(String(c.seconds).padStart(2, "0"));
-  const prefix = c.sign === "rin" ? "-" : "+";
-  return `${prefix}${mm}:${ss}`;
+  return formatPatroSignedCorrection(c);
 }
 
-/** Patro label देशान्तर — longitude correction from the zone meridian. */
 export function formatPatroDeshaantar(c?: SolarCorrection): string | undefined {
-  if (!c || c.minutes == null || c.seconds == null) return undefined;
-  const mm = toNepaliDigits(c.minutes);
-  const ss = toNepaliDigits(String(c.seconds).padStart(2, "0"));
-  const prefix = c.sign === "rin" ? "-" : "+";
+  return formatPatroSignedCorrection(c);
+}
+
+/** Patro aside ±MM:SS from a solar correction block (धन/ऋण). */
+export function formatPatroSignedCorrection(c?: SolarCorrection): string | undefined {
+  if (!c) return undefined;
+  let minutes = c.minutes;
+  let seconds = c.seconds;
+  const withTotal = c as SolarCorrection & { minutes_total?: number };
+  if ((minutes == null || seconds == null) && withTotal.minutes_total != null) {
+    const abs = Math.abs(withTotal.minutes_total);
+    minutes = Math.floor(abs);
+    seconds = Math.round((abs - minutes) * 60);
+    if (seconds >= 60) {
+      seconds -= 60;
+      minutes = (minutes ?? 0) + 1;
+    }
+  }
+  if (minutes == null || seconds == null) return undefined;
+  const sign =
+    c.sign ??
+    (withTotal.minutes_total != null && withTotal.minutes_total < 0 ? "rin" : "dhan");
+  const mm = toNepaliDigits(minutes);
+  const ss = toNepaliDigits(String(seconds).padStart(2, "0"));
+  const prefix = sign === "rin" ? "-" : "+";
   return `${prefix}${mm}:${ss}`;
 }
 
@@ -245,16 +261,23 @@ type SolarCorrection = {
 export type SolarCorrections = {
   belaantar?: SolarCorrection;
   deshaantar?: SolarCorrection;
+  akshamsha?: SolarCorrection;
   ishtakaal_note_ne?: string;
   sunrise_includes_corrections?: boolean;
 };
 
 export function getSolarCorrections(p: PanchangaDay): SolarCorrections | undefined {
   const detail = getPanchangaDetail(p);
-  return (
-    (detail?.solar_corrections as SolarCorrections | undefined) ??
-    (p as PanchangaDay & { solar_corrections?: SolarCorrections }).solar_corrections
-  );
+  const fromDetail = detail?.solar_corrections as SolarCorrections | undefined;
+  const fromTop = (p as PanchangaDay & { solar_corrections?: SolarCorrections }).solar_corrections;
+  if (!fromDetail && !fromTop) return undefined;
+  return {
+    ...fromTop,
+    ...fromDetail,
+    belaantar: fromDetail?.belaantar ?? fromTop?.belaantar,
+    deshaantar: fromDetail?.deshaantar ?? fromTop?.deshaantar,
+    akshamsha: fromDetail?.akshamsha ?? fromTop?.akshamsha,
+  };
 }
 
 /** Signed minutes — धन (+) / ऋण (−) per Surya Panchanga convention. */
@@ -1236,6 +1259,9 @@ type PlanetDetail = {
   rashi_ne?: string;
   deg_in_rashi?: number;
   dms_in_rashi?: string;
+  retrograde?: boolean;
+  is_retrograde?: boolean;
+  is_combust?: boolean;
   nakshatra?: {
     number?: number;
     name?: string;
@@ -1552,19 +1578,38 @@ export function getPlanetRows(p: PanchangaDay): PlanetRow[] {
     });
 }
 
-export function formatPlanetGocharLine(info: PlanetDetail): string {
+export function formatPlanetGocharParts(
+  info: PlanetDetail,
+  lang?: string,
+): { rashi?: string; degree: string } {
   const cells = planetDegreeCells(info).split("|");
-  const rashiNo = info.rashi;
-  if (rashiNo != null && rashiNo >= 1 && rashiNo <= 12) {
-    return [toNepaliDigits(rashiNo), ...cells].join(":");
-  }
-  return cells.join(":");
+  const degree = cells.join(":");
+  const rashi = formatRashiDisplay(
+    info.rashi_ne,
+    info.rashi_name ?? rashiEnFromNumber(info.rashi),
+    lang,
+  );
+  return { rashi, degree };
+}
+
+export function formatPlanetGocharLine(info: PlanetDetail, lang?: string): string {
+  const { rashi, degree } = formatPlanetGocharParts(info, lang);
+  if (rashi) return `${rashi} ${degree}`;
+  return degree;
 }
 
 export function getPlanetGocharLines(
   p: PanchangaDay,
   lang?: string,
-): { label: string; value: string }[] {
+): {
+  key: string;
+  label: string;
+  rashi?: string;
+  degree: string;
+  value: string;
+  isRetrograde?: boolean;
+  isCombust?: boolean;
+}[] {
   const planets = resolvePlanetsRecord(p);
   if (!planets) return [];
 
@@ -1587,9 +1632,18 @@ export function getPlanetGocharLines(
       const label = pickLocale(lang, ne, en);
       const info = planets[key];
       if (typeof info === "string") {
-        return { label, value: info };
+        return { key, label, degree: info, value: info };
       }
-      return { label, value: formatPlanetGocharLine(info) };
+      const { rashi, degree } = formatPlanetGocharParts(info, lang);
+      return {
+        key,
+        label,
+        rashi,
+        degree,
+        value: rashi ? `${rashi} ${degree}` : degree,
+        isRetrograde: info.is_retrograde ?? info.retrograde ?? false,
+        isCombust: info.is_combust ?? false,
+      };
     });
 }
 

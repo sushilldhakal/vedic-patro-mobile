@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Modal,
   Platform,
   Pressable,
   Text,
@@ -10,6 +9,7 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomSheetModal } from "@/components/ui/BottomSheetModal";
 import { useLocale } from "@/lib/i18n";
 import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
@@ -217,16 +217,13 @@ export function BsMonthYearNav({
         <Ionicons name="chevron-down" size={12} color={colors.mutedForeground} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: isTablet ? "center" : "flex-end",
-          }}
-        >
-          <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)} />
-          <View style={{ ...sheetStyle, backgroundColor: colors.card }}>
+      <BottomSheetModal
+        visible={open}
+        onClose={() => setOpen(false)}
+        variant={isTablet ? "center" : "bottom"}
+        maxHeight={isTablet ? "80%" : undefined}
+        sheetStyle={{ ...sheetStyle, backgroundColor: colors.card, overflow: "hidden" }}
+      >
             <View
               style={{
                 flexDirection: "row",
@@ -291,9 +288,7 @@ export function BsMonthYearNav({
             </View>
 
             <View style={{ height: Math.max(insets.bottom, 8) }} />
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
     </>
   );
 }
@@ -341,23 +336,18 @@ export function BsNativeSelect(props: SelectProps & { className?: string }) {
         <Ionicons name="chevron-down" size={12} color={colors.mutedForeground} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: isTablet ? "center" : "flex-end",
-          }}
-        >
-          <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)} />
-          <View
-            style={{
-              backgroundColor: colors.card,
-              ...(isTablet
-                ? { alignSelf: "center", width: "100%", maxWidth: 360, marginHorizontal: 24, borderRadius: 16 }
-                : { borderTopLeftRadius: 16, borderTopRightRadius: 16 }),
-            }}
-          >
+      <BottomSheetModal
+        visible={open}
+        onClose={() => setOpen(false)}
+        variant={isTablet ? "center" : "bottom"}
+        maxHeight={isTablet ? "80%" : undefined}
+        sheetStyle={{
+          backgroundColor: colors.card,
+          ...(isTablet
+            ? { borderWidth: 1, borderColor: colors.border }
+            : { borderTopLeftRadius: 16, borderTopRightRadius: 16 }),
+        }}
+      >
             <View
               style={{
                 flexDirection: "row",
@@ -403,9 +393,7 @@ export function BsNativeSelect(props: SelectProps & { className?: string }) {
               ))}
             </Picker>
             <View style={{ height: Math.max(insets.bottom, 8) }} />
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
     </>
   );
 }

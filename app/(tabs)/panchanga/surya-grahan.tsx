@@ -38,7 +38,7 @@ function EclipseYearScreen({ kind }: { kind: "solar" | "lunar" }) {
           <SimpleEventCard
             key={`${ev.date_ad}-${i}`}
             title={lang === "ne" ? ev.type_ne ?? ev.date_bs ?? "" : ev.type_en ?? ev.date_ad ?? ""}
-            subtitle={digits(ev.date_bs ?? ev.date_ad ?? "")}
+            subtitle={digits(ev.date_jd_date ?? ev.date_bs ?? ev.date_ad ?? "")}
             body={
               ev.maximum_time_local_short
                 ? `${pick("बढी:", "Max:")} ${digits(ev.maximum_time_local_short)}`

@@ -1,5 +1,4 @@
 import { Circle, G, Path, Svg } from "react-native-svg";
-import { GrahaMoonIcon } from "@/components/icons/GrahaMoonIcon";
 import { useTheme } from "@/lib/theme-context";
 import { elongationFromTithiIndex, moonPhaseLitPath } from "@/lib/moon-phase-svg";
 
@@ -24,7 +23,8 @@ function moonColors(isDark: boolean) {
 }
 
 /**
- * Tithi moon phase glyph for calendar cells — same geometry as web; पूर्णिमा uses {@link GrahaMoonIcon}.
+ * Tithi moon phase glyph for calendar cells — same geometry as web.
+ * पूर्णिमा → full yellow disc; औंसी → full dark disc.
  */
 export function CalendarMoonPhaseIcon({ tithiIndex, size = 16, title }: Props) {
   const { isDark } = useTheme();
@@ -38,13 +38,14 @@ export function CalendarMoonPhaseIcon({ tithiIndex, size = 16, title }: Props) {
       ? moonPhaseLitPath(elongationFromTithiIndex(tithiIndex), R)
       : null;
 
-  if (isPurnima) {
-    return <GrahaMoonIcon width={size} height={size} accessibilityLabel={title} />;
-  }
-
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityLabel={title}>
-      {isAaushi ? (
+      {isPurnima ? (
+        <>
+          <Circle cx={12} cy={12} r={R_FULL} fill={yellowFill} />
+          <Circle cx={12} cy={12} r={R_FULL} fill="none" stroke={yellowStroke} strokeWidth={1} />
+        </>
+      ) : isAaushi ? (
         <>
           <Circle cx={12} cy={12} r={R_FULL} fill={darkFill} />
           <Circle cx={12} cy={12} r={R_FULL} fill="none" stroke={darkStroke} strokeWidth={1} />

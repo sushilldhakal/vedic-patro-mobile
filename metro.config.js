@@ -1,6 +1,13 @@
 const https = require("https");
+const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
+
+/** One Three.js build for the whole bundle (avoids cjs + esm double-load warning). */
+const THREE_ENTRY = path.resolve(
+  __dirname,
+  "node_modules/three/build/three.module.js",
+);
 
 const config = getDefaultConfig(__dirname);
 
@@ -47,4 +54,16 @@ config.server = {
   },
 };
 
-module.exports = withNativeWind(config, { input: "./global.css" });
+const finalConfig = withNativeWind(config, { input: "./global.css" });
+const defaultResolveRequest = finalConfig.resolver.resolveRequest;
+finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === "three") {
+    return { type: "sourceFile", filePath: THREE_ENTRY };
+  }
+  if (defaultResolveRequest) {
+    return defaultResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
+module.exports = finalConfig;

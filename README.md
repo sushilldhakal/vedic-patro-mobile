@@ -12,7 +12,7 @@ React Native (Expo) app for **Vedic Patro** — calendar, panchanga, holidays, a
 - Nepali / English toggle with Devanagari digits
 - **Responsive layout**: phone bottom tabs, tablet/iPad sidebar
 - **Fonts**: Mukta (UI) + Fira Code (dates), matching the web app
-- Learn & ritual pages use an in-app WebView shell for interactive diagrams; data pages use the same API as the web app
+- Learn articles are **native React Native screens** (bilingual prose, in-app links). **Do not** embed vedicpatro.com or other site pages in a WebView for in-app content.
 
 ## Breakpoints
 

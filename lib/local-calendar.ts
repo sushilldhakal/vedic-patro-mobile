@@ -57,6 +57,114 @@ export function mergeEnrichedDays(local: CalendarDay[], enriched: CalendarDay[])
   });
 }
 
+export function buildLocalAdMonthDays(adYear: number, adMonth: number): CalendarDay[] {
+  const daysInMonth = new Date(adYear, adMonth, 0).getDate();
+  const days: CalendarDay[] = [];
+
+  for (let adDay = 1; adDay <= daysInMonth; adDay += 1) {
+    const adDate = new Date(adYear, adMonth - 1, adDay);
+    const bs = adToBS(adDate);
+    const weekdayIdx = adDate.getDay();
+    days.push({
+      day: bs.day,
+      date_ad: formatAdIso(adDate),
+      weekday: WEEKDAYS_NE[weekdayIdx],
+      weekday_en: WEEKDAYS_EN[weekdayIdx],
+      weekday_ne: WEEKDAYS_NE[weekdayIdx],
+      tithi: "",
+      festivals: [],
+    });
+  }
+
+  return days;
+}
+
+export function shiftAdMonth(
+  adYear: number,
+  adMonth: number,
+  delta: number,
+): { year: number; month: number } {
+  const d = new Date(adYear, adMonth - 1 + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+export function getBsMonthsOverlappingAdMonth(
+  adYear: number,
+  adMonth: number,
+): Array<{ year: number; month: number }> {
+  const start = new Date(adYear, adMonth - 1, 1);
+  const end = new Date(adYear, adMonth, 0);
+  const bsStart = adToBS(start);
+  const bsEnd = adToBS(end);
+  const result: Array<{ year: number; month: number }> = [];
+  const seen = new Set<string>();
+
+  let y = bsStart.year;
+  let m = bsStart.month;
+  while (true) {
+    const key = `${y}-${m}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ year: y, month: m });
+    }
+    if (y === bsEnd.year && m === bsEnd.month) break;
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+
+  return result;
+}
+
+export function buildAdCalendarGridDays(
+  adYear: number,
+  adMonth: number,
+  enriched?: {
+    prev?: CalendarDay[];
+    current?: CalendarDay[];
+    next?: CalendarDay[];
+  },
+): CalendarDay[] {
+  const currentLocal = buildLocalAdMonthDays(adYear, adMonth);
+  const byAdCurrent = new Map(enriched?.current?.map((d) => [d.date_ad, d]) ?? []);
+  const current: CalendarDay[] = currentLocal.map((d) => ({
+    ...d,
+    ...byAdCurrent.get(d.date_ad),
+    outsideMonth: false,
+  }));
+
+  const first = current[0];
+  if (!first) return current;
+
+  const startOffset = parseCivilIsoToDate(first.date_ad).getDay();
+  const prevAd = shiftAdMonth(adYear, adMonth, -1);
+  const nextAd = shiftAdMonth(adYear, adMonth, 1);
+
+  const prevLocal = buildLocalAdMonthDays(prevAd.year, prevAd.month);
+  const leading: CalendarDay[] =
+    startOffset > 0
+      ? prevLocal.slice(-startOffset).map((d) => ({ ...d, outsideMonth: true as const }))
+      : [];
+
+  const totalCells = Math.ceil((startOffset + current.length) / 7) * 7;
+  const trailingCount = totalCells - startOffset - current.length;
+  const nextLocal = buildLocalAdMonthDays(nextAd.year, nextAd.month);
+  const trailing: CalendarDay[] = nextLocal.slice(0, trailingCount).map((d) => ({
+    ...d,
+    outsideMonth: true as const,
+  }));
+
+  let grid: CalendarDay[] = [...leading, ...current, ...trailing];
+
+  if (enriched?.prev?.length) grid = mergeEnrichedDays(grid, enriched.prev);
+  if (enriched?.current?.length) grid = mergeEnrichedDays(grid, enriched.current);
+  if (enriched?.next?.length) grid = mergeEnrichedDays(grid, enriched.next);
+
+  return grid;
+}
+
 /** Full month grid with lead/trail days — merges prev/current/next API payloads like web. */
 export function buildCalendarGridDays(
   year: number,

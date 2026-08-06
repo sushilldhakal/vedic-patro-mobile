@@ -3,6 +3,7 @@ import { adToBS, BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import type { AppLanguage } from "@/lib/i18n";
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
+import { formatRashiDisplay } from "@/lib/rashi-i18n";
 
 const NEPALI_DIGITS: Record<string, string> = {
   "0": "०", "1": "१", "2": "२", "3": "३", "4": "४",
@@ -125,6 +126,7 @@ export function formatAngaPatroTransitionHint(
 type SolarCorrection = {
   minutes?: number;
   seconds?: number;
+  minutes_total?: number;
   sign?: "dhan" | "rin";
   sign_ne?: string;
 };
@@ -132,22 +134,37 @@ type SolarCorrection = {
 export type SolarCorrections = {
   belaantar?: SolarCorrection;
   deshaantar?: SolarCorrection;
+  akshamsha?: SolarCorrection;
 };
 
-export function formatPatroBelaantar(c?: SolarCorrection): string | undefined {
-  if (!c || c.minutes == null || c.seconds == null) return undefined;
-  const mm = toNepaliDigits(c.minutes);
-  const ss = toNepaliDigits(String(c.seconds).padStart(2, "0"));
-  const prefix = c.sign === "rin" ? "-" : "+";
+/** Patro aside ±MM:SS from a solar correction block (धन/ऋण). */
+export function formatPatroSignedCorrection(c?: SolarCorrection): string | undefined {
+  if (!c) return undefined;
+  let minutes = c.minutes;
+  let seconds = c.seconds;
+  if ((minutes == null || seconds == null) && c.minutes_total != null) {
+    const abs = Math.abs(c.minutes_total);
+    minutes = Math.floor(abs);
+    seconds = Math.round((abs - minutes) * 60);
+    if (seconds >= 60) {
+      seconds -= 60;
+      minutes = (minutes ?? 0) + 1;
+    }
+  }
+  if (minutes == null || seconds == null) return undefined;
+  const sign = c.sign ?? (c.minutes_total != null && c.minutes_total < 0 ? "rin" : "dhan");
+  const mm = toNepaliDigits(minutes);
+  const ss = toNepaliDigits(String(seconds).padStart(2, "0"));
+  const prefix = sign === "rin" ? "-" : "+";
   return `${prefix}${mm}:${ss}`;
 }
 
+export function formatPatroBelaantar(c?: SolarCorrection): string | undefined {
+  return formatPatroSignedCorrection(c);
+}
+
 export function formatPatroDeshaantar(c?: SolarCorrection): string | undefined {
-  if (!c || c.minutes == null || c.seconds == null) return undefined;
-  const mm = toNepaliDigits(c.minutes);
-  const ss = toNepaliDigits(String(c.seconds).padStart(2, "0"));
-  const prefix = c.sign === "rin" ? "-" : "+";
-  return `${prefix}${mm}:${ss}`;
+  return formatPatroSignedCorrection(c);
 }
 
 export function formatSolarCorrectionDisplay(
@@ -204,6 +221,66 @@ export function getPanchangaDetail(p: PanchangaDay) {
   return p.detail;
 }
 
+const LUNAR_MONTH_NE_TO_EN: Record<string, string> = {
+  चैत्र: "Chaitra",
+  वैशाख: "Vaishakha",
+  ज्येष्ठ: "Jyeshtha",
+  जेष्ठ: "Jyeshtha",
+  आषाढ: "Ashadha",
+  अषाढ: "Ashadha",
+  श्रावण: "Shravana",
+  साउन: "Shravana",
+  भाद्रपद: "Bhadrapada",
+  भाद्र: "Bhadra",
+  भदौ: "Bhadra",
+  आश्विन: "Ashvina",
+  असोज: "Ashvina",
+  कार्तिक: "Kartika",
+  मार्गशीर्ष: "Margashirsha",
+  मार्ग: "Margashirsha",
+  पौष: "Pausha",
+  पुष: "Pausha",
+  माघ: "Magha",
+  फाल्गुन: "Phalguna",
+  फागुन: "Phalguna",
+};
+
+/** Locale-aware paksha label (e.g. "श्रावण शुक्ल पक्ष") from API detail.paksha. */
+export function formatPakshaLabel(
+  p: PanchangaDay | undefined,
+  lang?: string,
+  fallbackNe?: string | null,
+  fallbackEn?: string | null,
+): string | undefined {
+  const detail = p ? getPanchangaDetail(p) : undefined;
+  const paksha = detail?.paksha as { label_en?: string; label_ne?: string } | undefined;
+  const ne =
+    paksha?.label_ne ?? p?.paksha?.label_ne ?? p?.paksha_ne ?? fallbackNe ?? undefined;
+  const enRaw =
+    paksha?.label_en ?? p?.paksha?.label_en ?? fallbackEn ?? undefined;
+
+  if (normalizeLang(lang) !== "en") return ne ?? enRaw;
+
+  if (enRaw && !/[\u0900-\u097F]/.test(enRaw)) {
+    return enRaw.replace(/\b\p{Ll}/gu, (c) => c.toUpperCase());
+  }
+
+  if (!ne) return enRaw;
+  let out = ne;
+  for (const [n, e] of Object.entries(LUNAR_MONTH_NE_TO_EN)) {
+    out = out.replaceAll(n, e);
+  }
+  out = out
+    .replace(/शुक्ल\s*पक्ष/g, "Shukla Paksha")
+    .replace(/कृष्ण\s*पक्ष/g, "Krishna Paksha")
+    .replace(/शुक्ल/g, "Shukla")
+    .replace(/कृष्ण/g, "Krishna")
+    .replace(/पक्ष/g, "Paksha")
+    .replace(/\s+/g, " ")
+    .trim();
+  return out || enRaw;
+}
+
 type RituBlock = { name?: string; name_ne?: string; season?: string };
 
 function getDetailValue<T>(p: PanchangaDay, key: string): T | undefined {
@@ -242,7 +319,16 @@ export function getRituSeason(p?: PanchangaDay | null, lang?: string): string | 
 
 export function getSolarCorrections(p: PanchangaDay): SolarCorrections | undefined {
   const detail = getPanchangaDetail(p);
-  return detail?.solar_corrections ?? p.solar_corrections;
+  const fromDetail = detail?.solar_corrections as SolarCorrections | undefined;
+  const fromTop = p.solar_corrections as SolarCorrections | undefined;
+  if (!fromDetail && !fromTop) return undefined;
+  return {
+    ...fromTop,
+    ...fromDetail,
+    belaantar: fromDetail?.belaantar ?? fromTop?.belaantar,
+    deshaantar: fromDetail?.deshaantar ?? fromTop?.deshaantar,
+    akshamsha: fromDetail?.akshamsha ?? fromTop?.akshamsha,
+  };
 }
 
 export function getSunrise(p: PanchangaDay): string | undefined {
@@ -384,6 +470,9 @@ type PlanetDetail = {
   rashi_ne?: string;
   deg_in_rashi?: number;
   dms_in_rashi?: string;
+  retrograde?: boolean;
+  is_retrograde?: boolean;
+  is_combust?: boolean;
   nakshatra?: {
     number?: number;
     name?: string;
@@ -454,19 +543,38 @@ function resolvePlanetsRecord(
   return fromDetail ?? fromTop;
 }
 
-export function formatPlanetGocharLine(info: PlanetDetail): string {
+export function formatPlanetGocharParts(
+  info: PlanetDetail,
+  lang?: string,
+): { rashi?: string; degree: string } {
   const cells = planetDegreeCells(info).split("|");
-  const rashiNo = info.rashi;
-  if (rashiNo != null && rashiNo >= 1 && rashiNo <= 12) {
-    return [toNepaliDigits(rashiNo), ...cells].join(":");
-  }
-  return cells.join(":");
+  const degree = cells.join(":");
+  const rashi = formatRashiDisplay(
+    info.rashi_ne,
+    info.rashi_name ?? rashiEnFromNumber(info.rashi),
+    lang,
+  );
+  return { rashi, degree };
+}
+
+export function formatPlanetGocharLine(info: PlanetDetail, lang?: string): string {
+  const { rashi, degree } = formatPlanetGocharParts(info, lang);
+  if (rashi) return `${rashi} ${degree}`;
+  return degree;
 }
 
 export function getPlanetGocharLines(
   p: PanchangaDay,
   lang?: string,
-): { label: string; value: string }[] {
+): {
+  key: string;
+  label: string;
+  rashi?: string;
+  degree: string;
+  value: string;
+  isRetrograde?: boolean;
+  isCombust?: boolean;
+}[] {
   const planets = resolvePlanetsRecord(p);
   if (!planets) return [];
 
@@ -481,9 +589,18 @@ export function getPlanetGocharLines(
       const label = pickLocale(lang, ne, en);
       const info = planets[key];
       if (typeof info === "string") {
-        return { label, value: info };
+        return { key, label, degree: info, value: info };
       }
-      return { label, value: formatPlanetGocharLine(info) };
+      const { rashi, degree } = formatPlanetGocharParts(info, lang);
+      return {
+        key,
+        label,
+        rashi,
+        degree,
+        value: rashi ? `${rashi} ${degree}` : degree,
+        isRetrograde: info.is_retrograde ?? info.retrograde ?? false,
+        isCombust: info.is_combust ?? false,
+      };
     });
 }
 

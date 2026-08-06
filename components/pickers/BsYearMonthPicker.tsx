@@ -1,45 +1,27 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { Button } from "@/components/ui/Button";
+import { PatroYearDateNav } from "@/components/patro-date/PatroYearDateNav";
 import { getCurrentBs } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
 
+/** @deprecated Use {@link usePatroYearBrowse} from `@/lib/use-patro-year-browse`. */
+export function useBsYear(initial?: number) {
+  const [year, setYear] = useState(initial ?? getCurrentBs().year);
+  return { year, setYear };
+}
+
+/** @deprecated Use {@link PatroYearDateNav} from `@/components/patro-date`. */
 export function BsYearPicker({
   year,
   onYearChange,
-  min = 2070,
-  max = 2095,
 }: {
   year: number;
   onYearChange: (y: number) => void;
   min?: number;
   max?: number;
 }) {
-  const { digits } = useLocale();
-  return (
-    <View className="mb-4 flex-row items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
-      <Button
-        label="‹"
-        variant="outline"
-        size="sm"
-        onPress={() => onYearChange(Math.max(min, year - 1))}
-        disabled={year <= min}
-      />
-      <Text className="text-lg font-bold text-foreground">{digits(year)} BS</Text>
-      <Button
-        label="›"
-        variant="outline"
-        size="sm"
-        onPress={() => onYearChange(Math.min(max, year + 1))}
-        disabled={year >= max}
-      />
-    </View>
-  );
-}
-
-export function useBsYear(initial?: number) {
-  const [year, setYear] = useState(initial ?? getCurrentBs().year);
-  return { year, setYear };
+  return <PatroYearDateNav year={year} onYearChange={onYearChange} />;
 }
 
 export function BsMonthPicker({

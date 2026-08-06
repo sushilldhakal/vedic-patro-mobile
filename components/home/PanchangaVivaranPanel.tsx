@@ -3,8 +3,7 @@ import { useRouter } from "expo-router";
 import type { CalendarDay, PanchangaDay } from "@/lib/api";
 import {
   buildPanchangaDetailCells,
-  formatPatroBelaantar,
-  formatPatroDeshaantar,
+  formatPatroSignedCorrection,
   getAbhijitMuhurta,
   getPlanetGocharLines,
   getSolarCorrections,
@@ -13,12 +12,12 @@ import {
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 type Props = {
   p?: PanchangaDay;
   selectedDay?: CalendarDay | null;
-  bsYear?: number;
-  bsMonth?: number;
+  selectedAd?: string;
   loading?: boolean;
 };
 
@@ -35,80 +34,114 @@ function VivaranCell({
       className={cn("min-w-0 rounded-lg p-2.5", wide && "col-span-2")}
       style={{ backgroundColor: insetBg }}
     >
-      <Text className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Text>
+      <Text className="text-sm uppercase tracking-widest text-muted-foreground">{label}</Text>
       <Text
         className={cn(
-          "mt-1 text-sm font-semibold leading-snug text-foreground",
+          "mt-1 text-base font-semibold leading-snug text-foreground",
           mono && "font-num text-sm",
         )}
+        style={mono ? nepaliTextStyle(14) : undefined}
       >
         {value ?? "—"}
       </Text>
       {hint ? (
-        <Text className="mt-0.5 text-xs leading-snug text-muted-foreground">{hint}</Text>
+        <Text className="mt-0.5 text-sm leading-snug text-muted-foreground">{hint}</Text>
       ) : null}
     </View>
   );
 }
 
-function AbhijitVivaranBlock({
-  p,
-  bsYear,
-  bsMonth,
+function GocharAsideCard({
+  label,
+  rashi,
+  degree,
+  insetBg,
 }: {
-  p: PanchangaDay;
-  bsYear: number;
-  bsMonth: number;
+  label: string;
+  rashi?: string;
+  degree: string;
+  insetBg: string;
 }) {
-  const { pick } = useLocale();
-  const router = useRouter();
-  const abhijit = getAbhijitMuhurta(p);
-
   return (
-    <View className="mt-2.5 border-t border-border/60 pt-2.5">
-      <View className="mb-2 flex-row items-center justify-between gap-2">
-        <Text className="text-sm font-bold text-secondary">
-          {pick("अभिजित् मुहूर्त", "Abhijit Muhurta")}
-        </Text>
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/panchanga",
-              params: { year: String(bsYear), month: String(bsMonth) },
-            })
-          }
-        >
-          <Text className="text-xs text-secondary">
-            {pick("सबै हेर्नुहोस् →", "View all →")}
-          </Text>
-        </Pressable>
-      </View>
-      {abhijit ? (
-        <View className="flex-row flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <Text className="text-xs text-muted-foreground">
-            {pick("आजको समय", "Today's window")}
-          </Text>
-          <View className="flex-row flex-wrap items-baseline justify-end gap-1.5">
-            <Text className="font-num text-sm font-semibold text-foreground">
-              {abhijit.rangeDisplay}
-            </Text>
-            {abhijit.noonDisplay ? (
-              <Text className="font-num text-sm text-foreground">
-                ({pick("मध्यान्ह", "noon")} {abhijit.noonDisplay})
-              </Text>
-            ) : null}
-          </View>
-        </View>
-      ) : (
-        <Text className="py-5 text-center text-sm text-muted-foreground">
-          {pick("अभिजित् मुहूर्त उपलब्ध छैन।", "Abhijit muhurta unavailable.")}
-        </Text>
-      )}
+    <View
+      className="min-w-[46%] flex-1 gap-0.5 rounded-[5px] p-2.5"
+      style={{ backgroundColor: insetBg, maxWidth: "33%" }}
+    >
+      <Text className="text-sm font-semibold leading-tight text-foreground" style={nepaliTextStyle(14)}>
+        {label}
+        {rashi ? (
+          <>
+            {" "}
+            <Text aria-hidden>→</Text> {rashi}
+          </>
+        ) : null}
+      </Text>
+      <Text className="font-num text-sm font-semibold leading-tight text-foreground" style={nepaliTextStyle(14)}>
+        {degree}
+      </Text>
     </View>
   );
 }
 
-export function PanchangaVivaranPanel({ p, selectedDay, bsYear, bsMonth, loading }: Props) {
+function SolarCorrectionAsideCard({
+  label,
+  value,
+  insetBg,
+}: {
+  label: string;
+  value: string;
+  insetBg: string;
+}) {
+  return (
+    <View className="min-w-0 flex-1 gap-0.5 rounded-[5px] p-2.5" style={{ backgroundColor: insetBg }}>
+      <Text className="text-sm font-semibold leading-tight text-foreground">{label}</Text>
+      <Text className="font-num text-sm font-semibold leading-tight text-foreground" style={nepaliTextStyle(14)}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function AsideFooter({ p, selectedAd }: { p: PanchangaDay; selectedAd?: string }) {
+  const { pick, lang } = useLocale();
+  const router = useRouter();
+  const abhijit = getAbhijitMuhurta(p);
+  const isEn = lang === "en";
+
+  return (
+    <View className="mt-2.5 border-t border-border/60 pt-2.5">
+      {abhijit ? (
+        <Text className="text-sm leading-snug text-foreground">
+          <Text className="font-semibold">{pick("अभिजित् मुहूर्त", "Abhijit Muhurta")} </Text>
+          <Text className="font-num font-semibold" style={nepaliTextStyle(14)}>
+            {abhijit.rangeDisplay}
+            {abhijit.noonDisplay
+              ? isEn
+                ? ` (noon ${abhijit.noonDisplay})`
+                : ` (${pick("मध्यान्ह", "noon")} ${abhijit.noonDisplay})`
+              : ""}
+          </Text>
+        </Text>
+      ) : (
+        <Text className="text-sm text-muted-foreground">
+          {pick("अभिजित् मुहूर्त उपलब्ध छैन।", "Abhijit muhurta unavailable.")}
+        </Text>
+      )}
+      {selectedAd ? (
+        <Pressable
+          onPress={() => router.push({ pathname: "/panchanga", params: { date: selectedAd } })}
+          className="mt-3 items-center rounded-lg border border-border py-2.5"
+        >
+          <Text className="text-sm font-semibold text-foreground">
+            {pick("पञ्चाङ्ग विवरण", "Panchanga detail")}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+export function PanchangaVivaranPanel({ p, selectedDay, selectedAd, loading }: Props) {
   const { pick, lang } = useLocale();
   const colors = useThemeColors();
 
@@ -143,8 +176,22 @@ export function PanchangaVivaranPanel({ p, selectedDay, bsYear, bsMonth, loading
   });
   const planets = getPlanetGocharLines(p, lang);
   const solar = getSolarCorrections(p);
-  const deshaantar = formatPatroDeshaantar(solar?.deshaantar);
-  const belaantar = formatPatroBelaantar(solar?.belaantar);
+  const hasSolar =
+    solar?.deshaantar != null || solar?.akshamsha != null || solar?.belaantar != null;
+  const solarCards = hasSolar
+    ? (
+        [
+          [pick("देशान्तर", "Deshaantar"), solar?.deshaantar] as const,
+          [pick("अक्षांश", "Akshamsha"), solar?.akshamsha] as const,
+          [pick("बेलान्तर", "Belaantar"), solar?.belaantar] as const,
+        ] as const
+      )
+        .filter(([, block]) => block != null)
+        .map(([label, block]) => ({
+          label,
+          value: formatPatroSignedCorrection(block) ?? "—",
+        }))
+    : [];
 
   return (
     <View>
@@ -156,65 +203,46 @@ export function PanchangaVivaranPanel({ p, selectedDay, bsYear, bsMonth, loading
         ))}
       </View>
 
-      {planets.length > 0 || deshaantar || belaantar ? (
+      {planets.length > 0 ? (
         <View className="mt-2.5 border-t border-border/60 pt-2.5">
           <Text className="mb-1.5 text-sm font-bold text-foreground">
             {pick("ग्रह गोचर", "Planet positions")}
           </Text>
-          {planets.length > 0 ? (
-            <View className="flex-row flex-wrap gap-1.5">
-              {planets.map(({ label, value }) => (
-                <View
-                  key={label}
-                  className="min-w-[30%] flex-1 flex-row items-center justify-between gap-1 rounded px-1.5 py-1"
-                  style={{ backgroundColor: colors.surfaceInset }}
-                >
-                  <Text className="shrink-0 text-xs font-semibold leading-tight text-foreground">
-                    {label}
-                  </Text>
-                  <Text className="min-w-0 flex-1 text-right font-num text-xs font-semibold text-foreground">
-                    {value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          {deshaantar || belaantar ? (
-            <View className="mt-1.5 flex-row flex-wrap gap-1.5 border-t border-border/60 pt-2">
-              {deshaantar ? (
-                <View
-                  className="min-w-[46%] flex-1 flex-row items-center justify-between gap-1 rounded px-1.5 py-1"
-                  style={{ backgroundColor: colors.surfaceInset }}
-                >
-                  <Text className="shrink-0 text-xs font-semibold leading-tight text-foreground">
-                    {pick("देशान्तर", "Deshaantar")}
-                  </Text>
-                  <Text className="font-num text-xs font-semibold text-foreground">
-                    {deshaantar}
-                  </Text>
-                </View>
-              ) : null}
-              {belaantar ? (
-                <View
-                  className="min-w-[46%] flex-1 flex-row items-center justify-between gap-1 rounded px-1.5 py-1"
-                  style={{ backgroundColor: colors.surfaceInset }}
-                >
-                  <Text className="shrink-0 text-xs font-semibold leading-tight text-foreground">
-                    {pick("बेलान्तर", "Belaantar")}
-                  </Text>
-                  <Text className="font-num text-xs font-semibold text-foreground">
-                    {belaantar}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
+          <View className="flex-row flex-wrap gap-1.5">
+            {planets.map(({ key, label, rashi, degree }) => (
+              <GocharAsideCard
+                key={key}
+                label={label}
+                rashi={rashi}
+                degree={degree}
+                insetBg={colors.surfaceInset}
+              />
+            ))}
+          </View>
         </View>
       ) : null}
 
-      {bsYear != null && bsMonth != null ? (
-        <AbhijitVivaranBlock p={p} bsYear={bsYear} bsMonth={bsMonth} />
+      {solarCards.length > 0 ? (
+        <View
+          className={cn(
+            "border-t border-border/60 pt-2",
+            planets.length > 0 ? "mt-1.5" : "mt-2.5",
+          )}
+        >
+          <View className="flex-row gap-1.5">
+            {solarCards.map(({ label, value }) => (
+              <SolarCorrectionAsideCard
+                key={label}
+                label={label}
+                value={value}
+                insetBg={colors.surfaceInset}
+              />
+            ))}
+          </View>
+        </View>
       ) : null}
+
+      <AsideFooter p={p} selectedAd={selectedAd} />
     </View>
   );
 }

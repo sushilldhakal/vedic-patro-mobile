@@ -1,5 +1,6 @@
-import { Modal, Pressable, ScrollView, View } from "react-native"
+import { Pressable, ScrollView, View } from "react-native"
 import { Text } from "@/components/ui/Text"
+import { BottomSheetModal } from "@/components/ui/BottomSheetModal"
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import {
   bsMonthsForWheel,
@@ -138,15 +139,20 @@ export function WheelPanel({ sel, open, num, onClose }: WheelPanelProps) {
   }
 
   return (
-    <Modal visible={open && !!sel} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-end bg-black/50" onPress={onClose}>
-        <View
-          className="max-h-[70%] overflow-hidden rounded-t-2xl border border-white/10 bg-[#0b1416]"
-          onStartShouldSetResponder={() => true}
-        >
-          {body}
-        </View>
-      </Pressable>
-    </Modal>
+    <BottomSheetModal
+      visible={open && !!sel}
+      onClose={onClose}
+      maxHeight="70%"
+      sheetStyle={{
+        overflow: "hidden",
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.1)",
+        backgroundColor: "#0b1416",
+      }}
+    >
+      <View onStartShouldSetResponder={() => true}>{body}</View>
+    </BottomSheetModal>
   );
 }

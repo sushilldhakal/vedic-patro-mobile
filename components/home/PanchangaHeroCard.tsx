@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocale } from "@/lib/i18n";
 import {
@@ -6,75 +6,126 @@ import {
   BS_MONTHS_NE,
   adToBS,
   bsMonthLabel,
-  formatDigits,
 } from "@/lib/bs-calendar";
 import type { CalendarDay, PanchangaDay } from "@/lib/api";
 import { MONTH_HERO_COLORS } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
-import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { formatPakshaLabel, getPanchangaDetail } from "@/lib/panchanga-format";
+import {
+  formatGregorianFromDateParts,
+  formatPatroCivilDayLabel,
+  patroHeadlineDigits,
+} from "@/lib/patro-headline-subtitle";
+import type { PatroBrowseEra } from "@/lib/patro-era";
+import { patroEraShortLabel } from "@/components/patro-date/patro-era-labels";
+import { resolveSamvatsaraForPatroYear, type SamvatsaraPayload } from "@/lib/samvatsara";
+import { parseCivilIsoToDate } from "@/lib/patro-day";
 
 type Props = {
   month: number;
   year: number;
+  browseEra?: PatroBrowseEra;
+  isAdCalendar?: boolean;
   selectedAd: string;
   todayAd: string;
   p?: PanchangaDay;
   contextDay?: CalendarDay | null;
 };
 
-function fmtAdFull(iso: string, lang: "ne" | "en"): string {
-  const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString(lang === "en" ? "en-US" : "ne-NP", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-export function PanchangaHeroCard({ month, year, selectedAd, todayAd, p, contextDay }: Props) {
+export function PanchangaHeroCard({
+  month,
+  year,
+  browseEra = "bs",
+  isAdCalendar = false,
+  selectedAd,
+  todayAd,
+  p,
+  contextDay,
+}: Props) {
   const colors = useThemeColors();
   const { pick, digits, lang } = useLocale();
   const isToday = selectedAd === todayAd;
+  const digitFn = patroHeadlineDigits(lang);
 
   const weekdayNe = pick(
     p?.weekday ?? contextDay?.weekday_ne ?? contextDay?.weekday ?? "",
     contextDay?.weekday_en ?? p?.weekday ?? contextDay?.weekday ?? "",
   );
 
+  const detail = p ? getPanchangaDetail(p) : undefined;
+  const tithiBlock = (detail?.tithi ?? p?.tithi) as { name?: string; name_ne?: string } | undefined;
   const tithi = pick(
-    p?.tithi?.name_ne ?? p?.tithi?.name ?? contextDay?.tithi_ne ?? contextDay?.tithi ?? "",
-    p?.tithi?.name ?? p?.tithi?.name_ne ?? contextDay?.tithi ?? contextDay?.tithi_ne ?? "",
+    tithiBlock?.name_ne ?? p?.tithi?.name_ne ?? p?.tithi?.name ?? contextDay?.tithi_ne ?? contextDay?.tithi ?? "",
+    tithiBlock?.name ?? p?.tithi?.name ?? p?.tithi?.name_ne ?? contextDay?.tithi ?? contextDay?.tithi_ne ?? "",
   );
 
-  const paksha = pick(p?.paksha?.label_ne ?? "", p?.paksha?.label_en ?? "");
-
-  const topFest = pick(
-    p?.festivals?.[0]?.name_ne ?? p?.festivals?.[0]?.name ?? contextDay?.festivals[0] ?? "",
-    p?.festivals?.[0]?.name ?? p?.festivals?.[0]?.name_ne ?? contextDay?.festivals[0] ?? "",
+  const paksha = formatPakshaLabel(
+    p,
+    lang,
+    contextDay?.paksha_ne ?? contextDay?.panchanga?.paksha_ne,
+    contextDay?.paksha ?? contextDay?.panchanga?.paksha,
   );
-  const topFestPublic = p?.festivals?.[0]?.is_public_holiday ?? false;
+
+  const topFest = p?.festivals?.[0];
+  const topFestName = pick(
+    topFest?.name_ne ?? topFest?.name_en ?? topFest?.name ?? contextDay?.festivals[0] ?? "",
+    topFest?.name_en ?? topFest?.name ?? topFest?.name_ne ?? contextDay?.festivals[0] ?? "",
+  );
+  const topFestPublic = topFest?.is_public_holiday ?? false;
 
   const displayHeroDate = (() => {
+    const v = p?.date_parts?.vikram;
+    if (v?.month && v.day) {
+      const monthName = pick(BS_MONTHS_NE[v.month - 1], BS_MONTH_NAMES[v.month - 1]);
+      return `${monthName} ${digits(v.day)}`;
+    }
+    if (p?.display?.bs_ne) return digits(p.display.bs_ne);
     if (p?.bs_date && typeof p.bs_date === "object") {
       const monthName = pick(BS_MONTHS_NE[p.bs_date.month - 1], BS_MONTH_NAMES[p.bs_date.month - 1]);
       return `${monthName} ${digits(p.bs_date.day)}`;
     }
-    if (contextDay) {
+    if (contextDay && !isAdCalendar) {
       return `${bsMonthLabel(month, lang)} ${digits(contextDay.day)}`;
     }
+    if (contextDay) {
+      const bs = adToBS(parseCivilIsoToDate(contextDay.date_ad));
+      const monthName = pick(BS_MONTHS_NE[bs.month - 1], BS_MONTH_NAMES[bs.month - 1]);
+      return `${monthName} ${digits(bs.day)}`;
+    }
+    if (p?.date_bs) return digits(p.date_bs);
     const fallback = adToBS(new Date(`${selectedAd}T12:00:00`));
     return `${bsMonthLabel(fallback.month, lang)} ${digits(fallback.day)}`;
   })();
 
-  const bsYearLabel =
-    p?.bs_date && typeof p.bs_date === "object"
-      ? digits(p.bs_date.year)
-      : digits(year);
+  const patroYearForLabel =
+    p?.date_parts?.vikram?.year ??
+    (p?.bs_date && typeof p.bs_date === "object" ? p.bs_date.year : year);
+  const patroEraForLabel =
+    (p?.date_parts?.vikram?.era as PatroBrowseEra | undefined) ??
+    (p?.bs_date && typeof p.bs_date === "object" && p.bs_date.year < 0 ? "bbs" : browseEra);
+  const vikramEraLabel = patroEraShortLabel(patroEraForLabel, pick);
+  const samvatsaraInfo = resolveSamvatsaraForPatroYear(
+    patroEraForLabel,
+    patroYearForLabel,
+    p?.samvatsara as SamvatsaraPayload | undefined,
+  );
+  const samvatsaraLabel = samvatsaraInfo ? pick(samvatsaraInfo.name_ne, samvatsaraInfo.name_en) : "";
 
-  const samvatsara = pick(p?.samvatsara?.name_ne ?? "", p?.samvatsara?.name_en ?? "");
+  const adDisplay = (() => {
+    const g = p?.date_parts?.gregorian;
+    if (g?.year && g.month && g.day) {
+      return formatGregorianFromDateParts(g, lang, digitFn);
+    }
+    if (lang === "en" && p?.display?.gregorian_en) return p.display.gregorian_en;
+    if (p?.date_ad) return formatPatroCivilDayLabel(p.date_ad, lang, digitFn);
+    return formatPatroCivilDayLabel(selectedAd, lang, digitFn);
+  })();
 
-  const base = MONTH_HERO_COLORS[month] ?? colors.secondary;
+  const heroMonth =
+    p?.date_parts?.vikram?.month ??
+    (p?.bs_date && typeof p.bs_date === "object" ? p.bs_date.month : month);
+  const base = MONTH_HERO_COLORS[heroMonth] ?? colors.secondary;
 
   return (
     <View className="overflow-hidden rounded-xl shadow-lg">
@@ -95,19 +146,21 @@ export function PanchangaHeroCard({ month, year, selectedAd, todayAd, p, context
               </Text>
               <Text className="mt-0.5 text-sm text-white/90">
                 {weekdayNe}
-                {`, ${pick("वि.सं.", "BS")} ${bsYearLabel}`}
-              {samvatsara ? (
-                <Text className="text-white/75">{` · ${samvatsara}`}</Text>
-              ) : null}
+                {`, ${vikramEraLabel} ${digits(patroYearForLabel)}`}
+                {samvatsaraLabel ? (
+                  <Text className="text-white/75">{` · ${samvatsaraLabel}`}</Text>
+                ) : null}
               </Text>
-              <Text className="mt-1.5 text-xs text-white/70">{fmtAdFull(selectedAd, lang)}</Text>
+              <Text className="mt-1.5 text-xs text-white/70">{adDisplay}</Text>
             </View>
 
-            {(paksha || tithi || topFest) ? (
+            {(paksha || tithi || topFestName) ? (
               <View className="mt-0.5 max-w-[42%] shrink-0 items-end gap-1.5">
                 {paksha ? <HeroPill label={paksha} /> : null}
                 {tithi ? <HeroPill label={tithi} /> : null}
-                {topFest ? <HeroPill label={topFest} kind={topFestPublic ? "public" : "festival"} /> : null}
+                {topFestName ? (
+                  <HeroPill label={topFestName} kind={topFestPublic ? "public" : "festival"} />
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -141,7 +194,7 @@ function HeroPill({ label, kind }: { label: string; kind?: "public" | "festival"
       <Text
         style={{ color: text, ...nepaliTextStyle(14) }}
         className="text-sm font-semibold"
-        numberOfLines={1}
+        numberOfLines={2}
       >
         {label}
       </Text>

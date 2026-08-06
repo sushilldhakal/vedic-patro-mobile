@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { Text } from "@/components/ui/Text";
+import { BottomSheetModal } from "@/components/ui/BottomSheetModal";
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { Profile } from "@/lib/auth/client";
 import { useLocale } from "@/lib/i18n";
@@ -152,58 +153,21 @@ export function SaitProfilePicker({
         </Pressable>
       </View>
 
-      <Modal
+      <BottomSheetModal
         visible={sheetOpen}
-        transparent
-        animationType={isTablet ? "fade" : "slide"}
-        onRequestClose={() => setSheetOpen(false)}
+        onClose={() => setSheetOpen(false)}
+        variant={isTablet ? "center" : "bottom"}
+        maxHeight="70%"
+        sheetStyle={{
+          backgroundColor: colors.card,
+          paddingBottom: Math.max(insets.bottom, 12),
+          ...(isTablet
+            ? { borderWidth: 1, borderColor: colors.border }
+            : { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, borderColor: colors.border }),
+        }}
       >
-        {isTablet ? (
-          <Pressable
-            onPress={() => setSheetOpen(false)}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-              paddingHorizontal: 24,
-              backgroundColor: "rgba(0,0,0,0.45)",
-            }}
-          >
-            <View
-              style={{
-                width: "100%",
-                maxWidth: 360,
-                maxHeight: "80%",
-                borderRadius: 16,
-                overflow: "hidden",
-                backgroundColor: colors.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              {sheet}
-            </View>
-          </Pressable>
-        ) : (
-          <>
-            <Pressable
-              className="flex-1"
-              style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-              onPress={() => setSheetOpen(false)}
-            />
-            <View
-              style={{
-                backgroundColor: colors.card,
-                paddingBottom: Math.max(insets.bottom, 12),
-                maxHeight: "70%",
-              }}
-              className="rounded-t-2xl border-t border-border"
-            >
-              {sheet}
-            </View>
-          </>
-        )}
-      </Modal>
+        {sheet}
+      </BottomSheetModal>
     </>
   );
 }
