@@ -547,7 +547,7 @@ export function AakashGocharSky({
           </Text>
         </View>
 
-        <View className="absolute right-3 gap-1.5" style={{ top: overlayTop }}>
+        <View className="absolute right-3 gap-2.5" style={{ top: overlayTop }}>
           <RoundButton label="+" onPress={() => zoomBy(0.7)} />
           <RoundButton label="−" onPress={() => zoomBy(1.4)} />
           <RoundButton
@@ -1038,15 +1038,23 @@ function IconButton({
   );
 }
 
+/**
+ * Zoom and fullscreen, sitting on top of the sky. Double the old 32pt: against a
+ * star field a small dark disc reads as scenery, and on a tablet the scene is
+ * now tall enough that 32pt vanished into it entirely.
+ */
 function RoundButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      className="h-8 w-8 items-center justify-center rounded-full bg-black/45 active:opacity-70"
+      className="h-16 w-16 items-center justify-center rounded-full bg-black/45 active:opacity-70"
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Text className="text-base font-bold" style={{ color: LABEL_COLOR.hud }}>
+      <Text
+        className="font-bold"
+        style={{ color: LABEL_COLOR.hud, fontSize: 32, lineHeight: 38 }}
+      >
         {label}
       </Text>
     </Pressable>

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { View } from "react-native";
 import { Text } from "@/components/ui/Text";
-import { Card } from "@/components/ui/Card";
 import { KundaliBirthPanchangaCard } from "@/components/kundali/KundaliBirthPanchangaCard";
 import { DashaSystemPanel } from "@/components/kundali/DashaSystemPanel";
 import { DivisionalChartCompare } from "@/components/kundali/DivisionalChartCompare";
@@ -17,7 +16,9 @@ import {
   YogaList,
 } from "@/components/kundali/KundaliSections";
 import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
-import type { KundaliDetailResponse } from "@/lib/api";
+import { KundaliReport } from "@/components/kundali/KundaliReport";
+import type { KundaliDetailResponse, LocationParams } from "@/lib/api";
+import type { InstantQuery } from "@/lib/instant-query";
 import type { AyanamshaMode } from "@/lib/ayanamsha";
 import type { KundaliSectionId } from "@/lib/kundali/kundali-section-nav";
 import { useLocale } from "@/lib/i18n";
@@ -29,9 +30,20 @@ type Props = {
   section: KundaliSectionId;
   ayanamshaMode: AyanamshaMode;
   timeZone?: string;
+  birthMoment?: InstantQuery | null;
+  birthLocation?: LocationParams;
+  reportDisabled?: boolean;
 };
 
-export function KundaliDetailView({ detail, section, ayanamshaMode, timeZone }: Props) {
+export function KundaliDetailView({
+  detail,
+  section,
+  ayanamshaMode,
+  timeZone,
+  birthMoment,
+  birthLocation,
+  reportDisabled,
+}: Props) {
   const { pick } = useLocale();
   const d1Rows = detail.vargaCharts.entries["1"] ?? [];
   const show = (id: KundaliSectionId) => section === id;
@@ -169,18 +181,13 @@ export function KundaliDetailView({ detail, section, ayanamshaMode, timeZone }: 
         </KundaliSection>
       ) : null}
 
-      {show("kundali-report") ? (
-        <Card>
-          <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(15)}>
-            {pick("कुण्डली विश्लेषण", "Chart analysis")}
-          </Text>
-          <Text className="mt-2 text-sm leading-relaxed text-muted-foreground" style={nepaliTextStyle(14)}>
-            {pick(
-              "विस्तृत AI विश्लेषण रिपोर्ट हाल web (dhakal-patro) मा उपलब्ध छ। मोबाइलमा चाँडै थपिनेछ।",
-              "The full AI analysis report is available on the web app today; mobile support is coming soon.",
-            )}
-          </Text>
-        </Card>
+      {show("kundali-report") && birthMoment ? (
+        <KundaliReport
+          moment={birthMoment}
+          location={birthLocation}
+          ayanamsha={ayanamshaMode}
+          disabled={reportDisabled}
+        />
       ) : null}
     </View>
   );

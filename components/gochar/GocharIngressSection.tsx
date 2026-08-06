@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
 import { Text } from "@/components/ui/Text";
@@ -19,7 +19,12 @@ import type { GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { colorWithAlpha } from "@/lib/theme";
+import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
+
+/** ~15 calendar-day rows visible; additional events scroll inside the panel. */
+const INGRESS_VISIBLE_DAY_ROWS = 15;
+const INGRESS_EVENT_ROW_HEIGHT = 54;
 
 const FILTERS: { id: IngressFilter; ne: string; en: string }[] = [
   { id: "all", ne: "सबै", en: "All" },
@@ -46,14 +51,20 @@ export function GocharIngressSection({
 }) {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
+  const { height: windowHeight } = useBreakpoint();
   const [filter, setFilter] = useState<IngressFilter>("all");
+
+  const listMaxHeight = Math.min(
+    INGRESS_VISIBLE_DAY_ROWS * INGRESS_EVENT_ROW_HEIGHT,
+    Math.round(windowHeight * 0.52),
+  );
 
   const counts = useMemo(() => countIngressByFilter(events), [events]);
   const visible = useMemo(() => filterIngressEvents(events, filter), [events, filter]);
   const showMonthNav = Boolean(browseMonthLabel && onPrevMonth && onNextMonth);
 
   return (
-    <View className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
+    <View className="w-full min-w-0 overflow-hidden rounded-xl border border-border bg-card">
       <View className="gap-2 border-b border-border px-3 py-2.5">
         <View className="flex-row items-start justify-between gap-2">
           <View className="min-w-0 flex-1">
@@ -115,7 +126,12 @@ export function GocharIngressSection({
         })}
       </View>
 
-      <View className="px-1 py-1">
+      <ScrollView
+        style={{ maxHeight: listMaxHeight }}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+        contentContainerStyle={{ paddingVertical: 4 }}
+      >
         {loading ? (
           <Text className="px-2 py-6 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
             {pick("लोड हुँदै…", "Loading…")}
@@ -134,6 +150,7 @@ export function GocharIngressSection({
               <View
                 key={`${ev.graha}-${ev.entry_time_utc ?? i}-${ev.level}`}
                 className="flex-row items-center gap-2.5 border-b border-border px-2 py-2"
+                style={{ minHeight: INGRESS_EVENT_ROW_HEIGHT }}
               >
                 <View className="w-11 shrink-0 overflow-hidden rounded-lg border border-border">
                   <View className="bg-secondary px-1 py-0.5">
@@ -174,7 +191,7 @@ export function GocharIngressSection({
             );
           })
         )}
-      </View>
+      </ScrollView>
     </View>
   );
 }

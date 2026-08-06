@@ -7,6 +7,12 @@ import {
   GrahaBanner,
   GrahaDescription,
 } from "@/components/graha/GrahaPageParts";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import {
+  GrahaInline,
+  NakshatraInline,
+  RashiInline,
+} from "@/components/kundali/KundaliGlyphLabels";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { Text } from "@/components/ui/Text";
 import {
@@ -17,13 +23,14 @@ import {
   type TableColumn,
 } from "@/components/ui/DataTable";
 import { fetchGrahaSthiti, grahaDetailKeys, type GrahaSthitiRow } from "@/lib/api";
+import type { GrahaKey } from "@/lib/graha-details";
 import {
+  grahaKeyFromLordNe,
   grahaSthitiLord,
-  grahaSthitiNakshatra,
   grahaSthitiName,
   grahaSthitiRekhamsha,
   grahaSthitiShara,
-  grahaSthitiSubLord,
+  siderealRashiNumber,
 } from "@/lib/graha-sthiti-display";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -32,10 +39,10 @@ import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 
 const COLUMNS: TableColumn[] = [
-  { key: "graha", ne: "ग्रह", en: "Graha", width: 132 },
-  { key: "longitude", ne: "रेखांश", en: "Longitude", width: 176 },
-  { key: "nakshatra_pada", ne: "नक्षत्र / पद", en: "Nakshatra / Pada", width: 148 },
-  { key: "lord_sublord", ne: "स्वामी / उप स्वामी", en: "Lord / Sub-lord", width: 158 },
+  { key: "graha", ne: "ग्रह", en: "Graha", width: 148 },
+  { key: "longitude", ne: "रेखांश", en: "Longitude", width: 192 },
+  { key: "nakshatra_pada", ne: "नक्षत्र / पद", en: "Nakshatra / Pada", width: 168 },
+  { key: "lord_sublord", ne: "स्वामी / उप स्वामी", en: "Lord / Sub-lord", width: 168 },
   { key: "full_degree", ne: "पूर्ण डिग्री", en: "Full degree", width: 104 },
   { key: "latitude", ne: "अक्षांश / शर", en: "Latitude", width: 158 },
   { key: "speed", ne: "गति °/दिन", en: "Speed °/day", width: 104 },
@@ -49,16 +56,42 @@ function signed(value: number | undefined, digits: (v: number | string) => strin
   return `${s}${digits(Math.abs(value).toFixed(2))}`;
 }
 
+function LordInline({ ne, lang }: { ne: string; lang: "ne" | "en" }) {
+  const key = grahaKeyFromLordNe(ne);
+  const stub = { nakshatra_lord_ne: ne, sub_lord_ne: ne } as GrahaSthitiRow;
+  const label = lang === "en" ? grahaSthitiLord(stub, lang) : ne;
+  if (key) {
+    return <GrahaInline grahaKey={key} label={label} size={16} textSize={12} />;
+  }
+  return (
+    <Text className="text-sm text-foreground" style={nepaliTextStyle(12)}>
+      {label}
+    </Text>
+  );
+}
+
 function GrahaRow({ row, index }: { row: GrahaSthitiRow; index: number }) {
   const { lang, digits } = useLocale();
   const colors = useThemeColors();
   const isLagna = row.graha === "lagna";
+  const grahaKey = isLagna ? null : (row.graha as GrahaKey);
+  const rashiNum = siderealRashiNumber(row.full_degree);
+  const norm = ((row.full_degree % 360) + 360) % 360;
+  const nakIndex = Math.min(26, Math.floor(norm / (360 / 27)));
+  const rekhaText =
+    lang === "en" ? grahaSthitiRekhamsha(row, lang) : digits(grahaSthitiRekhamsha(row, lang));
+  const sharaText =
+    lang === "en" ? grahaSthitiShara(row, lang) : digits(grahaSthitiShara(row, lang));
 
   return (
     <TableRow rowIndex={index} highlight={isLagna}>
       <TableCell width={COLUMNS[0].width}>
-        <View className="flex-row items-center gap-1">
-          <Text className="text-xs text-muted-foreground">{row.symbol}</Text>
+        <View className="flex-row items-center gap-1.5">
+          {grahaKey ? (
+            <GrahaPlanetIcon graha={grahaKey} size={20} />
+          ) : (
+            <Text className="text-xs text-muted-foreground">{row.symbol}</Text>
+          )}
           <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(13)}>
             {grahaSthitiName(row, lang)}
           </Text>
@@ -71,25 +104,32 @@ function GrahaRow({ row, index }: { row: GrahaSthitiRow; index: number }) {
         </View>
       </TableCell>
       <TableCell width={COLUMNS[1].width}>
-        <Text className="font-num text-sm text-foreground">{digits(grahaSthitiRekhamsha(row, lang))}</Text>
+        <View className="gap-1">
+          <RashiInline rashiNum={rashiNum} lang={lang} nameNe={row.rashi_ne} size={16} textSize={12} />
+          <Text className="font-num text-xs text-muted-foreground">{rekhaText}</Text>
+        </View>
       </TableCell>
       <TableCell width={COLUMNS[2].width}>
-        <Text className="text-sm text-foreground" style={nepaliTextStyle(13)}>
-          {grahaSthitiNakshatra(row, lang)}
-          <Text className="text-muted-foreground"> · {digits(row.pada)}</Text>
-        </Text>
+        <NakshatraInline
+          index={nakIndex}
+          lang={lang}
+          pada={row.pada}
+          digits={digits}
+          size={16}
+          textSize={12}
+        />
       </TableCell>
       <TableCell width={COLUMNS[3].width}>
-        <Text className="text-sm text-foreground" style={nepaliTextStyle(13)}>
-          {grahaSthitiLord(row, lang)}
-          <Text className="text-muted-foreground"> / {grahaSthitiSubLord(row, lang)}</Text>
-        </Text>
+        <View className="gap-1">
+          {row.nakshatra_lord_ne ? <LordInline ne={row.nakshatra_lord_ne} lang={lang} /> : null}
+          {row.sub_lord_ne ? <LordInline ne={row.sub_lord_ne} lang={lang} /> : null}
+        </View>
       </TableCell>
       <TableCell width={COLUMNS[4].width}>
         <Text className="font-num text-sm text-foreground">{digits(row.full_degree.toFixed(2))}</Text>
       </TableCell>
       <TableCell width={COLUMNS[5].width}>
-        <Text className="font-num text-sm text-foreground">{digits(grahaSthitiShara(row, lang))}</Text>
+        <Text className="font-num text-sm text-foreground">{sharaText}</Text>
       </TableCell>
       <TableCell width={COLUMNS[6].width}>
         <Text

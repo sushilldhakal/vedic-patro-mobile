@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { AakashGocharSky } from "@/components/sky3d/AakashGocharSky";
@@ -10,9 +11,27 @@ import { Text } from "@/components/ui/Text";
 import { fetchGochar, gocharKeys } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { useBreakpoint } from "@/lib/responsive";
 import { KATHMANDU, type Observer } from "@/lib/sky3d/horizon";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
+
+/** Roughly what the date chrome above the scene occupies. */
+const DATE_NAV_HEIGHT = 132;
+const SCENE_MIN_HEIGHT = 380;
+/** Phones keep the scene inside a scrollable page rather than filling it. */
+const PHONE_SCENE_HEIGHT = 460;
+
+/**
+ * A fixed height left half an iPad empty. Tablets get whatever the viewport has
+ * left under the date chrome; phones keep the old size, where a taller scene
+ * would just push the notes below it out of reach.
+ */
+function sceneHeightFor(screenH: number, safeAreaTop: number, isTablet: boolean): number {
+  const available = screenH - safeAreaTop - DATE_NAV_HEIGHT - 24;
+  const target = isTablet ? available : Math.min(available, PHONE_SCENE_HEIGHT);
+  return Math.max(SCENE_MIN_HEIGHT, Math.round(target));
+}
 
 /**
  * 3D Aakash Gochar — the live sky in three dimensions, seen from the Earth.
@@ -23,11 +42,18 @@ import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
  */
 export default function AakashGocharScreen() {
   const { pick } = useLocale();
+  const { height: screenH, isTablet } = useBreakpoint();
+  const insets = useSafeAreaInsets();
   const { location, setLocation } = usePanchangaLocation();
   const tz = resolveTimeZone(undefined, location.params.timezone);
   const todayAd = todayAdStringInTimezone(new Date(), tz);
   const [date, setDate] = useState(() => new Date(`${todayAd}T12:00:00`));
   const [clock, setClock] = useState(() => defaultClockForTimezone(tz));
+
+  const sceneHeight = useMemo(
+    () => sceneHeightFor(screenH, insets.top, isTablet),
+    [screenH, insets.top, isTablet],
+  );
 
   const dateAd = useMemo(() => {
     const y = date.getFullYear();
@@ -95,7 +121,7 @@ export default function AakashGocharScreen() {
           todayAd={todayAd}
           observer={observer}
           timeZone={tz}
-          height={460}
+          height={sceneHeight}
         />
       )}
 

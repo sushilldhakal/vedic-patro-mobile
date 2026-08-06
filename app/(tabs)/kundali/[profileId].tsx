@@ -233,6 +233,9 @@ export default function KundaliDetailScreen() {
           section={section}
           ayanamshaMode={ayanamshaMode}
           timeZone={profile?.timezone}
+          birthMoment={moment}
+          birthLocation={chart?.location.params}
+          reportDisabled={false}
         />
       </View>
     );

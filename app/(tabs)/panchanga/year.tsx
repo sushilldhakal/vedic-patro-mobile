@@ -19,6 +19,7 @@ import {
   BS_MONTHS_NE,
   BS_MONTH_NAMES,
   getBSMonthLength,
+  shiftBsMonth,
 } from "@/lib/bs-calendar";
 import { formatTimeShort, getSunrise } from "@/lib/panchanga-format";
 import { useLocale } from "@/lib/i18n";
@@ -26,6 +27,7 @@ import { nepaliTextStyle } from "@/lib/nepali-text";
 import {
   buildYearWheelDays,
   sliceWheelWindow,
+  wheelWindowAtLimit,
   wheelWindowBounds,
   yearWheelIndexOfAdDate,
 } from "@/lib/panchanga-year-wheel";
@@ -35,7 +37,11 @@ import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 
 /** Slowest tick; the scrub's speed multiplier divides into it. */
 const PLAY_BASE_MS = 900;
-const MAX_PLAY_SPEED = 8;
+const MAX_PLAY_SPEED = 32;
+/** Days from an edge at which the next stretch is requested. */
+const EXTEND_MARGIN = 7;
+/** Window half-width cap — past this the window slides rather than grows. */
+const MAX_MONTHS_EACH = 3;
 
 function toAdStr(d: Date): string {
   const y = d.getFullYear();
@@ -47,6 +53,13 @@ function toAdStr(d: Date): string {
 function parseAdStr(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
+/** Move the window's centre a whole BS month, keeping the day of the month. */
+function shiftAnchorMonths(centre: Date, delta: number): Date {
+  const bs = adToBS(centre);
+  const next = shiftBsMonth(bs.year, bs.month, delta);
+  return bsToAD(next.year, next.month, Math.min(bs.day, getBSMonthLength(next.year, next.month)));
 }
 
 /**
@@ -76,10 +89,21 @@ export default function PanchangaYearScreen() {
   const [clockUserAdjusted, setClockUserAdjusted] = useState(false);
   const clockSyncedKeyRef = useRef<string | null>(null);
 
-  const [dayIndex, setDayIndex] = useState(1);
+  /* The needle's position is a date, not an index: growing the window backwards
+     prepends days and would shift every index out from under it. */
+  const [dayAd, setDayAd] = useState(() => toAdStr(new Date()));
   const [play, setPlay] = useState<{ dir: -1 | 0 | 1; speed: number }>({ dir: 0, speed: 1 });
 
-  const bounds = useMemo(() => wheelWindowBounds(anchor), [anchor]);
+  /* How far the window has grown past its opening two months. Playback pushes
+     whichever edge it is running into; picking a date resets both. */
+  const [monthsBack, setMonthsBack] = useState(1);
+  const [monthsFwd, setMonthsFwd] = useState(1);
+
+  const bounds = useMemo(
+    () => wheelWindowBounds(anchor, monthsBack, monthsFwd),
+    [anchor, monthsBack, monthsFwd],
+  );
+  const atLimit = useMemo(() => wheelWindowAtLimit(bounds), [bounds]);
 
   /* Days still come from the bulk year payload — ~5 KB a day against the month
      endpoint's ~55 KB — and get sliced down to the window. A window straddling
@@ -90,7 +114,8 @@ export default function PanchangaYearScreen() {
       queryFn: () => fetchYearWheelCalendar(y, location.params),
       enabled: ready,
       staleTime: Number.POSITIVE_INFINITY,
-      gcTime: 1000 * 60 * 60,
+      // Years the sliding window has left go inactive; release them fairly soon.
+      gcTime: 1000 * 60 * 10,
       placeholderData: keepPreviousData,
     })),
   });
@@ -110,16 +135,11 @@ export default function PanchangaYearScreen() {
   }, [yearsStamp, bounds]);
   const total = days.length;
 
-  const landedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!total) return;
-    const key = `${bounds.startAd}|${bounds.endAd}`;
-    if (landedRef.current === key) return;
-    landedRef.current = key;
-    setDayIndex(yearWheelIndexOfAdDate(days, toAdStr(anchor)) ?? 1);
-  }, [anchor, bounds, days, total]);
-
-  const clamped = total ? Math.min(Math.max(1, dayIndex), total) : 1;
+  /* No landing effect: `dayAd` starts on today, which the opening window is
+     centred on, and only a date the user picks moves it. That is what lets the
+     window grow and slide underneath without tugging the needle. */
+  const foundIndex = yearWheelIndexOfAdDate(days, dayAd);
+  const clamped = foundIndex ?? 1;
   const current = days[clamped - 1];
   const wheelData = current?.p;
 
@@ -132,18 +152,57 @@ export default function PanchangaYearScreen() {
 
   useEffect(() => {
     if (play.dir === 0 || !total) return;
-    const tick = Math.max(70, Math.round(PLAY_BASE_MS / play.speed));
+    /* 900/32 = 28ms, so the floor has to come down with the top speed or 16×
+       and 32× would both land on the old 70ms clamp and look identical. 33ms is
+       one frame at 30fps — past that the wheel cannot redraw in time anyway. */
+    const tick = Math.max(33, Math.round(PLAY_BASE_MS / play.speed));
     const id = setInterval(() => {
-      setDayIndex((d) => {
-        const cur = Math.min(Math.max(1, d), total);
-        if (play.dir === 1) return cur >= total ? 1 : cur + 1;
-        return cur <= 1 ? total : cur - 1;
+      setDayAd((ad) => {
+        const i = days.findIndex((d) => d.dateAd === ad);
+        const next = (i < 0 ? 0 : i) + play.dir;
+        /* Sitting still at the edge is the pause while the next stretch loads —
+           the growth effect below has already asked for it. */
+        return days[next]?.dateAd ?? ad;
       });
     }, tick);
     return () => clearInterval(id);
-  }, [play, total]);
+  }, [play, total, days]);
+
+  /* Run the window out ahead of playback so there is always more to play into.
+     It grows to MAX_MONTHS_EACH either side and then slides — the centre moves
+     a month at a time instead. Growing without bound would pin every BS year it
+     ever crossed in memory, and each one is a couple of MB parsed. Sliding keeps
+     playback endless with two years live at most. */
+  useEffect(() => {
+    if (play.dir === 0 || !total || windowFetching) return;
+
+    if (play.dir === 1 && total - clamped <= EXTEND_MARGIN && !atLimit.end) {
+      if (monthsFwd < MAX_MONTHS_EACH) setMonthsFwd((m) => m + 1);
+      else setAnchor((a) => shiftAnchorMonths(a, 1));
+    }
+    if (play.dir === -1 && clamped <= EXTEND_MARGIN && !atLimit.start) {
+      if (monthsBack < MAX_MONTHS_EACH) setMonthsBack((m) => m + 1);
+      else setAnchor((a) => shiftAnchorMonths(a, -1));
+    }
+  }, [play.dir, clamped, total, windowFetching, atLimit, monthsBack, monthsFwd]);
 
   const pausePlay = useCallback(() => setPlay({ dir: 0, speed: 1 }), []);
+
+  /* The web dock still hands back a 1-based index; translate it to the date the
+     rest of the page runs on. */
+  const jumpToIndex = useCallback(
+    (i: number) => {
+      const row = days[Math.min(Math.max(1, Math.round(i)), days.length) - 1];
+      if (!row) return;
+      scrubbingRef.current = true;
+      setDayAd(row.dateAd);
+      setDate(parseAdStr(row.dateAd));
+      requestAnimationFrame(() => {
+        scrubbingRef.current = false;
+      });
+    },
+    [days],
+  );
 
   const stepForward = useCallback(() => {
     setPlay((p) =>
@@ -164,12 +223,14 @@ export default function PanchangaYearScreen() {
     (d: Date) => {
       pausePlay();
       scrubbingRef.current = false;
+      setClockUserAdjusted(false);
       setDate(d);
       setAnchor(d);
-      const idx = yearWheelIndexOfAdDate(days, toAdStr(d));
-      if (idx != null) setDayIndex(idx);
+      setDayAd(toAdStr(d));
+      setMonthsBack(1);
+      setMonthsFwd(1);
     },
-    [days, pausePlay],
+    [pausePlay],
   );
 
   const handleClockChange = useCallback(
@@ -180,9 +241,10 @@ export default function PanchangaYearScreen() {
     [setClock],
   );
 
-  useEffect(() => {
-    setClockUserAdjusted(false);
-  }, [adDateStr]);
+  /* Deliberately not reset per day: playback changes the date every tick, and a
+     time you set in the picker should ride along with it instead of snapping
+     back to each day's sunrise. Picking a new date clears it (see
+     handleDateChange). */
 
   useEffect(() => {
     const syncKey = `${adDateStr}|${locationCacheKey(location.params)}`;
@@ -293,23 +355,11 @@ export default function PanchangaYearScreen() {
             onPause: pausePlay,
             onDayChange: (d) => {
               pausePlay();
-              scrubbingRef.current = true;
-              setDayIndex(d);
-              const row = days[d - 1];
-              if (row?.dateAd) setDate(parseAdStr(row.dateAd));
-              requestAnimationFrame(() => {
-                scrubbingRef.current = false;
-              });
+              jumpToIndex(d);
             },
             onJumpDay: (d) => {
               pausePlay();
-              scrubbingRef.current = true;
-              setDayIndex(d);
-              const row = days[d - 1];
-              if (row?.dateAd) setDate(parseAdStr(row.dateAd));
-              requestAnimationFrame(() => {
-                scrubbingRef.current = false;
-              });
+              jumpToIndex(d);
             },
             onScrubStart: () => {
               pausePlay();

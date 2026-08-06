@@ -112,6 +112,36 @@ export const KUNDALI_I18N = {
   vimshopaka_bala: ["विंशोपक बल", "Vimshopaka Bala"],
   nav_shanti_vidhi: ["शान्ति विधि", "Shanti Vidhi"],
   nav_analysis: ["ज्योतिष विश्लेषण", "Astrological Analysis"],
+  report_title: ["ज्योतिष विश्लेषण", "Astrological Analysis"],
+  report_intro: [
+    "तपाईंको जन्म मिति, समय र स्थानबाट स्वतः तयार पारिएको सरल, सन्तुलित विश्लेषण — स्वभाव, करियर, सम्बन्ध, स्वास्थ्य, समय र योग। हरेक खण्डमा कति भरपर्दो छ भन्ने देखाइन्छ।",
+    "A balanced reading built automatically from birth date, time and place — nature, career, relationships, health, timing and yogas. Each section shows how dependable it is.",
+  ],
+  report_regenerate: ["पुन: बनाउनुहोस्", "Regenerate"],
+  report_streaming_progress: ["{{total}} मध्ये {{done}} लेखिँदै…", "Writing {{done}}/{{total}}…"],
+  report_streaming_reading: ["कुण्डली पढिँदै…", "Reading the chart…"],
+  report_confidence_label: ["कति भरपर्दो:", "Confidence:"],
+  report_confidence_strong: ["बलियो", "Strong"],
+  report_confidence_moderate: ["मध्यम", "Moderate"],
+  report_confidence_mixed: ["मिश्रित / सशर्त", "Mixed / conditional"],
+  report_confidence_tentative: ["अनिश्चित", "Tentative"],
+  report_factors_based: ["{{count}} कुरामा आधारित", "Based on {{count}} factors"],
+  report_idle_hint: [
+    "व्यक्तित्व, करियर, सम्बन्ध, स्वास्थ्य, दशा-समय र योग — प्रत्येक अन्तर्दृष्टि विश्वास स्तरसहित।",
+    "Personality, career, relationships, health, dasha timing and yogas — each insight with a confidence level.",
+  ],
+  report_loaded_from_cache: [
+    "सुरक्षित विवरणबाट लोड — जन्म मिति, समय र स्थान उही छ।",
+    "Loaded from saved report — birth date, time and place unchanged.",
+  ],
+  report_error_generic: ["विवरण बनाउन सकिएन।", "Could not generate the report."],
+  report_meta_lagna: ["लग्न", "Lagna"],
+  report_meta_nakshatra: ["नक्षत्र", "Nakshatra"],
+  report_meta_sun: ["सूर्य", "Sun"],
+  report_meta_mahadasha: ["महादशा", "Mahadasha"],
+  report_meta_moon_sign: ["चन्द्र राशि", "Moon sign"],
+  report_meta_pada: ["चरण {{pada}}", "pada {{pada}}"],
+  report_meta_antar_ends: ["अन्तर समाप्त {{date}}", "antar ends {{date}}"],
 } as const;
 
 export type KundaliI18nKey = keyof typeof KUNDALI_I18N;
@@ -119,6 +149,26 @@ export type KundaliI18nKey = keyof typeof KUNDALI_I18N;
 export function kundaliLabel(key: KundaliI18nKey, lang: "ne" | "en"): string {
   const pair = KUNDALI_I18N[key];
   return lang === "en" ? pair[1] : pair[0];
+}
+
+export function kundaliLabelVars(
+  key: KundaliI18nKey,
+  lang: "ne" | "en",
+  vars: Record<string, string | number>,
+): string {
+  let s = kundaliLabel(key, lang);
+  for (const [k, v] of Object.entries(vars)) {
+    s = s.replace(new RegExp(`\\{\\{${k}\\}\\}`, "g"), String(v));
+  }
+  return s;
+}
+
+export function bilingualKundali(
+  lang: "ne" | "en",
+  ne: string,
+  en: string,
+): string {
+  return lang === "en" ? en : ne;
 }
 
 export function formatChoghadiyaAtBirth(

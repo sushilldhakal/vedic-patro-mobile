@@ -16,34 +16,35 @@ export default function TabsLayout() {
   const tabBarHeight = floatingNavTabBarHeight(isTablet, insets.bottom);
 
   return (
-    <View
-      className={cn("flex-1 bg-background", resolvedTheme === "dark" && "dark")}
-      style={{ flex: 1 }}
-    >
-      <AppHeader />
-      <View style={{ flex: 1 }}>
-        <Tabs
-          screenLayout={({ children }) => (
-            <PanchangaTabsShell>{children}</PanchangaTabsShell>
-          )}
-          tabBar={() => <FloatingNavBar />}
-          screenOptions={{
-            headerShown: false,
-            sceneStyle: { backgroundColor: "transparent", flex: 1 },
-            tabBarStyle: {
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: tabBarHeight,
-              backgroundColor: "transparent",
-              borderTopWidth: 0,
-              elevation: 0,
-              shadowOpacity: 0,
-            },
-          }}
-        />
-      </View>
-    </View>
+    <Tabs
+      layout={({ children }) => (
+        <View
+          className={cn("flex-1 bg-background", resolvedTheme === "dark" && "dark")}
+          style={{ flex: 1 }}
+        >
+          <AppHeader />
+          <View className="min-h-0 flex-1">{children}</View>
+        </View>
+      )}
+      screenLayout={({ children }) => (
+        <PanchangaTabsShell>{children}</PanchangaTabsShell>
+      )}
+      tabBar={() => <FloatingNavBar />}
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: "transparent", flex: 1 },
+        tabBarStyle: {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: tabBarHeight,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+      }}
+    />
   );
 }

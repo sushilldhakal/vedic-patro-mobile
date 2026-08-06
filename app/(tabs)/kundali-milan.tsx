@@ -39,7 +39,10 @@ export default function KundaliMilanScreen() {
   const girlQuery = useMemo(() => milanPersonQuery(girlProfile), [girlProfile]);
 
   const milanQuery = useQuery({
-    queryKey: milanKeys.match(boyQuery!, girlQuery!, undefined, lang),
+    queryKey:
+      boyQuery && girlQuery
+        ? milanKeys.match(boyQuery, girlQuery, undefined, lang)
+        : ["kundali", "milan", "idle", lang],
     queryFn: () => fetchKundaliMilan(boyQuery!, girlQuery!, { lang }),
     enabled: Boolean(boyQuery && girlQuery),
     staleTime: 1000 * 60 * 10,

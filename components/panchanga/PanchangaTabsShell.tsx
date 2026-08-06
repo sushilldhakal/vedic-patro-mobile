@@ -1,11 +1,16 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { usePathname } from "expo-router";
-import { normalizeMobilePathname, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
+import {
+  floatingNavBottomPadding,
+  normalizeMobilePathname,
+  PAGE_HORIZONTAL_PADDING,
+} from "@/lib/mobile-nav";
 import {
   routeUsesOwnPanchangaSplitShell,
   shouldShowPanchangaSidebar,
 } from "@/lib/panchanga-shell-paths";
+import { useBreakpoint } from "@/lib/responsive";
 import { PanchangaSidebarNav } from "./PanchangaSidebarNav";
 import { PANCHANGA_SIDEBAR_RAIL_WIDTH, useShowPanchangaSidebar } from "./PanchangaSplitShell";
 import { useThemeColors } from "@/lib/theme-context";
@@ -14,10 +19,35 @@ import { useThemeColors } from "@/lib/theme-context";
 const SHELL_SIDEBAR_GAP = 24;
 
 const PanchangaTabsShellContext = createContext(false);
+const PanchangaTabsShellScrollContext = createContext(false);
 
 /** True when the active tab route uses the shared panchanga shell inset (web `PageShell` in-shell). */
 export function useInPanchangaTabsShell() {
   return useContext(PanchangaTabsShellContext);
+}
+
+/** True when this layout owns the main vertical scroll (screens should not nest another page ScrollView). */
+export function usePanchangaTabsShellScrollHost() {
+  return useContext(PanchangaTabsShellScrollContext);
+}
+
+function ShellMainScroll({
+  children,
+  contentContainerStyle,
+}: {
+  children: ReactNode;
+  contentContainerStyle?: object;
+}) {
+  return (
+    <ScrollView
+      className="min-h-0 min-w-0 flex-1 bg-background"
+      contentContainerStyle={contentContainerStyle}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+  );
 }
 
 function isPanchangaShellRoute(pathname: string): boolean {
@@ -33,14 +63,18 @@ function isPanchangaShellRoute(pathname: string): boolean {
 export function PanchangaTabsShell({ children }: { children: ReactNode }) {
   const pathname = normalizeMobilePathname(usePathname());
   const colors = useThemeColors();
+  const { isTablet } = useBreakpoint();
   const wideEnough = useShowPanchangaSidebar();
   const shellRoute = isPanchangaShellRoute(pathname);
   const showRail = shellRoute && wideEnough;
+  const scrollBottom = floatingNavBottomPadding(isTablet);
 
   if (!shellRoute) {
     return (
       <PanchangaTabsShellContext.Provider value={false}>
-        <View className="min-h-0 flex-1">{children}</View>
+        <PanchangaTabsShellScrollContext.Provider value={false}>
+          <View className="min-h-0 flex-1">{children}</View>
+        </PanchangaTabsShellScrollContext.Provider>
       </PanchangaTabsShellContext.Provider>
     );
   }
@@ -48,45 +82,52 @@ export function PanchangaTabsShell({ children }: { children: ReactNode }) {
   if (!showRail) {
     return (
       <PanchangaTabsShellContext.Provider value={true}>
-        <View
-          className="min-h-0 flex-1 bg-background"
-          style={{
-            paddingHorizontal: PAGE_HORIZONTAL_PADDING,
-            paddingTop: 12,
-          }}
-        >
-          {children}
-        </View>
+        <PanchangaTabsShellScrollContext.Provider value={true}>
+          <ShellMainScroll
+            contentContainerStyle={{
+              paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+              paddingTop: 12,
+              paddingBottom: scrollBottom,
+            }}
+          >
+            {children}
+          </ShellMainScroll>
+        </PanchangaTabsShellScrollContext.Provider>
       </PanchangaTabsShellContext.Provider>
     );
   }
 
   return (
     <PanchangaTabsShellContext.Provider value={true}>
-      <View
-        className="min-h-0 flex-1 bg-background"
-        style={{
-          paddingHorizontal: PAGE_HORIZONTAL_PADDING,
-          paddingTop: 16,
-        }}
-      >
-        <View className="min-h-0 flex-1 flex-row" style={{ gap: SHELL_SIDEBAR_GAP }}>
-          <View
-            style={{
-              width: PANCHANGA_SIDEBAR_RAIL_WIDTH,
-              paddingBottom: 12,
-              borderRightWidth: 1,
-              borderRightColor: colors.border,
-              backgroundColor: colors.background,
-            }}
-          >
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-              <PanchangaSidebarNav className="w-full border-0" />
-            </ScrollView>
+      <PanchangaTabsShellScrollContext.Provider value={true}>
+        <View
+          className="min-h-0 flex-1 bg-background"
+          style={{
+            paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+            paddingTop: 16,
+          }}
+        >
+          <View className="min-h-0 flex-1 flex-row" style={{ gap: SHELL_SIDEBAR_GAP }}>
+            <View
+              className="min-h-0"
+              style={{
+                width: PANCHANGA_SIDEBAR_RAIL_WIDTH,
+                paddingBottom: 12,
+                borderRightWidth: 1,
+                borderRightColor: colors.border,
+                backgroundColor: colors.background,
+              }}
+            >
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+                <PanchangaSidebarNav className="w-full border-0" />
+              </ScrollView>
+            </View>
+            <ShellMainScroll contentContainerStyle={{ paddingBottom: scrollBottom }}>
+              {children}
+            </ShellMainScroll>
           </View>
-          <View className="min-h-0 min-w-0 flex-1">{children}</View>
         </View>
-      </View>
+      </PanchangaTabsShellScrollContext.Provider>
     </PanchangaTabsShellContext.Provider>
   );
 }

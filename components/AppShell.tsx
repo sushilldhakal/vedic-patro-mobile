@@ -1,5 +1,5 @@
 import { ScrollView, Text, View } from "react-native";
-import { useInPanchangaTabsShell } from "@/components/panchanga/PanchangaTabsShell";
+import { useInPanchangaTabsShell, usePanchangaTabsShellScrollHost } from "@/components/panchanga/PanchangaTabsShell";
 import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
@@ -23,6 +23,7 @@ export function AppShell({
 }) {
   const { isTablet } = useBreakpoint();
   const inShell = useInPanchangaTabsShell();
+  const shellScrollHost = usePanchangaTabsShellScrollHost();
   const pagePadH = inShell ? 0 : PAGE_HORIZONTAL_PADDING;
   const pagePadTop = inShell ? 0 : 16;
   const header = showHeader ? (
@@ -47,12 +48,14 @@ export function AppShell({
     </View>
   ) : null;
 
-  const body = (
-    <>
-      {header}
-      {children}
-    </>
-  );
+  if (shellScrollHost) {
+    return (
+      <View className="min-h-0 w-full">
+        {header}
+        {children}
+      </View>
+    );
+  }
 
   if (!scroll) {
     return (
@@ -80,6 +83,7 @@ export function AppShell({
         paddingTop: pagePadTop,
       }}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       {header}
       {children}

@@ -3,6 +3,27 @@ import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { getRashiName } from "@/lib/rashi-i18n";
 import { NAK_LORD_EN } from "@/lib/wheel-locale";
 
+export function siderealRashiNumber(fullDegree: number): number {
+  const lon = ((fullDegree % 360) + 360) % 360;
+  return Math.floor(lon / 30) + 1;
+}
+
+export function grahaKeyFromLordNe(ne: string): GrahaKey | null {
+  const trimmed = ne.trim();
+  if (!trimmed) return null;
+  for (const key of Object.keys(GRAHA_NAME) as GrahaKey[]) {
+    if (GRAHA_NAME[key].ne === trimmed) return key;
+  }
+  for (const [neLord, enLord] of Object.entries(NAK_LORD_EN)) {
+    if (neLord === trimmed) {
+      for (const key of Object.keys(GRAHA_NAME) as GrahaKey[]) {
+        if (GRAHA_NAME[key].en === enLord) return key;
+      }
+    }
+  }
+  return null;
+}
+
 function dmsParts(deg: number): { deg: number; minute: number; sec: number } {
   const d = deg % 30;
   const whole = Math.floor(d);

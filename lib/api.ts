@@ -1128,18 +1128,31 @@ export interface GrahaVakriResponse {
 }
 
 export interface EclipseEvent {
-  date_jd_date?: string;
-  date_ad?: string;
-  date_bs?: string;
+  kind?: "solar" | "lunar";
+  type?: string;
   type_ne?: string;
   type_en?: string;
+  max_utc?: string;
+  max_local?: string;
+  date_jd_date?: string;
+  date_ad?: string;
+  date_bs?: string | null;
+  visible?: boolean;
+  begin_local?: string | null;
+  end_local?: string | null;
+  penumbral_begin_local?: string | null;
+  penumbral_end_local?: string | null;
+  /** @deprecated use max_local */
   maximum_time_local_short?: string;
+  /** @deprecated use visible boolean */
   visible_ne?: string;
   visible_en?: string;
 }
 
 export interface EclipseYearResponse {
   bs_year?: number;
+  kind?: "solar" | "lunar";
+  gregorian_range?: { start: string; end: string };
   events: EclipseEvent[];
 }
 
@@ -2135,3 +2148,143 @@ export const fetchKundaliMilan = (
   if (options?.lang) params.set("lang", options.lang);
   return get<KundaliMilanResponse>(`/kundali/milan?${params.toString()}`);
 };
+
+// ─── Kundali interpretation report (streamed, deterministic) ──────────────────
+
+export type ReportConfidence = "strong" | "moderate" | "mixed" | "tentative";
+
+export interface ReportItem {
+  label: string;
+  confidence: ReportConfidence;
+  factors?: string[];
+  text: string;
+  polarity?: "benefic" | "mixed" | "caution";
+}
+
+export interface ReportSection {
+  kind: "section";
+  index: number;
+  total: number;
+  id: string;
+  title_en: string;
+  title_ne: string;
+  body: string[];
+  confidence?: ReportConfidence;
+  factors?: string[];
+  items?: ReportItem[];
+  optional?: boolean;
+}
+
+export interface ReportRashiRef {
+  sign: number;
+  name_en: string;
+  name_ne: string;
+}
+
+export interface ReportMeta {
+  kind: "meta";
+  lagna: ReportRashiRef;
+  moon_sign: ReportRashiRef;
+  sun_sign: ReportRashiRef;
+  nakshatra?: {
+    name_en: string;
+    name_ne: string;
+    pada: number;
+    lord_en: string;
+  };
+  mahadasha: {
+    lord: string;
+    lord_en: string;
+    lord_ne: string;
+    ends?: string;
+    antardasha?: string;
+    antardasha_en?: string;
+    antardasha_ne?: string;
+    antardasha_ends?: string;
+    window?: [string, string];
+  } | null;
+  yoga_count: number;
+  generated_at: string;
+  method: string;
+  disclaimer: string;
+}
+
+export interface ReportHeader {
+  kind: "header";
+  ayanamsha: string;
+  location: Record<string, unknown>;
+  birth_instant: string;
+}
+
+export type ReportRecord =
+  | ReportHeader
+  | ReportMeta
+  | ReportSection
+  | { kind: "done"; total: number };
+
+function parseNdjsonLines(text: string, onRecord: (record: ReportRecord) => void) {
+  const lines = text.split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line) onRecord(JSON.parse(line) as ReportRecord);
+  }
+}
+
+async function consumeNdjsonResponse(
+  res: Response,
+  onRecord: (record: ReportRecord) => void,
+): Promise<void> {
+  if (res.body && typeof res.body.getReader === "function") {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const flush = (chunk: string, final = false) => {
+      buffer += chunk;
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (line) onRecord(JSON.parse(line) as ReportRecord);
+      }
+      if (final && buffer.trim()) {
+        onRecord(JSON.parse(buffer.trim()) as ReportRecord);
+        buffer = "";
+      }
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      flush(decoder.decode(value, { stream: true }));
+    }
+    flush(decoder.decode(), true);
+    return;
+  }
+  parseNdjsonLines(await res.text(), onRecord);
+}
+
+/** Stream kundali report NDJSON — same contract as web `streamKundaliReport`. */
+export async function streamKundaliReport(
+  moment: InstantQuery,
+  location: LocationParams | undefined,
+  options: { ayanamsha?: string; lang?: string; force?: boolean } | undefined,
+  onRecord: (record: ReportRecord) => void,
+  signal?: AbortSignal,
+): Promise<{ fromCache: boolean }> {
+  const params = appendInstantParams(new URLSearchParams(), moment);
+  if (options?.ayanamsha) params.set("ayanamsha", options.ayanamsha);
+  if (options?.lang) params.set("lang", options.lang);
+  if (options?.force) params.set("force", "true");
+  const path = appendLocation(`/kundali/report?${params.toString()}`, location);
+
+  const res = await fetch(`${DATA_BASE}${path}`, {
+    signal,
+    headers: { Accept: "application/x-ndjson" },
+  });
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${path}`);
+  }
+
+  const fromCache = res.headers.get("X-Report-Cache") === "hit";
+  await consumeNdjsonResponse(res, onRecord);
+  return { fromCache };
+}

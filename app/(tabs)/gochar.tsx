@@ -102,20 +102,24 @@ export default function GocharScreen() {
             onSelectPlanet={setSelectedPlanet}
           />
 
-          <View className={width >= 1024 ? "flex-row gap-6" : "gap-6"}>
-            <GocharIngressSection
-              events={ingressQ.data?.events ?? []}
-              refDateAd={dateAd}
-              loading={ingressQ.isLoading && !ingressQ.data}
-              browseMonthLabel={monthLabel}
-              onPrevMonth={() => stepIngressMonth(-1)}
-              onNextMonth={() => stepIngressMonth(1)}
-            />
-            <GocharPlanetDeepDive
-              gochar={gochar}
-              selected={selectedPlanet}
-              onSelect={setSelectedPlanet}
-            />
+          <View className={width >= 1024 ? "flex-row items-start gap-6" : "gap-6"}>
+            <View className={width >= 1024 ? "min-w-0 flex-1" : "w-full"}>
+              <GocharIngressSection
+                events={ingressQ.data?.events ?? []}
+                refDateAd={dateAd}
+                loading={ingressQ.isLoading && !ingressQ.data}
+                browseMonthLabel={monthLabel}
+                onPrevMonth={() => stepIngressMonth(-1)}
+                onNextMonth={() => stepIngressMonth(1)}
+              />
+            </View>
+            <View className={width >= 1024 ? "min-w-0 flex-1" : "w-full"}>
+              <GocharPlanetDeepDive
+                gochar={gochar}
+                selected={selectedPlanet}
+                onSelect={setSelectedPlanet}
+              />
+            </View>
           </View>
         </View>
       ) : gocharQ.isError ? (

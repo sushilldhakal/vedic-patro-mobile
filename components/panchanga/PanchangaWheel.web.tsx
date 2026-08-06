@@ -1,5 +1,5 @@
 import { useTranslation } from "@/lib/i18n-translations.web";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
@@ -37,7 +37,6 @@ import { useLocale } from "@/lib/i18n";
 import { patroSkel, patroWheelShell } from "@/lib/patro-classes";
 import {
   wheelDock,
-  wheelDockEditInput,
   wheelDockGrp,
   wheelDockLabel,
   wheelDockSep,
@@ -220,6 +219,9 @@ function PanchangaWheelBody({
   locationLabel,
   atTimeScrubOnly = false,
   yearScrub,
+  clock,
+  onOpenDatePicker,
+  fullscreenOverlay,
 }: WheelBodyProps & { atTimeScrubOnly?: boolean; yearScrub?: YearWheelScrub }) {
   const det: WheelDetail = useMemo(() => buildWheelDetail(p), [p]);
   const tz = resolveTimeZone(p?.location?.timezone, timezone);
@@ -233,9 +235,6 @@ function PanchangaWheelBody({
   const [tip, setTip] = useState({ x: 0, y: 0 });
   const [scrubPinned, setScrubPinned] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [showYearTime, setShowYearTime] = useState(false);
-  const [editingDay, setEditingDay] = useState(false);
-  const [editingTime, setEditingTime] = useState(false);
   const expandedHistoryRef = useRef(false);
   const ignorePopRef = useRef(false);
 
@@ -289,8 +288,20 @@ function PanchangaWheelBody({
     return Math.max(0, Math.min(60, g));
   }, [now, det.sunriseMin, tz]);
 
+  /* Range view: the wheel has no time slider, so the needle follows the clock
+     the page's date chrome is holding. */
+  const rangeMode = Boolean(yearScrub);
+  const clockG = useMemo(() => {
+    if (!clock) return null;
+    const [h, m] = clock.split(":").map(Number);
+    let g = ((h ?? 0) * 60 + (m ?? 0) - det.sunriseMin) / 24;
+    if (g < 0) g += 60;
+    return Math.max(0, Math.min(60, g));
+  }, [clock, det.sunriseMin]);
+
   const [scrubG, setScrubG] = useState(() => (isToday ? nowG : 0));
   const [debouncedScrubG, setDebouncedScrubG] = useState(scrubG);
+  const effectiveG = rangeMode ? (clockG ?? 0) : scrubG;
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedScrubG(scrubG), 400);
@@ -320,8 +331,11 @@ function PanchangaWheelBody({
   const scrubbing =
     scrubPinned || Math.abs(scrubG - (isToday && !scrubPinned ? nowG : 0)) > 0.05;
 
+  /* Playback would queue an at-time request per tick and draw none of them, so
+     the range view stays on the day's own state and moves the needle locally. */
   const needsAtTime =
     Boolean(anchorAd) &&
+    !rangeMode &&
     (scrubbing || (isToday && !atTimeScrubOnly));
 
   const scrubQ = useQuery({
@@ -346,40 +360,14 @@ function PanchangaWheelBody({
     needsAtTime && !scrubQ.isPlaceholderData ? scrubQ.data : undefined;
 
   const markers = useMemo(
-    () => (atTimeData ? buildWheelMarkersAtTime(atTimeData) : buildWheelMarkers(p, det, scrubG)),
-    [atTimeData, p, det, scrubG]
+    () => (atTimeData ? buildWheelMarkersAtTime(atTimeData) : buildWheelMarkers(p, det, effectiveG)),
+    [atTimeData, p, det, effectiveG]
   );
 
   const handleScrubChange = useCallback((g: number) => {
     setScrubG(g);
     setScrubPinned(true);
   }, []);
-
-  // Commit an edited "HH:MM" clock value → convert to a g-offset from sunrise
-  // (mirrors the nowG math) and pin the wheel to that moment of the same day.
-  const commitTimeEdit = useCallback(
-    (value: string) => {
-      setEditingTime(false);
-      const [hh, mm] = value.split(":").map(Number);
-      if (hh == null || mm == null || Number.isNaN(hh) || Number.isNaN(mm)) return;
-      const mins = hh * 60 + mm;
-      let g = (mins - det.sunriseMin) / 24;
-      g = ((g % 60) + 60) % 60;
-      handleScrubChange(g);
-    },
-    [det.sunriseMin, handleScrubChange],
-  );
-
-  const commitDayEdit = useCallback(
-    (value: string) => {
-      setEditingDay(false);
-      if (!yearScrub) return;
-      const n = Number(value);
-      if (!Number.isFinite(n)) return;
-      yearScrub.onJumpDay(Math.round(n));
-    },
-    [yearScrub],
-  );
 
   const snapToNow = useCallback(() => {
     setScrubPinned(false);
@@ -450,7 +438,7 @@ function PanchangaWheelBody({
   const { pick, digits } = useLocale();
   const stageRef = useRef<HTMLDivElement>(null);
   const num = (n: number | string) => digits(n);
-  const scrubClock = gClock(scrubG, det.sunriseMin);
+  const scrubClock = gClock(effectiveG, det.sunriseMin);
   const scrubTithi = atTimeData
     ? (getPanchangaDetail(atTimeData)?.tithi as { name_ne?: string; name?: string } | undefined) ??
       (atTimeData.tithi as { name_ne?: string; name?: string } | undefined)
@@ -695,7 +683,16 @@ function PanchangaWheelBody({
     </div>
   );
 
-  return expanded ? createPortal(wheelNode, document.body) : wheelNode;
+  const withOverlay = (
+    <>
+      {wheelNode}
+      {/* Rendered with the fullscreen node so the picker sits above it, rather
+          than behind a portal the page mounted elsewhere. */}
+      {expanded ? fullscreenOverlay : null}
+    </>
+  );
+
+  return expanded ? createPortal(withOverlay, document.body) : wheelNode;
 }
 
 function PanchangaWheelImpl(props: Props) {
