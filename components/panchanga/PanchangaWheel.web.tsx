@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  CalendarDays,
   Clock,
   FastForward,
   Fullscreen,
@@ -161,8 +162,17 @@ interface Props {
   loading?: boolean;
   /** When true, only fetch at-time after the user moves the wheel time slider. */
   atTimeScrubOnly?: boolean;
-  /** Year view: vertical day scrub + autoplay on the right inside the wheel. */
+  /**
+   * Range view: playback across a window of days. Replaces the whole time dock —
+   * the day and the time both come from the page's own date chrome instead.
+   */
   yearScrub?: YearWheelScrub;
+  /** "HH:MM" — where the needle sits when the wheel has no time slider of its own. */
+  clock?: string;
+  /** Fullscreen-only calendar button; opens whatever `fullscreenOverlay` renders. */
+  onOpenDatePicker?: () => void;
+  /** Rendered inside the fullscreen view so a picker can sit above the wheel. */
+  fullscreenOverlay?: ReactNode;
 }
 
 function PanchangaWheelSkeleton({
