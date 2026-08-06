@@ -8,6 +8,7 @@ import { BsCalendarGrid } from "@/components/home/BsCalendarGrid";
 import { PanchangaAsidePanel } from "@/components/home/PanchangaAsidePanel";
 import { PanchangaMonthGrid } from "@/components/home/PanchangaMonthGrid";
 import { type HomePatroView } from "@/components/home/PatroViewToggle";
+import { PatroFooterNote } from "@/components/branding/PatroFooterNote";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 import { ErrorState } from "@/components/ui/States";
 import {
@@ -405,15 +406,7 @@ export default function HomeScreen() {
         <View onLayout={(e) => setAsideOffsetY(e.nativeEvent.layout.y)}>{asideBlock}</View>
       </View>
 
-      <Text
-        className="mt-7 text-center text-sm text-muted-foreground"
-        style={{ paddingHorizontal: contentInset }}
-      >
-        {pick(
-          "वैदिक पात्रो · नेपाल पञ्चाङ्ग · गणना स्थान: काठमाडौं",
-          "Powered by Vedic Patro · Nepal Panchanga · Default location Kathmandu",
-        )}
-      </Text>
+      <PatroFooterNote paddingHorizontal={contentInset} />
     </ScrollView>
   );
 }

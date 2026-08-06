@@ -212,6 +212,11 @@ export type SceneToggles = {
    */
   lockStars: boolean;
   /**
+   * Keep the selected graha in the middle of the view while time runs — the
+   * camera target follows its motion (works in space, globe, and horizon views).
+   */
+  lockCenter: boolean;
+  /**
    * The 27 नक्षत्र drawn as the star groups they are named for, each at its own
    * place on the belt — रोहिणी as Aldebaran and the Hyades, ज्येष्ठा as
    * Antares, कृत्तिका as the Pleiades.
@@ -575,7 +580,6 @@ export function AakashGocharScene({
   calibration,
   ayanamsaShift = 0,
   selectedKey,
-  focusKey,
   toggles,
   onSelect,
   onSample,
@@ -591,7 +595,6 @@ export function AakashGocharScene({
    */
   ayanamsaShift?: number;
   selectedKey: GrahaKey | null;
-  focusKey: FocusKey;
   toggles: SceneToggles;
   onSelect: (key: GrahaKey) => void;
   onSample: (sample: SkySample) => void;
@@ -1325,8 +1328,8 @@ export function AakashGocharScene({
         const spin = toggles.lockStars
           ? 0
           : ((dtDays * 86400) / SIDEREAL_DAY_S) * Math.PI * 2;
-        // Mirrored frame, so the Earth's eastward turn is negative here.
-        globeSpinRef.current.rotation.y = -(spin % (Math.PI * 2));
+        // +Y is the axis; positive Y rotation is eastward (prograde), viewed from the north pole.
+        globeSpinRef.current.rotation.y = spin % (Math.PI * 2);
       }
       for (const { object } of globeLines.parallels) object.visible = toggles.grid;
       for (const { object } of globeLines.meridians) object.visible = toggles.grid;
@@ -1370,17 +1373,23 @@ export function AakashGocharScene({
     /* ── camera ─────────────────────────────────────────────────────── */
     const v = view.current;
     const cam = state.camera as THREE.PerspectiveCamera;
+    const trackKey = toggles.lockCenter && selectedKey ? selectedKey : null;
+    const trackGroup = trackKey ? bodyRefs.current[trackKey] : null;
     if (horizon) {
       /* Standing at the centre, the only thing zoom can do is change the lens:
          a 6° telescopic crop at one end, a 160° fisheye that swallows nearly
          the whole dome at the other. The sky itself never changes shape. */
       const cosP = Math.cos(v.pitch);
       cam.position.set(0, 0, 0);
-      target.current.set(
-        DOME * cosP * Math.sin(v.yaw),
-        DOME * Math.sin(v.pitch),
-        -DOME * cosP * Math.cos(v.yaw),
-      );
+      if (trackGroup) {
+        target.current.copy(trackGroup.position);
+      } else {
+        target.current.set(
+          DOME * cosP * Math.sin(v.yaw),
+          DOME * Math.sin(v.pitch),
+          -DOME * cosP * Math.cos(v.yaw),
+        );
+      }
       cam.lookAt(target.current);
       const fov = Math.min(160, Math.max(6, (v.distance / 26) * 70));
       if (Math.abs(cam.fov - fov) > 0.01) {
@@ -1400,29 +1409,65 @@ export function AakashGocharScene({
       const framed = 1.4 + Math.pow(t, 1.25) * (GLOBE_BAND_R * 2 - 1.4);
       const radius = GLOBE_CAM_R;
       const fov = (2 * Math.atan(framed / radius)) / DEG;
-      cam.position.set(
-        radius * cosP * Math.sin(v.yaw),
-        radius * Math.sin(v.pitch),
-        radius * cosP * Math.cos(v.yaw),
-      );
-      target.current.set(0, 0, 0);
-      cam.lookAt(target.current);
+      if (trackGroup) {
+        target.current.copy(trackGroup.position);
+        scratch.current.copy(target.current);
+        const bodyR = scratch.current.length();
+        if (bodyR < 1e-5) {
+          cam.position.set(radius * cosP * Math.sin(v.yaw), radius * Math.sin(v.pitch), radius * cosP * Math.cos(v.yaw));
+          target.current.set(0, 0, 0);
+        } else {
+          /* Same hemisphere as the graha: camera rides the outward ray from
+             Earth so the body stays in front of the globe, not behind it. */
+          scratch.current.multiplyScalar(radius / bodyR);
+          cam.position.copy(scratch.current);
+          v.yaw = Math.atan2(cam.position.x, cam.position.z);
+          v.pitch = Math.asin(Math.max(-1, Math.min(1, cam.position.y / radius)));
+        }
+        cam.lookAt(target.current);
+      } else {
+        target.current.set(0, 0, 0);
+        cam.position.set(
+          radius * cosP * Math.sin(v.yaw),
+          radius * Math.sin(v.pitch),
+          radius * cosP * Math.cos(v.yaw),
+        );
+        cam.lookAt(target.current);
+      }
       if (Math.abs(cam.fov - fov) > 0.01) {
         cam.fov = fov;
         cam.updateProjectionMatrix();
       }
     } else {
-      const focusGroup = focusKey !== "earth" ? bodyRefs.current[focusKey] : null;
-      if (focusGroup) target.current.copy(focusGroup.position);
-      else target.current.set(0, 0, 0);
-
       const cosP = Math.cos(v.pitch);
-      cam.position.set(
-        target.current.x + v.distance * cosP * Math.sin(v.yaw),
-        target.current.y + v.distance * Math.sin(v.pitch),
-        target.current.z + v.distance * cosP * Math.cos(v.yaw),
-      );
-      cam.lookAt(target.current);
+      if (trackGroup) {
+        target.current.copy(trackGroup.position);
+        scratch.current.copy(target.current);
+        const bodyR = scratch.current.length();
+        if (bodyR < 1e-5) {
+          target.current.set(0, 0, 0);
+          cam.position.set(
+            v.distance * cosP * Math.sin(v.yaw),
+            v.distance * Math.sin(v.pitch),
+            -v.distance * cosP * Math.cos(v.yaw),
+          );
+        } else {
+          scratch.current.normalize().multiplyScalar(bodyR + v.distance);
+          cam.position.copy(scratch.current);
+          v.yaw = Math.atan2(cam.position.x, cam.position.z);
+          v.pitch = Math.asin(Math.max(-1, Math.min(1, cam.position.y / (bodyR + v.distance))));
+        }
+        cam.lookAt(target.current);
+      } else {
+        target.current.set(0, 0, 0);
+
+        cam.position.set(
+          target.current.x + v.distance * cosP * Math.sin(v.yaw),
+          target.current.y + v.distance * Math.sin(v.pitch),
+          target.current.z + v.distance * cosP * Math.cos(v.yaw),
+        );
+        cam.lookAt(target.current);
+      }
       if (Math.abs(cam.fov - 50) > 0.01) {
         cam.fov = 50;
         cam.updateProjectionMatrix();

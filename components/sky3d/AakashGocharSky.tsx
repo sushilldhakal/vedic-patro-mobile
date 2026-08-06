@@ -42,7 +42,6 @@ import { SOLAR_STATIONS } from "@/lib/sky3d/sky-geometry";
 import { POLE_STARS } from "@/lib/sky3d/pole-stars";
 import {
   AakashGocharScene,
-  type FocusKey,
   type SceneToggles,
   type ScreenLabel,
   type SimState,
@@ -170,19 +169,21 @@ export function AakashGocharSky({
     secondsPerRealSecond: SPEED_LADDER[0].seconds,
     playing: true,
   });
-  const view = useRef<ViewState>({ yaw: 0.5, pitch: 0.62, distance: SYSTEM_DISTANCE });
+  /* Opens on the globe, so these have to match the framing the पृथ्वी गोला chip
+     sets — otherwise the first frame is the space camera on a globe scene. */
+  const view = useRef<ViewState>({ yaw: 0.6, pitch: 0.42, distance: GLOBE_VIEW });
 
-  const [mode, setMode] = useState<SkyMode>("space");
+  const [mode, setMode] = useState<SkyMode>("globe");
   const [playing, setPlaying] = useState(true);
   const [speedIndex, setSpeedIndex] = useState(0);
   const [reverse, setReverse] = useState(false);
   const [selectedKey, setSelectedKey] = useState<GrahaKey | null>(null);
-  const [focusKey, setFocusKey] = useState<FocusKey>("earth");
   const [sample, setSample] = useState<SkySample | null>(null);
   const [toggles, setToggles] = useState<SceneToggles>({
     belts: true,
     grid: true,
     lockStars: true,
+    lockCenter: false,
     asterisms: true,
     poleStars: true,
     tilt: true,
@@ -436,7 +437,6 @@ export function AakashGocharSky({
         label={pick("अन्तरिक्ष", "Space")}
         onPress={() => {
           setMode("space");
-          setFocusKey("earth");
           view.current = { yaw: 0.5, pitch: 0.62, distance: SYSTEM_DISTANCE };
         }}
         overlay={fullscreen}
@@ -447,7 +447,6 @@ export function AakashGocharSky({
         label={pick("पृथ्वी गोला", "Earth globe")}
         onPress={() => {
           setMode("globe");
-          setFocusKey("earth");
           view.current = { yaw: 0.6, pitch: 0.42, distance: GLOBE_VIEW };
         }}
         overlay={fullscreen}
@@ -486,6 +485,18 @@ export function AakashGocharSky({
         overlay={fullscreen}
         compact={fullscreen}
       />
+      <IconButton
+        name="locate"
+        label={
+          selectedKey
+            ? pick("चयनित ग्रह केन्द्रमा", "Lock view on selected graha")
+            : pick("पहिले ग्रह छान्नुहोस्", "Select a graha on the sky first")
+        }
+        active={toggles.lockCenter}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={() => setToggles((t) => ({ ...t, lockCenter: !t.lockCenter }))}
+      />
     </>
   );
 
@@ -506,7 +517,6 @@ export function AakashGocharSky({
               calibration={calibration}
               ayanamsaShift={ayanamsaShift}
               selectedKey={selectedKey}
-              focusKey={focusKey}
               toggles={toggles}
               onSelect={onSelect}
               onSample={onSample}
