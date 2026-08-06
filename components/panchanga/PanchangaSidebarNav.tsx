@@ -3,6 +3,9 @@ import { Pressable, ScrollView, View } from "react-native"
 import { Text } from "@/components/ui/Text"
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
+import { KundaliSidebarSubnav } from "@/components/kundali/KundaliSidebarSubnav";
+import type { KundaliSectionId } from "@/lib/kundali/kundali-section-nav";
+import { parseKundaliProfileId } from "@/lib/kundali/kundali-routes";
 import {
   findActivePanchangaSidebarSection,
   isPanchangaSidebarItemActive,
@@ -11,10 +14,16 @@ import {
   type PanchangaSidebarSection,
 } from "@/lib/panchanga/panchanga-sidebar-nav";
 import { useLocale } from "@/lib/i18n";
+import { normalizeMobilePathname } from "@/lib/mobile-nav";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { cn } from "@/lib/utils";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
+
+export type KundaliSectionNavProps = {
+  activeId: KundaliSectionId;
+  onNavigate: (id: KundaliSectionId) => void;
+};
 
 function SidebarLink({
   item,
@@ -61,25 +70,42 @@ function SidebarSection({
   expanded,
   onToggle,
   pathname,
+  kundaliProfileId,
+  kundaliSectionNav,
 }: {
   section: PanchangaSidebarSection;
   expanded: boolean;
   onToggle: () => void;
   pathname: string;
+  kundaliProfileId: string | null;
+  kundaliSectionNav?: KundaliSectionNavProps;
 }) {
   const colors = useThemeColors();
   const { pick } = useLocale();
   const router = useRouter();
   const hasActiveItem = section.items.some((item) => isPanchangaSidebarItemActive(pathname, item));
 
-  const renderItem = (item: PanchangaSidebarItem, forceActive?: boolean) => (
-    <SidebarLink
-      key={item.id}
-      item={item}
-      active={forceActive ?? isPanchangaSidebarItemActive(pathname, item)}
-      onPress={() => router.push(item.href as never)}
-    />
-  );
+  const renderItem = (item: PanchangaSidebarItem, forceActive?: boolean) => {
+    const active = forceActive ?? isPanchangaSidebarItemActive(pathname, item);
+    const showKundaliSections =
+      item.id === "kundali" && kundaliProfileId != null && kundaliSectionNav != null;
+
+    return (
+      <View key={item.id} className="gap-0.5">
+        <SidebarLink
+          item={item}
+          active={active}
+          onPress={() => router.push(item.href as never)}
+        />
+        {showKundaliSections ? (
+          <KundaliSidebarSubnav
+            activeSectionId={kundaliSectionNav.activeId}
+            onNavigate={kundaliSectionNav.onNavigate}
+          />
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <View className="border-b border-border/60 pb-1 last:border-b-0">
@@ -121,9 +147,19 @@ function SidebarSection({
   );
 }
 
-export function PanchangaSidebarNav({ className, compact }: { className?: string; compact?: boolean }) {
+export function PanchangaSidebarNav({
+  className,
+  compact,
+  kundaliSectionNav,
+}: {
+  className?: string;
+  compact?: boolean;
+  /** When on `/kundali/:profileId`, nested section tabs under birth-chart link. */
+  kundaliSectionNav?: KundaliSectionNavProps;
+}) {
   const { pick } = useLocale();
-  const pathname = usePathname();
+  const pathname = normalizeMobilePathname(usePathname());
+  const kundaliProfileId = parseKundaliProfileId(pathname);
   const activeSectionId = findActivePanchangaSidebarSection(pathname);
   const [expandedId, setExpandedId] = useState<string | null>(activeSectionId);
 
@@ -147,6 +183,8 @@ export function PanchangaSidebarNav({ className, compact }: { className?: string
             expanded={expandedId === section.id}
             onToggle={() => setExpandedId((current) => (current === section.id ? null : section.id))}
             pathname={pathname}
+            kundaliProfileId={kundaliProfileId}
+            kundaliSectionNav={kundaliSectionNav}
           />
         ))}
       </View>
@@ -162,7 +200,7 @@ export function PanchangaSidebarNav({ className, compact }: { className?: string
   }
 
   return (
-    <View className={cn("w-56 shrink-0 overflow-hidden rounded-2xl border border-border bg-card", className)}>
+    <View className={cn("w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-card", className)}>
       <ScrollView showsVerticalScrollIndicator={false}>{body}</ScrollView>
     </View>
   );

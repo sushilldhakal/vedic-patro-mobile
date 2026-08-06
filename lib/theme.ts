@@ -10,6 +10,27 @@ export function colorWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Table header/zebra colors — use via `@/components/ui/DataTable`, not directly. */
+export function tableHeaderBackground(colors: ThemeColors, isDark: boolean): string {
+  return isDark ? colorWithAlpha(colors.muted, 0.92) : colors.surfaceInset;
+}
+
+/** Alternating row backgrounds for readable scan lines. */
+export function tableRowBackground(
+  colors: ThemeColors,
+  isDark: boolean,
+  rowIndex: number,
+  highlight?: boolean,
+): string {
+  if (highlight) {
+    return colorWithAlpha(colors.secondary, isDark ? 0.2 : 0.11);
+  }
+  if (rowIndex % 2 === 0) {
+    return colors.card;
+  }
+  return colors.surfaceMuted;
+}
+
 export type ThemeColors = {
   background: string;
   foreground: string;

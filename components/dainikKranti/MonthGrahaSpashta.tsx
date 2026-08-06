@@ -1,5 +1,6 @@
-import { ScrollView, View } from "react-native"
-import { Text } from "@/components/ui/Text"
+import { View } from "react-native";
+import { Text } from "@/components/ui/Text";
+import { TableHeader, TableRow } from "@/components/ui/DataTable";
 import {
   PATRO_PLANET_KEYS,
   PATRO_PLANET_NE,
@@ -11,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/i18n";
 import {
   patroStickyHeadCell,
-  patroStickyHeadRow,
   patroStickySubHeadCell,
 } from "@/lib/patro-classes";
 import { PatroTableShell } from "./PatroTableShell";
@@ -45,9 +45,8 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
   const isEn = lang === "en";
 
   const table = (
-    <ScrollView horizontal showsHorizontalScrollIndicator>
-      <View className="min-w-full">
-        <View className={cn("flex-row border-b border-border", patroStickyHeadRow)}>
+    <View className="min-w-full">
+      <TableHeader>
           <View className={cn(th, "min-w-[3rem] pl-3")}>
             <Text className="text-sm font-semibold">{pick("गते", "Date")}</Text>
           </View>
@@ -66,9 +65,9 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
               {pick("बेलान्तर", "Belaantar")}
             </Text>
           </View>
-        </View>
+      </TableHeader>
 
-        <View className="flex-row border-b border-border bg-muted/60">
+      <TableHeader>
           <View className="min-w-[6.5rem]" />
           {PATRO_PLANET_KEYS.map((key) => (
             <View key={`sub-${key}`} className={cn(th, patroStickySubHeadCell, "min-w-[5.5rem] items-center")}>
@@ -82,7 +81,7 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
               {pick("समय सुधार", "Time corr.")}
             </Text>
           </View>
-        </View>
+      </TableHeader>
 
         {loading ? (
           <View className="py-8">
@@ -97,13 +96,16 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
             </Text>
           </View>
         ) : (
-          rows.map((row) => {
+          rows.map((row, rowIndex) => {
             const isToday = row.dateAd === todayKey;
             const hasPlanets = PATRO_PLANET_KEYS.some((k) => row.planets[k]);
             return (
-              <View
+              <TableRow
                 key={row.dateAd}
-                className={cn("flex-row border-b border-border/60", isToday && "bg-secondary/15")}
+                rowIndex={rowIndex}
+                highlight={isToday}
+                borderTop={false}
+                className="border-b border-border/60"
               >
                 <View className={cn(td, "min-w-[3rem] pl-3 font-semibold")}>
                   <Text className="font-num font-semibold">{digits(row.day)}</Text>
@@ -123,12 +125,11 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
                     {row.belaantar ?? (hasPlanets ? "—" : "—")}
                   </Text>
                 </View>
-              </View>
+              </TableRow>
             );
           })
         )}
-      </View>
-    </ScrollView>
+    </View>
   );
 
   const footnote = (

@@ -1,5 +1,4 @@
-import { useMemo } from "react";
-import { View } from "react-native";
+import { useMemo, useState } from "react";
 import { adToBS, bsToAD, getBSMonthLength } from "@/lib/bs-calendar";
 import type { PanchangaDay } from "@/lib/api";
 import { PatroDateNav } from "@/components/patro-date/PatroDateNav";
@@ -50,11 +49,13 @@ export function PanchangaDateNav({
   className,
   location: locationProp,
   onLocationChange: onLocationChangeProp,
-  era = "bs",
+  era: eraProp = "bs",
   onEraChange,
   wheelData,
   adDateStr,
 }: Props) {
+  const [browseEra, setBrowseEra] = useState<PatroBrowseEra>(eraProp);
+  const handleEraChange = onEraChange ?? setBrowseEra;
   const fallback = usePanchangaLocation();
   const location = locationProp ?? fallback.location;
   const onLocationChange = onLocationChangeProp ?? fallback.setLocation;
@@ -78,7 +79,7 @@ export function PanchangaDateNav({
     return formatPatroCivilDayLabel(toAdStr(date), lang, digitFn);
   }, [gregorian, wheelData?.date_ad, adDateStr, date, lang, digitFn]);
 
-  const vikramEra = (vikram?.era as PatroBrowseEra | undefined) ?? era;
+  const vikramEra = (vikram?.era as PatroBrowseEra | undefined) ?? browseEra;
 
   const stepDay = (delta: number) => {
     const next = new Date(date);
@@ -90,8 +91,8 @@ export function PanchangaDateNav({
     <PatroDateNav
       className={className}
       mode="year-month-time"
-      era={era}
-      onEraChange={onEraChange ?? (() => {})}
+      era={browseEra}
+      onEraChange={handleEraChange}
       year={navYear}
       onYearChange={(y) => {
         const safeDay = Math.min(navDay, getBSMonthLength(y, navMonth));

@@ -104,8 +104,8 @@
       "apiBaseUrl": "https://www.vedicpatro.com/api",
       "apiVersion": "v1",
       "googleWebClientId": "568648791161-elpu27mjfjhcb3p9rm2vim62kgrqinao.apps.googleusercontent.com",
-      "googleIosClientId": "",
-      "googleAndroidClientId": "",
+      "googleIosClientId": "568648791161-4o9fdadb47ltb2nfp1fsdbj03u50q509.apps.googleusercontent.com",
+      "googleAndroidClientId": "568648791161-0dhpp9t58h249d0ema1lmk3nm00euql0.apps.googleusercontent.com",
       "facebookAppId": "1044570391345268",
       "router": {},
       "eas": {

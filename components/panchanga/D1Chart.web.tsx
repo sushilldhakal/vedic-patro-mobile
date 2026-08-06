@@ -1,4 +1,7 @@
 import type { BhavaHouse } from "@/lib/bhava";
+import { GrahaStatusMarksSvg } from "@/components/graha/GrahaStatusMarksSvg";
+import { GrahaStatusLegend } from "@/components/graha/GrahaStatusLegend";
+import { bhavaHousesHaveStatusMarks } from "@/lib/graha-status";
 import {
   NI_HOUSE_POLYGONS,
   planetGridLayout,
@@ -36,9 +39,11 @@ type Props = {
 export function D1Chart({ houses }: Props) {
   const { pick, digits } = useLocale();
   const byHouse = new Map(houses.map((h) => [h.house, h]));
+  const showLegend = bhavaHousesHaveStatusMarks(houses);
 
   return (
-    <svg
+    <div className="flex w-full flex-col items-center">
+      <svg
       viewBox="0 0 300 300"
       className="mx-auto h-auto w-full max-w-[340px]"
       role="img"
@@ -79,22 +84,38 @@ export function D1Chart({ houses }: Props) {
               const col = i - rowStart;
               const x = cx + (col - (itemsInRow - 1) / 2) * layout.colGap;
               const y = cy + row * layout.rowGap;
+              const markSize = layout.fontSize * 0.5;
+              const abbr = pick(
+                PLANET_ABBR_NE[planet.key] ?? planet.labelNe.slice(0, 2),
+                PLANET_ABBR_EN[planet.key] ?? planet.labelNe.slice(0, 2),
+              );
               return (
-                <text
-                  key={planet.key}
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  style={{ fontSize: `${layout.fontSize}px` }}
-                  className="fill-foreground"
-                >
-                  {pick(PLANET_ABBR_NE[planet.key] ?? planet.labelNe.slice(0, 2), PLANET_ABBR_EN[planet.key] ?? planet.labelNe.slice(0, 2))}
-                </text>
+                <g key={planet.key}>
+                  <text
+                    x={x}
+                    y={y}
+                    textAnchor="middle"
+                    style={{ fontSize: `${layout.fontSize}px` }}
+                    className="fill-foreground"
+                  >
+                    {abbr}
+                  </text>
+                  <GrahaStatusMarksSvg
+                    planetKey={planet.key}
+                    isRetrograde={planet.isRetrograde}
+                    isCombust={planet.isCombust}
+                    x={x + layout.fontSize * 0.42}
+                    y={y - markSize - layout.fontSize * 0.05}
+                    size={markSize}
+                  />
+                </g>
               );
             })}
           </g>
         );
       })}
     </svg>
+      {showLegend ? <GrahaStatusLegend className="mt-2 w-full" /> : null}
+    </div>
   );
 }

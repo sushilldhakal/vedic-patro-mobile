@@ -159,3 +159,143 @@ export function toNepaliDigits(value: string | number): string {
 export function formatDigits(value: string | number, lang: "ne" | "en"): string {
   return lang === "ne" ? toNepaliDigits(value) : String(value);
 }
+
+export function formatBsDateLong(
+  date: Date,
+  lang?: string,
+  digits?: (v: string | number) => string,
+): string {
+  const bs = adToBS(date);
+  const d = digits ?? String;
+  const isEn = (lang ?? "ne").slice(0, 2) === "en";
+  if (isEn) {
+    return `${BS_MONTH_NAMES[bs.month - 1]} ${bs.day}, ${bs.year}`;
+  }
+  return `${BS_MONTHS_NE[bs.month - 1]} ${d(bs.day)}, ${d(bs.year)}`;
+}
+
+const AD_MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+export const AD_MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const;
+
+const WEEKDAY_FULL_NE = [
+  "आइतबार", "सोमबार", "मङ्गलबार", "बुधबार", "बिहीबार", "शुक्रबार", "शनिबार",
+] as const;
+
+const WEEKDAY_FULL_EN = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+] as const;
+
+type ZonedParts = {
+  year: number;
+  month: number;
+  day: number;
+  weekday: number;
+  hour: string;
+  minute: string;
+};
+
+/** Civil date + clock in an IANA timezone (for BS / dasha display). */
+export function getZonedParts(date: Date, timeZone?: string): ZonedParts {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const weekdayIdx = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    weekday: weekdayIdx >= 0 ? weekdayIdx : 0,
+    hour: get("hour"),
+    minute: get("minute"),
+  };
+}
+
+/**
+ * Dasha period boundary — Bikram Sambat (Nepali) when lang is ne, Gregorian AD when en.
+ * Uses the chart place timezone so begin/end match the web kundali dasha view.
+ */
+export function formatDashaInstant(
+  date: Date,
+  lang: "ne" | "en",
+  timeZone?: string,
+): string {
+  if (Number.isNaN(date.getTime())) return "";
+  const z = getZonedParts(date, timeZone);
+  const civil = new Date(z.year, z.month - 1, z.day);
+  if (lang === "en") {
+    return `${AD_MONTHS_SHORT[z.month - 1]} ${z.day}, ${z.year}`;
+  }
+  const bs = adToBS(civil);
+  return `${BS_MONTHS_NE[bs.month - 1]} ${toNepaliDigits(bs.day)}, ${toNepaliDigits(bs.year)}`;
+}
+
+/**
+ * Zoned instant as BS calendar date + weekday + clock (Nepali UI).
+ * e.g. असार ४, २०७६, सोमबार ०६:३७
+ */
+export function formatZonedBsMoment(
+  date: Date,
+  options?: {
+    lang?: "ne" | "en";
+    timeZone?: string;
+    digits?: (v: string | number) => string;
+  },
+): string {
+  const { lang = "ne", timeZone, digits = String } = options ?? {};
+  const z = getZonedParts(date, timeZone);
+  const civil = new Date(z.year, z.month - 1, z.day);
+  const bs = adToBS(civil);
+  const time = `${z.hour}:${z.minute}`;
+
+  if (lang === "en") {
+    const monthEn = BS_MONTH_NAMES[bs.month - 1];
+    const weekdayEn = WEEKDAY_FULL_EN[z.weekday] ?? "";
+    return `${monthEn} ${bs.day}, ${bs.year}, ${weekdayEn} at ${time}`;
+  }
+  const monthNe = BS_MONTHS_NE[bs.month - 1];
+  const weekdayNe = WEEKDAY_FULL_NE[z.weekday] ?? "";
+  return `${monthNe} ${digits(bs.day)}, ${digits(bs.year)}, ${weekdayNe} ${digits(time)}`;
+}
+
+/** Gregorian AD + weekday + clock (English UI). */
+export function formatZonedAdMoment(
+  date: Date,
+  options?: {
+    timeZone?: string;
+    digits?: (v: string | number) => string;
+  },
+): string {
+  const { timeZone, digits = String } = options ?? {};
+  const z = getZonedParts(date, timeZone);
+  const time = `${digits(z.hour)}:${digits(z.minute)}`;
+  const weekdayEn = WEEKDAY_FULL_EN[z.weekday] ?? "";
+  return `${AD_MONTH_NAMES[z.month - 1]} ${z.day}, ${z.year}, ${weekdayEn} at ${time}`;
+}
+
+/** Dasha begin/end line — BS in Nepali, AD in English. */
+export function formatDashaMoment(
+  date: Date,
+  lang: "ne" | "en",
+  timeZone?: string,
+  digits?: (v: string | number) => string,
+): string {
+  if (lang === "en") {
+    return formatZonedAdMoment(date, { timeZone, digits });
+  }
+  return formatZonedBsMoment(date, { lang: "ne", timeZone, digits });
+}

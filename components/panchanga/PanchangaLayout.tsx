@@ -14,6 +14,7 @@ import {
   PANCHANGA_TIMING_HIGHLIGHT_BG,
   PANCHANGA_TIMING_HIGHLIGHT_BORDER,
 } from "@/lib/panchanga-card-colors";
+import { TableHeader, TableRow } from "@/components/ui/DataTable";
 
 /** Paired label|value columns — always on native (phones fit compact 2×2 rows). */
 export function usePanchangaLayoutWide(): boolean {
@@ -142,12 +143,14 @@ export function PanchangaBalamCard({
   tone = "neutral",
   isCurrent,
   className,
+  icon,
 }: {
   titleLine: React.ReactNode;
   subtitleLine?: React.ReactNode;
   tone?: "best" | "good" | "neutral" | "bad" | "worst";
   isCurrent?: boolean;
   className?: string;
+  icon?: React.ReactNode;
 }) {
   const bg = usePanchangaCardBg(tone);
   return (
@@ -160,10 +163,15 @@ export function PanchangaBalamCard({
       )}
       style={{ backgroundColor: bg }}
     >
-      <Text className="text-sm font-bold leading-snug text-foreground">{titleLine}</Text>
-      {subtitleLine ? (
-        <Text className="text-xs font-semibold leading-snug text-muted-foreground">{subtitleLine}</Text>
-      ) : null}
+      <View className="flex-row items-start gap-2">
+        {icon ? <View className="shrink-0 pt-0.5">{icon}</View> : null}
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="text-sm font-bold leading-snug text-foreground">{titleLine}</Text>
+          {subtitleLine ? (
+            <Text className="text-xs font-semibold leading-snug text-muted-foreground">{subtitleLine}</Text>
+          ) : null}
+        </View>
+      </View>
     </View>
   );
 }
@@ -511,15 +519,15 @@ export function PairedTimingTable({
 }) {
   return (
     <View>
-      <View className="flex-row border-b border-border bg-secondary/10 px-2 py-1">
+      <TableHeader className="px-2 py-1">
         <Text className="min-w-0 flex-1 text-xs font-semibold text-foreground md:text-sm">{leftTitle}</Text>
         <Text className="min-w-0 flex-1 border-l border-border/60 pl-2 text-xs font-semibold text-foreground md:text-sm">
           {rightTitle}
         </Text>
-      </View>
+      </TableHeader>
       <View className="divide-y divide-border/80">
         {rows.map((row, i) => (
-          <View key={i} className="flex-row items-start px-2 py-1">
+          <TableRow key={i} rowIndex={i} highlight={row.left?.highlight} borderTop={false} className="items-start px-2 py-1">
             <PairedTimingCell
               label={row.left?.label}
               time={row.left?.time}
@@ -532,7 +540,7 @@ export function PairedTimingTable({
               note={row.right?.note}
               bordered
             />
-          </View>
+          </TableRow>
         ))}
       </View>
     </View>

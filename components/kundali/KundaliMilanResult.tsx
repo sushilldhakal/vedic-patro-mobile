@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import type { AshtakutaResult, KutaRow } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { colorWithAlpha } from "@/lib/theme";
+import {
+  TableHeader,
+  TableRow,
+  TableScrollShell,
+} from "@/components/ui/DataTable";
 import { useThemeColors } from "@/lib/theme-context";
 
 const KUTA_LABELS: Record<string, { en: string; ne: string }> = {
@@ -222,35 +226,31 @@ export function KundaliMilanResult({
       </View>
 
       {/* ashtakuta table */}
-      <View
-        style={{ borderColor: colors.border }}
-        className="overflow-hidden rounded-2xl border bg-card"
-      >
-        <ScrollView horizontal showsHorizontalScrollIndicator>
-          <View>
-            <View className="flex-row bg-muted/30">
-              <View style={{ width: 34 }} />
-              {columns.map((c) => (
-                <Text
-                  key={c.key}
-                  numberOfLines={1}
-                  style={{ width: c.width, ...nepaliTextStyle(11) }}
-                  className="px-2 py-2.5 text-xs font-semibold text-muted-foreground"
-                >
-                  {pick(c.ne, c.en)}
-                </Text>
-              ))}
-            </View>
+      <TableScrollShell className="rounded-2xl">
+        <TableHeader>
+          <View style={{ width: 34 }} />
+          {columns.map((c) => (
+            <Text
+              key={c.key}
+              numberOfLines={1}
+              style={{ width: c.width, ...nepaliTextStyle(11) }}
+              className="px-2 py-2.5 text-xs font-semibold text-muted-foreground"
+            >
+              {pick(c.ne, c.en)}
+            </Text>
+          ))}
+        </TableHeader>
 
-            {result.kutas.map((kuta) => {
-              const label = KUTA_LABELS[kuta.id];
-              const isOpen = openId === kuta.id;
-              return (
-                <View key={kuta.id}>
-                  <Pressable
-                    onPress={() => setOpenId(isOpen ? null : kuta.id)}
-                    className="flex-row items-center border-t border-border active:opacity-80"
-                  >
+        {result.kutas.map((kuta, kutaIndex) => {
+          const label = KUTA_LABELS[kuta.id];
+          const isOpen = openId === kuta.id;
+          return (
+            <View key={kuta.id}>
+              <TableRow
+                rowIndex={kutaIndex}
+                onPress={() => setOpenId(isOpen ? null : kuta.id)}
+                className="items-center"
+              >
                     <View style={{ width: 34 }} className="items-center">
                       <Ionicons
                         name={isOpen ? "chevron-down" : "chevron-forward"}
@@ -297,17 +297,15 @@ export function KundaliMilanResult({
                     >
                       {lang === "en" ? kuta.areaOfLife : kuta.areaOfLifeNe}
                     </Text>
-                  </Pressable>
-                  {isOpen ? (
-                    <View style={{ width: 34 + columns.reduce((a, c) => a + c.width, 0) }}>
-                      <KutaDetailPanel kuta={kuta} boyName={boyName} girlName={girlName} />
-                    </View>
-                  ) : null}
+              </TableRow>
+              {isOpen ? (
+                <View style={{ width: 34 + columns.reduce((a, c) => a + c.width, 0) }}>
+                  <KutaDetailPanel kuta={kuta} boyName={boyName} girlName={girlName} />
                 </View>
-              );
-            })}
-          </View>
-        </ScrollView>
+              ) : null}
+            </View>
+          );
+        })}
         <Text
           className="border-t border-border px-4 py-2 text-xs text-muted-foreground"
           style={nepaliTextStyle(11)}
@@ -318,7 +316,7 @@ export function KundaliMilanResult({
             "Max — maximum point · Obt — obtained point",
           )}
         </Text>
-      </View>
+      </TableScrollShell>
 
       {/* notes */}
       <View style={{ borderColor: colors.border }} className="rounded-2xl border bg-card p-5">

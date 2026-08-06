@@ -29,7 +29,13 @@ import {
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
-import { useThemeColors } from "@/lib/theme-context";
+import {
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+  TableScrollShell,
+} from "@/components/ui/DataTable";
+import { useTheme, useThemeColors } from "@/lib/theme-context";
 
 const GANA_TONE: Record<Gana, { bg: string; fg: string }> = {
   देव: { bg: "rgba(16,185,129,0.15)", fg: "#047857" },
@@ -166,6 +172,7 @@ const COLUMNS: {
 export default function AvakahadaScreen() {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
+  const { isDark } = useTheme();
   const { width, isTablet } = useBreakpoint();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
@@ -173,7 +180,6 @@ export default function AvakahadaScreen() {
     dir: "asc",
   });
 
-  const isDark = colors.background === "#082628";
   const ganaTone = isDark ? GANA_TONE_DARK : GANA_TONE;
 
   const data = useMemo(() => buildRows(lang), [lang]);
@@ -234,44 +240,37 @@ export default function AvakahadaScreen() {
         ) : null}
       </View>
 
-      <View className="overflow-hidden rounded-xl border border-border">
-        <ScrollView horizontal showsHorizontalScrollIndicator>
-          <View>
-            <View className="flex-row bg-muted">
-              {COLUMNS.map((col) => {
-                const active = col.sortable && sort.key === col.key;
-                return (
-                  <Pressable
-                    key={col.key}
-                    disabled={!col.sortable}
-                    onPress={() => col.sortable && toggleSort(col.key as SortKey)}
-                    style={{ width: col.width }}
-                    className="flex-row items-center gap-1 px-2.5 py-2.5 active:opacity-70"
-                  >
-                    <Text
-                      numberOfLines={2}
-                      className="shrink text-xs font-semibold text-foreground"
-                      style={nepaliTextStyle(11)}
-                    >
-                      {pick(col.ne, col.en)}
-                    </Text>
-                    {col.sortable ? (
-                      <Ionicons
-                        name={
-                          active
-                            ? sort.dir === "asc"
-                              ? "chevron-up"
-                              : "chevron-down"
-                            : "swap-vertical"
-                        }
-                        size={11}
-                        color={active ? colors.foreground : colors.mutedForeground}
-                      />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
+      <TableScrollShell>
+        <TableHeader>
+          {COLUMNS.map((col) => {
+            const active = col.sortable && sort.key === col.key;
+            return (
+              <TableHeaderCell
+                key={col.key}
+                width={col.width}
+                disabled={!col.sortable}
+                onPress={col.sortable ? () => toggleSort(col.key as SortKey) : undefined}
+              >
+                <Text
+                  numberOfLines={2}
+                  className="shrink text-xs font-semibold text-foreground"
+                  style={nepaliTextStyle(11)}
+                >
+                  {pick(col.ne, col.en)}
+                </Text>
+                {col.sortable ? (
+                  <Ionicons
+                    name={
+                      active ? (sort.dir === "asc" ? "chevron-up" : "chevron-down") : "swap-vertical"
+                    }
+                    size={11}
+                    color={active ? colors.foreground : colors.mutedForeground}
+                  />
+                ) : null}
+              </TableHeaderCell>
+            );
+          })}
+        </TableHeader>
 
             {rows.length === 0 ? (
               <View className="px-4 py-8">
@@ -280,8 +279,8 @@ export default function AvakahadaScreen() {
                 </Text>
               </View>
             ) : (
-              rows.map((row) => (
-                <View key={row.index} className="flex-row border-t border-border">
+              rows.map((row, rowIndex) => (
+                <TableRow key={row.index} rowIndex={rowIndex}>
                   <Cell width={COLUMNS[0].width} bold>
                     {digits(row.index)}. {row.label}
                   </Cell>
@@ -321,12 +320,10 @@ export default function AvakahadaScreen() {
                     </View>
                   </View>
                   <Cell width={COLUMNS[13].width}>{row.nadi}</Cell>
-                </View>
+                </TableRow>
               ))
             )}
-          </View>
-        </ScrollView>
-      </View>
+      </TableScrollShell>
 
       <AvakahadaWheel highlighted={query.trim() ? rows : undefined} />
 

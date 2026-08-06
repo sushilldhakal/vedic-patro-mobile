@@ -5,7 +5,8 @@ import type { CalcNote } from "@/lib/dainikKranti/month-patro-tables";
 import { cn } from "@/lib/utils";
 import { PatroTableShell } from "./PatroTableShell";
 import { useLocale } from "@/lib/i18n";
-import { patroStickyHeadCell, patroStickyHeadRow } from "@/lib/patro-classes";
+import { patroStickyHeadCell } from "@/lib/patro-classes";
+import { TableHeader, TableRow } from "@/components/ui/DataTable";
 
 const UDAYAST_LEGEND: { code: string; full: string; fullEn: string; meaning: string; meaningEn: string }[] = [
   { code: "व.उ.", full: "वक्र उदय", fullEn: "Retrograde rising", meaning: "ग्रह वक्र (उल्टो) अवस्थामा उदय भएको।", meaningEn: "The planet rises while retrograde (moving backward)." },
@@ -114,16 +115,21 @@ export function MonthCalcNotes({ notes, loading, embedded }: Props) {
   ) : (
     <ScrollView horizontal showsHorizontalScrollIndicator>
       <View className="min-w-full">
-        <View className={cn("flex-row border-b border-border", patroStickyHeadRow)}>
+        <TableHeader>
           <View className={cn("w-14 px-2.5 py-2", patroStickyHeadCell)}>
             <Text className="text-xs font-semibold">{pick("गते", "Date")}</Text>
           </View>
           <View className={cn("flex-1 px-2.5 py-2", patroStickyHeadCell)}>
             <Text className="text-xs font-semibold">{pick("सूचना", "Notes")}</Text>
           </View>
-        </View>
-        {groups.map((group) => (
-          <View key={group.dateAd} className="flex-row border-b border-border/60">
+        </TableHeader>
+        {groups.map((group, groupIndex) => (
+          <TableRow
+            key={group.dateAd}
+            rowIndex={groupIndex}
+            borderTop={false}
+            className="border-b border-border/60"
+          >
             <View className="w-14 px-2.5 py-2">
               <Text className="font-num font-bold tabular-nums text-secondary">{digits(group.day)}</Text>
             </View>
@@ -138,7 +144,7 @@ export function MonthCalcNotes({ notes, loading, embedded }: Props) {
                 </View>
               ))}
             </View>
-          </View>
+          </TableRow>
         ))}
       </View>
     </ScrollView>

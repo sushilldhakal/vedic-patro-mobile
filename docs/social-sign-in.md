@@ -32,11 +32,25 @@ edit the native project.
 4. Rebuild the dev client (`npx expo run:ios` / `npx expo run:android`). The
    reversed-client URL scheme is added for you from the iOS client ID.
 
-For the **web** build, the Web OAuth client also needs, under *Authorised
-redirect URIs* and *Authorised JavaScript origins*, the origin you serve from
-(e.g. `http://localhost:8081` in dev). The app logs the exact redirect URI to the
-console in dev, and the sign-in sheet shows it if Google returns
-`redirect_uri_mismatch`.
+For the **web** build and for **dev builds that only have `googleWebClientId`**, the
+same **Web** OAuth client must list mobile redirect URIs (the web site uses
+`/auth/google/callback`; Expo uses `/oauthredirect` or a custom scheme):
+
+```bash
+node scripts/print-google-oauth-setup.cjs
+```
+
+Typical entries under *Authorized redirect URIs*:
+
+- `http://localhost:8081/oauthredirect` (Expo web / Metro default)
+- `http://localhost:19006/oauthredirect` (older Expo web port)
+- `vedicpatro:/oauthredirect` (iOS/Android dev or production build)
+
+Under *Authorized JavaScript origins* for web: `http://localhost:8081` (and your
+production web origin if you ship Expo web).
+
+The app logs `[Google OAuth] redirect URI:` in dev; the sign-in sheet lists the
+same checklist if Google returns `redirect_uri_mismatch`.
 
 **Google sign-in cannot work in Expo Go** — Expo Go runs under
 `host.exp.Exponent`, so an OAuth client registered for `com.vedicpatro.mobile`

@@ -12,6 +12,8 @@ const PALETTE_COLOR_CLASS =
 function themedTextColor(className: string | undefined, colors: ThemeColors): string | undefined {
   if (!className) return colors.foreground;
   if (PALETTE_COLOR_CLASS.test(className)) return undefined;
+  if (/\btext-\[#/.test(className)) return undefined;
+  if (/\btext-\[/.test(className)) return undefined;
   if (/\btext-muted-foreground\b/.test(className)) return colors.mutedForeground;
   if (/\btext-secondary-foreground\b/.test(className)) return "#ffffff";
   if (/\btext-secondary\b/.test(className)) return colors.secondary;

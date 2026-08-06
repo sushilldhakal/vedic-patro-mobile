@@ -1,5 +1,6 @@
-import { ScrollView, View } from "react-native"
-import { Text } from "@/components/ui/Text"
+import { View } from "react-native";
+import { Text } from "@/components/ui/Text";
+import { TableHeader, TableRow, TableScrollShell } from "@/components/ui/DataTable";
 import type { GocharGraha } from "@/lib/api";
 import {
   mergeKundaliRashi,
@@ -88,9 +89,9 @@ export function GocharRashyadiTable({
         ) : null}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator>
+      <TableScrollShell bordered={false} rounded={false}>
         <View className="min-w-full">
-          <View className="flex-row border-b border-border bg-muted/30">
+          <TableHeader>
             <View className="w-10 px-1 py-2" />
             {RASHYADI_PLANET_KEYS.map((key) => (
               <View key={key} className="min-w-[2.25rem] px-1 py-2">
@@ -99,7 +100,7 @@ export function GocharRashyadiTable({
                 </Text>
               </View>
             ))}
-          </View>
+          </TableHeader>
 
           <View className="flex-row border-b border-border/60">
             <View className="w-10 items-center justify-center px-1 py-2">
@@ -110,8 +111,13 @@ export function GocharRashyadiTable({
             ))}
           </View>
 
-          {RASHYADI_ROW_KEYS.map((rowKey) => (
-            <View key={rowKey} className="flex-row border-b border-border/60 last:border-b-0">
+          {RASHYADI_ROW_KEYS.map((rowKey, rowIndex) => (
+            <TableRow
+              key={rowKey}
+              rowIndex={rowIndex}
+              borderTop={false}
+              className="border-b border-border/60 last:border-b-0"
+            >
               <View className="w-10 items-center justify-center px-1 py-2">
                 <Text className="text-center text-xs font-semibold">
                   {rowLabelFor(segment, rowKey)}
@@ -127,10 +133,10 @@ export function GocharRashyadiTable({
                   </View>
                 );
               })}
-            </View>
+            </TableRow>
           ))}
         </View>
-      </ScrollView>
+      </TableScrollShell>
 
       <Text className="border-t border-border/60 px-3 py-1.5 text-xs text-muted-foreground">
         {pick(

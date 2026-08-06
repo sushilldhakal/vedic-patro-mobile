@@ -139,6 +139,8 @@ export function PatroDateNav(props: PatroDateNavProps) {
     crossEraSubtitle,
     toolbar,
     mobileToolbar,
+    mobileToolbarLower,
+    hideNavLocation,
     vikramEra,
     samvatsara: samvatsaraPayload,
     className,
@@ -206,7 +208,7 @@ export function PatroDateNav(props: PatroDateNavProps) {
   const dateChipLabel = (() => {
     if (mode === "year") return `${digits(year)} ${eraShort}`;
     if (mode === "year-month") {
-      return isCompact ? `${digits(year)}` : (monthTitleShort ?? "");
+      return monthTitleShort ?? monthTitle ?? "";
     }
     if (mode === "year-month-time") {
       const dayPart = `${digits(day)} ${monthTitle ?? ""}`.trim();
@@ -326,14 +328,30 @@ export function PatroDateNav(props: PatroDateNavProps) {
     </Pressable>
   );
 
-  const navRowPhone = (
+  const locationChip = (
+    <LocationChip location={safeLocation} onPress={sheet.openLocation} />
+  );
+
+  const resolvedToolbarLower =
+    mobileToolbarLower ?? (!hideNavLocation ? locationChip : null);
+
+  const navControlsPhone = (
+    <View className="-mt-1 min-w-0 flex-1 flex-row items-center gap-1">
+      {onPrev ? <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" compact={isPhone} /> : null}
+      {dateChip}
+      {onNext ? <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" compact={isPhone} /> : null}
+    </View>
+  );
+
+  const navRowPhone = resolvedToolbarLower ? (
+    <View className="-mt-1 flex-row items-start gap-2">
+      {navControlsPhone}
+      <View className="shrink-0 items-end justify-end self-start">{resolvedToolbarLower}</View>
+    </View>
+  ) : (
     <View className="-mt-1 flex-row items-center justify-between gap-2">
-      <View className="min-w-0 flex-1 flex-row items-center gap-1">
-        {onPrev ? <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" compact={isPhone} /> : null}
-        {dateChip}
-        {onNext ? <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" compact={isPhone} /> : null}
-      </View>
-      <LocationChip location={safeLocation} onPress={sheet.openLocation} />
+      {navControlsPhone}
+      {!hideNavLocation ? locationChip : null}
     </View>
   );
 
@@ -369,7 +387,7 @@ export function PatroDateNav(props: PatroDateNavProps) {
         )}
         {onNext ? <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" /> : null}
       </View>
-      <LocationChip location={safeLocation} onPress={sheet.openLocation} />
+      {!hideNavLocation ? locationChip : null}
     </View>
   );
 
@@ -382,10 +400,13 @@ export function PatroDateNav(props: PatroDateNavProps) {
             <View className="gap-0.5">
               <View className="flex-row items-center justify-between gap-2">
                 <View className="min-w-0 flex-1 self-center">{headlineCompact}</View>
-                {mobileToolbar ?? toolbar ? (
-                  <View className="h-[30px] shrink-0 flex-row items-center justify-end gap-1.5">
+                {mobileToolbar ? (
+                  <View className="h-[30px] shrink-0 flex-row items-center justify-end self-start [&>*]:h-full">
                     {mobileToolbar}
-                    {!mobileToolbar ? toolbar : null}
+                  </View>
+                ) : toolbar ? (
+                  <View className="h-[30px] shrink-0 flex-row items-center justify-end gap-1.5">
+                    {toolbar}
                   </View>
                 ) : null}
               </View>

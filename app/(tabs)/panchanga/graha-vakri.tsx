@@ -15,6 +15,7 @@ import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
+import { TableRow } from "@/components/ui/DataTable";
 import { useThemeColors } from "@/lib/theme-context";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 
@@ -29,10 +30,7 @@ function EventRow({ ev, index }: { ev: GrahaVakriEvent; index: number }) {
   const timeLabel = ev.entry_time_local_short ?? "";
 
   return (
-    <View
-      style={index % 2 === 1 ? { backgroundColor: colors.surfaceInset } : undefined}
-      className="flex-row items-center justify-between gap-2 rounded-md px-2.5 py-1.5"
-    >
+    <TableRow rowIndex={index} className="items-center justify-between gap-2 rounded-md px-2.5 py-1.5">
       <View className="flex-row items-center gap-1.5">
         <Text style={{ color: tone }} className="text-sm font-semibold">
           {isVakri ? "↺" : "→"}
@@ -47,7 +45,7 @@ function EventRow({ ev, index }: { ev: GrahaVakriEvent; index: number }) {
           <Text className="font-num text-muted-foreground"> · {digits(timeLabel)}</Text>
         ) : null}
       </Text>
-    </View>
+    </TableRow>
   );
 }
 

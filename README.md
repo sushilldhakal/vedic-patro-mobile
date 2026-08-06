@@ -59,6 +59,21 @@ That URL is for a **development build** (custom “Vedic Patro” app with `expo
 
 Also check: phone and Mac on the **same Wi‑Fi**, and Metro finished bundling (no red errors in the terminal).
 
+### Google sign-in (`redirect_uri_mismatch`)
+
+Google compares the redirect URI your app sends with what is registered on the **Web**
+OAuth client (`googleWebClientId` in `app.json`). The website uses
+`/auth/google/callback`; Expo uses `/oauthredirect` or `vedicpatro:/oauthredirect`.
+
+1. Run `node scripts/print-google-oauth-setup.cjs` and copy the listed URIs.
+2. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → your **Web**
+   OAuth client → add those under **Authorized redirect URIs** (and JS origins for web).
+3. **Expo Go does not support Google sign-in** — use a dev build: `npx expo run:ios` or
+   `npx expo run:android` (see `docs/social-sign-in.md`).
+
+After changing Google Console, wait a minute and try again. In dev, Metro logs
+`[Google OAuth] redirect URI:` — that exact string must appear in the console list.
+
 ### Local API (optional)
 
 To point at your local FastAPI server instead of production, edit `app.json`:

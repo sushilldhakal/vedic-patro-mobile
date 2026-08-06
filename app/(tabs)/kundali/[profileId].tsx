@@ -1,100 +1,76 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AuthDialog } from "@/components/auth/AuthDialog";
-import {
-  AshtakavargaCard,
-  AvakahadaCard,
-  BhavaBalaCard,
-  BhavaTable,
-  DashaTree,
-  GrahaAstroTable,
-  KundaliSection,
-  ShadbalaCard,
-  UpagrahaTable,
-  YogaList,
-  grahaName,
-} from "@/components/kundali/KundaliSections";
+import { ProfileForm, profileToInput } from "@/components/auth/ProfileForm";
+import { AyanamshaSelector } from "@/components/kundali/AyanamshaSelector";
+import { KundaliDetailView } from "@/components/kundali/KundaliDetailView";
 import { KundaliLoginPrompt } from "@/components/kundali/KundaliLoginPrompt";
 import { KundaliPageShell } from "@/components/kundali/KundaliPageShell";
 import {
-  KundaliProfilePicker,
-  type KundaliProfilePickerHandle,
-} from "@/components/kundali/KundaliProfilePicker";
-import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
-import { D1Chart } from "@/components/panchanga/D1Chart";
+  KundaliProfileHeader,
+  formatProfileBirthDateLabel,
+} from "@/components/kundali/KundaliProfileHeader";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
-import { fetchKundaliDetail, kundaliDetailKeys, type VargaChartEntry } from "@/lib/api";
+import { BottomSheetModal } from "@/components/ui/BottomSheetModal";
+import { fetchKundaliDetail, kundaliDetailKeys } from "@/lib/api";
+import { type AyanamshaMode } from "@/lib/ayanamsha";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { buildBhavaChart } from "@/lib/bhava";
-import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
+import { getStoredAyanamshaMode, setStoredAyanamshaMode } from "@/lib/kundali/ayanamsha-storage";
+import { useKundaliSection } from "@/lib/kundali/use-kundali-section";
 import { instantFromCivilIso } from "@/lib/instant-query";
-import { profileChartParams } from "@/lib/kundali/profile-chart";
-import { useProfilesQuery } from "@/lib/kundali/profiles-query";
+import {
+  parseBirthDate,
+  profileChartParams,
+  profileLocation,
+} from "@/lib/kundali/profile-chart";
+import { PROFILES_QUERY_KEY, useProfilesQuery } from "@/lib/kundali/profiles-query";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { formatRashiByNumber, rashiNeFromNumber } from "@/lib/rashi-i18n";
-import { useBreakpoint } from "@/lib/responsive";
+import { toNepaliDigits } from "@/lib/panchanga-format";
 import { useThemeColors } from "@/lib/theme-context";
-
-/** Vertical divisions the server ships; D1 + D9 lead, the rest follow. */
-const PRIMARY_DIVISIONS = [1, 9];
-
-function StatTile({
-  label,
-  value,
-  sub,
-  width,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  width: string;
-}) {
-  return (
-    <View
-      style={{ width: width as never }}
-      className="rounded-xl border border-border bg-card px-3.5 py-3"
-    >
-      <Text
-        numberOfLines={1}
-        className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-        style={nepaliTextStyle(10)}
-      >
-        {label}
-      </Text>
-      <Text className="text-base font-bold leading-tight text-foreground" style={nepaliTextStyle(15)}>
-        {value}
-      </Text>
-      {sub ? (
-        <Text className="mt-0.5 text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
-          {sub}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function KundaliDetailScreen() {
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const { lang, pick, digits } = useLocale();
   const router = useRouter();
   const colors = useThemeColors();
-  const { width } = useBreakpoint();
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-  const [division, setDivision] = useState(1);
-  const pickerRef = useRef<KundaliProfilePickerHandle>(null);
-  const { data: profiles, isLoading: profilesLoading } = useProfilesQuery(isAuthenticated);
+  const [editOpen, setEditOpen] = useState(false);
+  const [ayanamshaMode, setAyanamshaModeState] = useState<AyanamshaMode>("nepal");
+  const { section, setSection } = useKundaliSection();
+
+  useEffect(() => {
+    void getStoredAyanamshaMode().then((saved) => {
+      if (saved) setAyanamshaModeState(saved);
+    });
+  }, []);
+
+  const setAyanamshaMode = (next: AyanamshaMode) => {
+    setAyanamshaModeState(next);
+    void setStoredAyanamshaMode(next);
+  };
+
+  const { data: profiles, isLoading: profilesLoading, isError: profilesError } = useProfilesQuery(
+    isAuthenticated,
+  );
 
   const profile = useMemo(
     () => profiles?.find((p) => p.id === profileId) ?? null,
     [profiles, profileId],
   );
+  const birthDate = useMemo(() => (profile ? parseBirthDate(profile) : null), [profile]);
+  const location = useMemo(() => (profile ? profileLocation(profile) : null), [profile]);
   const chart = profile ? profileChartParams(profile) : null;
 
   const moment = useMemo(
@@ -102,51 +78,71 @@ export default function KundaliDetailScreen() {
     [chart],
   );
 
+  const detailQueryKey = useMemo(
+    () =>
+      moment && chart
+        ? kundaliDetailKeys.atTime(moment, chart.location.params, ayanamshaMode)
+        : (["kundali", "detail", "idle", profileId ?? ""] as const),
+    [moment, chart, profileId, ayanamshaMode],
+  );
+
   const detailQuery = useQuery({
-    queryKey: kundaliDetailKeys.atTime(moment!, chart?.location.params),
-    queryFn: () => fetchKundaliDetail(moment!, chart?.location.params),
-    enabled: Boolean(moment),
+    queryKey: detailQueryKey,
+    queryFn: () => fetchKundaliDetail(moment!, chart!.location.params, { ayanamsha: ayanamshaMode }),
+    enabled: Boolean(moment && chart),
     staleTime: 1000 * 60 * 10,
     placeholderData: keepPreviousData,
   });
 
   const detail = detailQuery.data;
+  const canShowChart = Boolean(birthDate && location && chart);
 
-  const d1Rows: VargaChartEntry[] = detail?.vargaCharts.entries["1"] ?? [];
-  const divisions = detail?.vargaCharts.divisions ?? PRIMARY_DIVISIONS;
-
-  /** North-Indian chart houses for the selected division. */
-  const houses = useMemo(() => {
-    if (!detail) return [];
-    const entries = detail.vargaCharts.entries[String(division)] ?? [];
-    const lagna = entries.find((e) => e.key === "lagna");
-    if (!lagna) return [];
-    const planetRashis = entries
-      .filter((e) => e.key !== "lagna")
-      .map((e) => ({
-        key: e.key,
-        labelNe: GRAHA_NAME[e.key as GrahaKey]?.ne ?? e.key,
-        rashi: e.vargaRashi,
-      }));
-    return buildBhavaChart(lagna.vargaRashi, planetRashis, rashiNeFromNumber);
-  }, [detail, division]);
+  const birthDateLabel = profile
+    ? formatProfileBirthDateLabel(profile, birthDate, lang, lang === "en" ? digits : toNepaliDigits)
+    : "—";
+  const birthTime = profile?.birth_time ? digits(profile.birth_time) : "—";
+  const place = profile?.location_label || profile?.city || "—";
 
   const openAuth = (mode: "login" | "signup") => {
     setAuthMode(mode);
     setAuthOpen(true);
   };
 
-  const tileCols = width >= 1024 ? 4 : width >= 640 ? 3 : 2;
-  const tileWidth = `${(100 / tileCols - 1.5).toFixed(2)}%`;
-
-  const panchanga = detail?.panchanga;
-  const birthMeta = detail?.birthMeta;
+  const topBar = (
+    <View className="mb-4 flex-row flex-wrap items-center justify-between gap-3">
+      <Pressable onPress={() => router.back()} className="flex-row items-center gap-1.5 active:opacity-70">
+        <Ionicons name="arrow-back" size={18} color={colors.foreground} />
+        <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+          {pick("सबै कुण्डली", "All charts")}
+        </Text>
+      </Pressable>
+      <View className="flex-row flex-wrap gap-2">
+        <Button
+          label={pick("अर्को कुण्डली", "Other chart")}
+          size="sm"
+          variant="outline"
+          onPress={() => router.push("/kundali" as never)}
+        />
+        {profile ? (
+          <Button
+            label={pick("सम्पादन", "Edit profile")}
+            size="sm"
+            variant="outline"
+            onPress={() => setEditOpen(true)}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
 
   const renderBody = () => {
     if (authLoading || (isAuthenticated && profilesLoading && !profile)) {
       return (
-        <View className="items-center rounded-xl border border-dashed border-border bg-muted/20 px-5 py-12">
+        <View className="items-center rounded-xl border border-dashed border-border bg-muted/20 px-5 py-16">
           <ActivityIndicator />
+          <Text className="mt-3 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+            {pick("लोड हुँदै…", "Loading…")}
+          </Text>
         </View>
       );
     }
@@ -164,32 +160,44 @@ export default function KundaliDetailScreen() {
       );
     }
 
-    if (!profile) {
+    if (profilesError || (!profilesLoading && !profile)) {
       return (
         <Card>
-          <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+          <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
             {pick("प्रोफाइल फेला परेन।", "Profile not found.")}
+          </Text>
+          <Text className="mt-1 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            {pick("प्रोफाइल मेटिएको वा लिङ्क गलत हुन सक्छ।", "The profile may have been removed or the link is wrong.")}
           </Text>
         </Card>
       );
     }
 
-    if (!chart) {
+    if (!profile) return null;
+
+    if (!canShowChart) {
       return (
-        <Card>
-          <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+        <View className="items-center rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-16">
+          <Ionicons name="time-outline" size={40} color={colors.mutedForeground} />
+          <Text className="mt-4 text-base font-semibold text-foreground" style={nepaliTextStyle(16)}>
+            {pick("जन्म मिति छैन", "No birth date")}
+          </Text>
+          <Text className="mt-2 max-w-md text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
             {pick(
-              "यो प्रोफाइलमा जन्म मिति छैन — खातामा गएर थप्नुहोस्।",
-              "This profile has no birth date — add one in your account.",
+              "कुण्डली बनाउन जन्म मिति, समय र स्थान थप्नुहोस्।",
+              "Add birth date, time and place to generate the chart.",
             )}
           </Text>
-        </Card>
+          <View className="mt-6">
+            <Button label={pick("प्रोफाइल सम्पादन", "Edit profile")} onPress={() => setEditOpen(true)} />
+          </View>
+        </View>
       );
     }
 
     if (detailQuery.isLoading && !detail) {
       return (
-        <View className="items-center rounded-xl border border-dashed border-border bg-muted/20 px-5 py-12">
+        <View className="items-center rounded-xl border border-dashed border-border bg-muted/20 px-5 py-16">
           <ActivityIndicator />
           <Text className="mt-3 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
             {pick("कुण्डली गणना हुँदै…", "Computing the chart…")}
@@ -213,182 +221,18 @@ export default function KundaliDetailScreen() {
 
     return (
       <View>
-        {/* birth summary */}
-        <View className="mb-4 flex-row flex-wrap gap-2">
-          <StatTile
-            width={tileWidth}
-            label={pick("जन्म मिति", "Birth date")}
-            value={`${profile.birth_date ?? chart.adDate}`}
-            sub={(profile.birth_era ?? "bs").toUpperCase()}
-          />
-          <StatTile
-            width={tileWidth}
-            label={pick("जन्म समय", "Birth time")}
-            value={digits(birthMeta?.birthClock ?? chart.clock)}
-            sub={
-              birthMeta?.isDayBirth == null
-                ? undefined
-                : birthMeta.isDayBirth
-                  ? pick("दिवा जन्म", "Day birth")
-                  : pick("रात्रि जन्म", "Night birth")
-            }
-          />
-          <StatTile
-            width={tileWidth}
-            label={pick("जन्म स्थान", "Birth place")}
-            value={profile.location_label || profile.city || "—"}
-            sub={profile.timezone || undefined}
-          />
-          <StatTile
-            width={tileWidth}
-            label={pick("लग्न", "Lagna")}
-            value={
-              detail.lagnaRashi ? formatRashiByNumber(detail.lagnaRashi, lang) : "—"
-            }
-            sub={detail.ayanamsha}
-          />
-        </View>
-
-        {/* chart */}
-        <KundaliSection
-          title={pick("कुण्डली चक्र", "Chart")}
-          subtitle={pick("उत्तर भारतीय शैली", "North Indian style")}
-          icon="grid-outline"
-        >
-          {divisions.length > 1 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 6, paddingBottom: 10 }}
-            >
-              {divisions.map((d) => {
-                const active = d === division;
-                return (
-                  <Pressable
-                    key={d}
-                    onPress={() => setDivision(d)}
-                    style={{
-                      backgroundColor: active ? colors.secondary : colors.surfaceInset,
-                      borderColor: active ? colors.secondary : colors.border,
-                    }}
-                    className="rounded-lg border px-3 py-1.5 active:opacity-80"
-                  >
-                    <Text
-                      style={{ color: active ? "#ffffff" : colors.foreground }}
-                      className="font-num text-xs font-bold"
-                    >
-                      D{digits(d)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          ) : null}
-          {houses.length ? (
-            <View className="items-center">
-              <D1Chart houses={houses} />
-            </View>
-          ) : null}
-        </KundaliSection>
-
-        <KundaliSection
-          title={pick("ग्रह स्पष्ट", "Graha positions")}
-          subtitle={pick("D१ — राशि, अंश, नक्षत्र र स्वामी", "D1 — sign, degree, nakshatra & lords")}
-          icon="planet-outline"
-        >
-          <GrahaAstroTable
-            d1Rows={d1Rows}
-            points={detail.vargaCharts.points}
-            combustion={detail.combustion}
-          />
-        </KundaliSection>
-
-        <KundaliSection
-          title={pick("भाव विवरण", "Bhava table")}
-          subtitle={pick("स्थित ग्रह, स्वामी र दृष्टि", "Residents, lords and aspects")}
-          icon="home-outline"
-        >
-          <BhavaTable division={division} anchorKey="lagna" vargaCharts={detail.vargaCharts} />
-        </KundaliSection>
-
-        {detail.avakahada ? (
-          <KundaliSection
-            title={pick("जन्म अवकहडा", "Janma Avakahada")}
-            subtitle={pick("नक्षत्रबाट निस्कने जन्म विवरण", "Birth traits from the natal nakshatra")}
-            icon="star-outline"
-          >
-            <AvakahadaCard data={detail.avakahada} />
-          </KundaliSection>
-        ) : null}
-
-        {detail.dasha?.tree?.length ? (
-          <KundaliSection
-            title={pick("विंशोत्तरी दशा", "Vimshottari Dasha")}
-            subtitle={pick("महादशा — थिच्नुहोस् अन्तर्दशा हेर्न", "Mahadasha — tap to open sub-periods")}
-            icon="time-outline"
-          >
-            <DashaTree tree={detail.dasha.tree} />
-          </KundaliSection>
-        ) : null}
-
-        <KundaliSection
-          title={pick("षड्बल", "Shadbala")}
-          subtitle={pick("ग्रह बल — रूपमा", "Planetary strength, in rupas")}
-          icon="barbell-outline"
-        >
-          <ShadbalaCard shadbala={detail.shadbala} />
-        </KundaliSection>
-
-        {detail.bhavaBala ? (
-          <KundaliSection
-            title={pick("भाव बल", "Bhava Bala")}
-            subtitle={pick("भावको सापेक्ष बल", "Relative house strength")}
-            icon="stats-chart-outline"
-          >
-            <BhavaBalaCard data={detail.bhavaBala} />
-          </KundaliSection>
-        ) : null}
-
-        {detail.ashtakavarga ? (
-          <KundaliSection
-            title={pick("अष्टकवर्ग", "Ashtakavarga")}
-            subtitle={pick("प्रस्तार र शोधित बिन्दु", "Raw and reduced bindus")}
-            icon="apps-outline"
-          >
-            <AshtakavargaCard data={detail.ashtakavarga} />
-          </KundaliSection>
-        ) : null}
-
-        {detail.upagrahas?.length ? (
-          <KundaliSection
-            title={pick("उपग्रह", "Upagrahas")}
-            subtitle={pick("गुलिक, माण्डी आदि", "Gulika, Mandi and the rest")}
-            icon="ellipse-outline"
-          >
-            <UpagrahaTable rows={detail.upagrahas} />
-          </KundaliSection>
-        ) : null}
-
-        <KundaliSection
-          title={pick("योग", "Yogas")}
-          subtitle={pick("कुण्डलीमा बनेका योग", "Combinations present in this chart")}
-          icon="sparkles-outline"
-        >
-          <YogaList yogas={detail.yogas} />
-        </KundaliSection>
-
-        <KundaliSection
-          title={pick("शान्ति विधि", "Shanti Vidhi")}
-          subtitle={pick("यस कुण्डलीका लागि उपाय", "Remedies for this chart")}
-          icon="flame-outline"
-        >
-          <ShantiVidhiPanel vimshottari={detail.dasha ?? undefined} shadbala={detail.shadbala} />
-        </KundaliSection>
-
-        <KundaliProfilePicker
-          ref={pickerRef}
-          selectedId={profile.id}
-          onSelect={(p) => router.replace(`/kundali/${p.id}` as never)}
+        <KundaliProfileHeader
+          profile={profile}
+          birthDateLabel={birthDateLabel}
+          birthTime={birthTime}
+          place={place}
+        />
+        <AyanamshaSelector mode={ayanamshaMode} onModeChange={setAyanamshaMode} />
+        <KundaliDetailView
+          detail={detail}
+          section={section}
+          ayanamshaMode={ayanamshaMode}
+          timeZone={profile?.timezone}
         />
       </View>
     );
@@ -397,19 +241,10 @@ export default function KundaliDetailScreen() {
   return (
     <>
       <KundaliPageShell
-        eyebrow={pick("ज्योतिष", "Jyotish")}
-        title={profile?.full_name ?? pick("कुण्डली", "Kundali")}
-        subtitle={
-          profile
-            ? pick("जन्मकुण्डली विवरण", "Birth chart details")
-            : pick("प्रोफाइल लोड हुँदै…", "Loading profile…")
-        }
-        headerRight={
-          <Pressable onPress={() => router.back()} className="rounded-lg p-2 active:bg-muted">
-            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
-          </Pressable>
-        }
+        variant="detail"
+        sectionNav={{ activeId: section, onNavigate: setSection }}
       >
+        {topBar}
         {renderBody()}
       </KundaliPageShell>
 
@@ -419,6 +254,49 @@ export default function KundaliDetailScreen() {
         onOpenChange={setAuthOpen}
         initialMode={authMode}
       />
+
+      {profile ? (
+        <BottomSheetModal
+          visible={editOpen}
+          onClose={() => setEditOpen(false)}
+          keyboardAvoiding
+          maxHeight="92%"
+        >
+          <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
+            <Pressable onPress={() => setEditOpen(false)} hitSlop={8} className="min-w-[4.5rem] active:opacity-70">
+              <Text className="text-base text-muted-foreground" style={nepaliTextStyle(15)}>
+                {pick("रद्द", "Cancel")}
+              </Text>
+            </Pressable>
+            <Text
+              className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
+              style={nepaliTextStyle(16)}
+              numberOfLines={1}
+            >
+              {pick("प्रोफाइल सम्पादन", "Edit profile")}
+            </Text>
+            <View className="min-w-[4.5rem]" />
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              paddingHorizontal: 16,
+              paddingTop: 16,
+              paddingBottom: Math.max(insets.bottom, 16),
+            }}
+          >
+            <ProfileForm
+              initial={profileToInput(profile)}
+              existing={profile}
+              onCancel={() => setEditOpen(false)}
+              onSaved={async () => {
+                setEditOpen(false);
+                await queryClient.invalidateQueries({ queryKey: PROFILES_QUERY_KEY });
+              }}
+            />
+          </ScrollView>
+        </BottomSheetModal>
+      ) : null}
     </>
   );
 }

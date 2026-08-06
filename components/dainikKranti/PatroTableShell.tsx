@@ -1,8 +1,9 @@
 import { type ReactNode } from "react";
-import { ScrollView, View } from "react-native"
-import { Text } from "@/components/ui/Text"
-import { cn } from "@/lib/utils";
+import { View } from "react-native";
+import { Text } from "@/components/ui/Text";
+import { TableScrollShell } from "@/components/ui/DataTable";
 import { useLocale } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 type Props = {
   titleNe: string;
@@ -26,9 +27,9 @@ export function PatroTableShell({ titleNe, titleEn, subtitle, subtitleEn, childr
           </Text>
         ) : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator className="max-w-full">
+      <TableScrollShell bordered={false} rounded={false} className="max-w-full">
         {children}
-      </ScrollView>
+      </TableScrollShell>
     </View>
   );
 }

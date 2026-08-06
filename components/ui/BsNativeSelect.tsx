@@ -35,7 +35,7 @@ function WebSelect({ value, options, onChange, ariaLabel, minWidth = 72 }: Selec
         position: "relative",
         display: "inline-flex",
         minWidth,
-        height: 30,
+        height: 36,
         alignItems: "center",
         gap: 2,
         borderRadius: 8,
@@ -88,7 +88,7 @@ function AndroidSelect({ value, options, onChange, minWidth = 72 }: SelectProps)
   const colors = useThemeColors();
   return (
     <View
-      className="h-[30px] justify-center overflow-hidden rounded-lg border border-border bg-card"
+      className="h-9 justify-center overflow-hidden rounded-lg border border-border bg-card"
       style={{ minWidth }}
     >
       <Picker
@@ -96,7 +96,7 @@ function AndroidSelect({ value, options, onChange, minWidth = 72 }: SelectProps)
         onValueChange={(v) => onChange(Number(v))}
         mode="dropdown"
         dropdownIconColor={colors.mutedForeground}
-        style={{ height: 30, marginTop: -4, marginBottom: -4 }}
+        style={{ height: 36, marginTop: -4, marginBottom: -4 }}
       >
         {options.map((o) => (
           <Picker.Item key={o.value} label={o.label} value={o.value} color={colors.foreground} />

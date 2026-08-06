@@ -15,6 +15,12 @@ import { MonthCalcNotes } from "@/components/dainikKranti/MonthCalcNotes";
 import { MonthGrahaSpashta } from "@/components/dainikKranti/MonthGrahaSpashta";
 import { MonthLagnaMatrix } from "@/components/dainikKranti/MonthLagnaMatrix";
 import { PatroAccordion, PatroAccordionItem } from "@/components/dainikKranti/PatroAccordion";
+import {
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+  TableScrollShell,
+} from "@/components/ui/DataTable";
 import { PanchangaShellLayout } from "@/components/panchanga/PanchangaShellLayout";
 import {
   apiKeys,
@@ -47,11 +53,11 @@ import {
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { formatTimeShort, formatVedicPatroTime } from "@/lib/panchanga-format";
-import { patroStickyHeadCell, patroStickyHeadRow } from "@/lib/patro-classes";
+import { patroStickyHeadCell } from "@/lib/patro-classes";
 import { useBreakpoint } from "@/lib/responsive";
+import { useThemeColors } from "@/lib/theme-context";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { cn } from "@/lib/utils";
-import { useThemeColors } from "@/lib/theme-context";
 
 type Phase = "krishna" | "shukla";
 
@@ -162,6 +168,12 @@ function phaseOf(day: CalendarDay): Phase | undefined {
   return undefined;
 }
 
+function defaultMobilePaksha(days: CalendarDay[], todayAd: string): Phase {
+  const today = days.find((d) => d.date_ad === todayAd);
+  const phase = today ? phaseOf(today) : undefined;
+  return phase === "krishna" || phase === "shukla" ? phase : "shukla";
+}
+
 function pakshaShort(day: CalendarDay, isEn = false): string {
   const p = phaseOf(day);
   if (isEn) return p === "shukla" ? "Shukla" : p === "krishna" ? "Krishna" : "";
@@ -269,9 +281,29 @@ export default function DainikKrantiScreen() {
   });
 
   const allDays = useMemo(() => monthQ.data?.calendar ?? [], [monthQ.data]);
+
+  const effectivePaksha = useMemo((): PakshaFilter => {
+    if (!isCompact) return paksha;
+    if (paksha === "krishna" || paksha === "shukla") return paksha;
+    return defaultMobilePaksha(allDays, todayAd);
+  }, [isCompact, paksha, allDays, todayAd]);
+
+  useEffect(() => {
+    if (!isCompact || paksha !== "all" || allDays.length === 0) return;
+    setPaksha(defaultMobilePaksha(allDays, todayAd));
+  }, [isCompact, paksha, allDays, todayAd]);
+
+  const mobilePakshaDisplay =
+    effectivePaksha === "krishna" || effectivePaksha === "shukla"
+      ? effectivePaksha
+      : defaultMobilePaksha(allDays, todayAd);
+
   const days = useMemo(
-    () => (paksha === "all" ? allDays : allDays.filter((d) => phaseOf(d) === paksha)),
-    [allDays, paksha],
+    () =>
+      effectivePaksha === "all"
+        ? allDays
+        : allDays.filter((d) => phaseOf(d) === effectivePaksha),
+    [allDays, effectivePaksha],
   );
 
   const specialQ = useQuery({
@@ -434,8 +466,16 @@ export default function DainikKrantiScreen() {
     ? `${BS_MONTH_NAMES[month - 1]} (${BS_MONTHS_NE[month - 1]})`
     : BS_MONTHS_NE[month - 1];
   const pakshaLabel = isEnglish
-    ? paksha === "krishna" ? "Krishna Paksha" : paksha === "shukla" ? "Shukla Paksha" : "Full month"
-    : paksha === "krishna" ? "कृष्णपक्ष" : paksha === "shukla" ? "शुक्लपक्ष" : "पूरा महिना";
+    ? effectivePaksha === "krishna"
+      ? "Krishna Paksha"
+      : effectivePaksha === "shukla"
+        ? "Shukla Paksha"
+        : "Full month"
+    : effectivePaksha === "krishna"
+      ? "कृष्णपक्ष"
+      : effectivePaksha === "shukla"
+        ? "शुक्लपक्ष"
+        : "पूरा महिना";
 
   const pageLoading =
     monthQ.isLoading || specialQ.isLoading || gocharQ.isLoading || ingressQ.isLoading;
@@ -447,8 +487,8 @@ export default function DainikKrantiScreen() {
       <DainikKrantiHeader
         year={year}
         month={month}
-        todayAd={todayAd}
         paksha={paksha}
+        mobilePakshaDisplay={mobilePakshaDisplay}
         onPakshaChange={setPaksha}
         onToday={goToday}
         onMonthChange={setMonth}
@@ -523,7 +563,7 @@ export default function DainikKrantiScreen() {
                   </Text>
                 </View>
               ) : (
-                days.map((d) => {
+                days.map((d, dayIndex) => {
                   const segLabel = headerByDate[d.date_ad];
                   return (
                     <Fragment key={d.date_ad}>
@@ -688,7 +728,7 @@ export default function DainikKrantiScreen() {
               {pakshaLabel} {pick("कर्तव्य", "duties")}
             </Text>
             <View className="gap-2">
-              {paksha === "all" ? (
+              {effectivePaksha === "all" ? (
                 <>
                   <Text className="text-sm leading-relaxed text-foreground" style={nepaliTextStyle(14)}>
                     {pick(KARTAVYA.krishna.ne, KARTAVYA.krishna.en)}
@@ -699,7 +739,7 @@ export default function DainikKrantiScreen() {
                 </>
               ) : (
                 <Text className="text-sm leading-relaxed text-foreground" style={nepaliTextStyle(14)}>
-                  {pick(KARTAVYA[paksha].ne, KARTAVYA[paksha].en)}
+                  {pick(KARTAVYA[effectivePaksha].ne, KARTAVYA[effectivePaksha].en)}
                 </Text>
               )}
             </View>
@@ -864,9 +904,9 @@ function DesktopPatroTable({
   const subLine = "text-xs leading-tight text-muted-foreground";
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator className="rounded-xl border border-border">
+    <TableScrollShell className="rounded-xl">
       <View>
-        <View className={cn("flex-row border-b border-border", patroStickyHeadRow)}>
+        <TableHeader>
           <View className={cn(th, patroStickyHeadCell, "w-9")} />
           <View className={cn(th, patroStickyHeadCell, "min-w-[5rem]")}>
             <Text className="font-semibold">{pick("गते · ता.", "Date")}</Text>
@@ -904,7 +944,7 @@ function DesktopPatroTable({
           <View className={cn(th, patroStickyHeadCell, "min-w-[6rem]")}>
             <Text className="font-semibold">{pick("पर्व", "Festival")}</Text>
           </View>
-        </View>
+        </TableHeader>
 
         {isError ? (
           <View className="py-8">
@@ -919,7 +959,7 @@ function DesktopPatroTable({
             </Text>
           </View>
         ) : (
-          days.map((d) => {
+          days.map((d, dayIndex) => {
             const det = d.panchanga;
             const tithiEnd = angaEnd(det?.tithi, digits, isEn);
             const nakEnd = angaEnd(det?.nakshatra, digits, isEn);
@@ -942,12 +982,11 @@ function DesktopPatroTable({
                     </Text>
                   </View>
                 ) : null}
-                <View
-                  className={cn(
-                    "flex-row border-b border-border",
-                    isToday && "bg-secondary/15",
-                    !isToday && hasFestival && "bg-rose-500/5",
-                  )}
+                <TableRow
+                  rowIndex={dayIndex}
+                  highlight={isToday}
+                  borderTop={false}
+                  className="border-b border-border"
                 >
                   <View className="w-9 items-center justify-center px-1">
                     <Pressable
@@ -1029,7 +1068,7 @@ function DesktopPatroTable({
                       {hasFestival ? d.festivals.join(" · ") : "—"}
                     </Text>
                   </View>
-                </View>
+                </TableRow>
                 {isExpanded ? (
                   <View className="border-b border-border bg-muted/25 px-4 py-2">
                     <DayPatroExpandPanel
@@ -1044,6 +1083,6 @@ function DesktopPatroTable({
           })
         )}
       </View>
-    </ScrollView>
+    </TableScrollShell>
   );
 }

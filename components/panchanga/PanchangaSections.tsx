@@ -62,7 +62,12 @@ import {
   UptoValue,
   panchangaCardGrid,
 } from "./PanchangaLayout";
+import { CalendarMoonPhaseIcon } from "@/components/panchanga/CalendarMoonPhaseIcon";
 import { NavataraBalamCardGrid } from "./NavataraBalamCardGrid";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { GrahaStatusBadges } from "@/components/graha/GrahaStatusBadges";
+import type { GrahaKey } from "@/lib/graha-details";
+import { tithiIndexFromPanchanga } from "@/lib/tithi-wheel-data";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 
@@ -123,6 +128,7 @@ export function SunMoonSamvatSection({ p }: { p: PanchangaDay }) {
     ? resolveSamvatsaraForBsYear(bs.year, p.samvatsara as Parameters<typeof resolveSamvatsaraForBsYear>[1])
     : undefined;
   const pakshaLabel = formatPakshaLabel(p, lang) ?? "—";
+  const tithiIdx = tithiIndexFromPanchanga(p);
 
   return (
     <PanchangaSection titleKey="sections.sun_moon_samvat">
@@ -136,11 +142,11 @@ export function SunMoonSamvatSection({ p }: { p: PanchangaDay }) {
           <Text className="font-mono font-semibold">{getSunsetDisplay(p) ?? "—"}</Text>
         </PanchangaFieldCell>
         <PanchangaFieldCell labelKey="sections.moonrise" nowrap>
-          <Text>🌒</Text>
+          <CalendarMoonPhaseIcon tithiIndex={tithiIdx} size={16} />
           <Text className="font-mono font-semibold">{getMoonriseDisplay(p, lang) ?? "—"}</Text>
         </PanchangaFieldCell>
         <PanchangaFieldCell labelKey="sections.moonset" nowrap>
-          <Text>🌘</Text>
+          <CalendarMoonPhaseIcon tithiIndex={tithiIdx} size={16} />
           <Text className="font-mono font-semibold">{getMoonsetDisplay(p, lang) ?? "—"}</Text>
         </PanchangaFieldCell>
         {belaantar ? (
@@ -203,8 +209,7 @@ export function PanchangCoreSection({ p }: { p: PanchangaDay }) {
   const yoga = (instant ? p.yoga : detail?.yoga ?? p.yoga) as Anga | undefined;
   const karana = (instant ? p.karana : detail?.karana ?? p.karana) as Anga | undefined;
   const paksha = formatPakshaLabel(p, lang) ?? formatPakshaNepaliDisplay(p);
-  const pakshaName = (detail?.paksha as { name?: string } | undefined)?.name;
-  const pakshaSym = pakshaName === "shukla" ? "🌕" : "🌑";
+  const tithiIdx = tithiIndexFromPanchanga(p);
 
   return (
     <PanchangaSection titleKey="sections.panchang_core">
@@ -227,7 +232,7 @@ export function PanchangCoreSection({ p }: { p: PanchangaDay }) {
           </Text>
         </PanchangaFieldCell>
         <PanchangaFieldCell labelKey="sections.paksha" nowrap>
-          <Text>{pakshaSym}</Text>
+          <CalendarMoonPhaseIcon tithiIndex={tithiIdx} size={16} />
           <Text className="font-semibold">{paksha ?? "—"}</Text>
         </PanchangaFieldCell>
       </PanchangaTableBody>
@@ -277,14 +282,22 @@ function BalamCardGrid({
   clock,
   formatName,
   lang,
+  variant,
 }: {
   cards: BalamCardItem[];
   clock?: string;
   formatName: (card: BalamCardItem) => string;
   lang?: string;
+  variant: "chandrabala" | "tarabala";
 }) {
   return (
-    <NavataraBalamCardGrid cards={cards} clock={clock} formatName={formatName} lang={lang} />
+    <NavataraBalamCardGrid
+      cards={cards}
+      clock={clock}
+      formatName={formatName}
+      lang={lang}
+      variant={variant}
+    />
   );
 }
 
@@ -295,6 +308,7 @@ function BalamKindBlock({
   clock,
   formatName,
   lang,
+  variant,
 }: {
   label: string;
   moonRef?: string;
@@ -302,6 +316,7 @@ function BalamKindBlock({
   clock?: string;
   formatName: (card: BalamCardItem) => string;
   lang?: string;
+  variant: "chandrabala" | "tarabala";
 }) {
   if (!cards.length) return null;
 
@@ -311,7 +326,13 @@ function BalamKindBlock({
       {moonRef ? (
         <Text className="m-0 text-center text-sm text-muted-foreground">{moonRef}</Text>
       ) : null}
-      <BalamCardGrid cards={cards} clock={clock} formatName={formatName} lang={lang} />
+      <BalamCardGrid
+        cards={cards}
+        clock={clock}
+        formatName={formatName}
+        lang={lang}
+        variant={variant}
+      />
     </View>
   );
 }
@@ -354,6 +375,7 @@ export function BalamSection({ p, clock }: { p: PanchangaDay; clock?: string }) 
         clock={clock}
         formatName={formatRashiName}
         lang={lang}
+        variant="chandrabala"
       />
       <BalamKindBlock
         label={t("muhurta_aside.tarabal")}
@@ -362,6 +384,7 @@ export function BalamSection({ p, clock }: { p: PanchangaDay; clock?: string }) 
         clock={clock}
         formatName={formatNakName}
         lang={lang}
+        variant="tarabala"
       />
     </PanchangaSection>
   );
@@ -808,20 +831,24 @@ export function PlanetsPanel({ p }: { p: PanchangaDay }) {
             )}
           </View>
         )}
-        {planets.map(({ key, label, labelEn, rashiNe, rashiEn, coords }) => (
+        {planets.map(({ key, label, labelEn, rashiNe, rashiEn, coords, isRetrograde, isCombust }) => (
           <View
             key={key}
-            className="flex items-center gap-3 py-2 border-b border-border last:border-0"
+            className="flex flex-row flex-wrap items-start gap-x-3 gap-y-1 py-2 border-b border-border last:border-0"
           >
+            <GrahaPlanetIcon graha={key as GrahaKey} size={32} />
             <View className="min-w-0 flex-1">
-              <Text className="text-sm font-semibold">{pick(label, labelEn)}</Text>
+              <View className="flex-row flex-wrap items-center gap-1.5">
+                <Text className="text-sm font-semibold">{pick(label, labelEn)}</Text>
+                <GrahaStatusBadges planetKey={key} isRetrograde={isRetrograde} isCombust={isCombust} />
+              </View>
               {(rashiNe || rashiEn) ? (
                 <Text className="text-sm">
                   {formatRashiDisplay(rashiNe, rashiEn, lang) ?? pick(rashiNe ?? "", rashiEn ?? "")}
                 </Text>
               ) : null}
             </View>
-            <Text className="font-mono text-sm font-semibold text-foreground whitespace-nowrap">
+            <Text className="font-mono text-sm font-semibold text-foreground">
               {coords}
             </Text>
           </View>

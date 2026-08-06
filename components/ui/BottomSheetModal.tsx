@@ -11,6 +11,8 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useThemeColors } from "@/lib/theme-context";
 
 const OPEN_MS = 280;
 const CLOSE_MS = 220;
@@ -42,6 +44,8 @@ export function BottomSheetModal({
   keyboardInset = 0,
   variant = "bottom",
 }: Props) {
+  const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const sheetTravel = useRef(Math.max(Dimensions.get("window").height * 0.55, 320)).current;
@@ -80,6 +84,22 @@ export function BottomSheetModal({
 
   const isCenter = variant === "center";
 
+  const themedSheetStyle: ViewStyle = isCenter
+    ? {
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }
+    : {
+        backgroundColor: colors.card,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderColor: colors.border,
+        overflow: "hidden",
+        paddingBottom: Math.max(insets.bottom, 8),
+      };
+
   const body = (
     <View style={[styles.root, isCenter && styles.rootCenter]}>
       <Animated.View
@@ -105,6 +125,7 @@ export function BottomSheetModal({
             opacity: centerOpacity,
             transform: [{ scale: centerScale }],
           },
+          themedSheetStyle,
           sheetStyle,
         ]}
       >

@@ -252,7 +252,7 @@ export function PatroDateSheet({
                 keyboardDismissMode="interactive"
                 automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
                 showsVerticalScrollIndicator={false}
-                style={{ maxHeight: keyboardHeight > 0 ? 280 : 420 }}
+                style={{ maxHeight: keyboardHeight > 0 ? 360 : mode === "year-month-time" && showTime ? 520 : 420 }}
                 contentContainerStyle={{
                   paddingBottom: keyboardHeight > 0 ? 16 : 8,
                 }}

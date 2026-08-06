@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CivilTimeline, PanchangaDay } from "@/lib/api";
 import { formatDegreeInRashi, getPlanetRows, getPlanetsAnchorLabel, getSunriseLagnaRow } from "@/lib/panchanga-format.web";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { GrahaStatusBadges } from "@/components/graha/GrahaStatusBadges";
+import type { GrahaKey } from "@/lib/graha-details";
 import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-time";
 import {
   buildCivilTimelineData,
@@ -44,6 +47,20 @@ import {
   pgxSunline,
   pgxTimeLagna,
 } from "@/lib/timeline-classes";
+
+function isGrahaKey(key: string): key is GrahaKey {
+  return (
+    key === "sun" ||
+    key === "moon" ||
+    key === "mars" ||
+    key === "mercury" ||
+    key === "jupiter" ||
+    key === "venus" ||
+    key === "saturn" ||
+    key === "rahu" ||
+    key === "ketu"
+  );
+}
 
 const W = 1000;
 /** Left inset for row labels + start of the ghati grid (~26px tighter than before). */
@@ -731,6 +748,8 @@ export function DayTimeline({
                 nakshatraLordEn,
                 nakshatraSubLordNe,
                 nakshatraSubLordEn,
+                isRetrograde,
+                isCombust,
               }) => {
                 const labelL = pick(label, labelEn);
                 const isLagna = planetKey === "lagna";
@@ -779,12 +798,24 @@ export function DayTimeline({
                       .filter(Boolean)
                       .join(" · ")}
                   >
-                    <div className="flex items-baseline justify-between gap-1.5">
-                      <span className="shrink-0 text-sm font-bold leading-tight">{labelL}</span>
-                      <span className={cn(patroMono, "min-w-0 truncate text-sm tabular-nums leading-tight")}>
-                        {coordText}
-                      </span>
-                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span className="flex items-center gap-1 text-sm font-bold leading-tight">
+                          {planetKey !== "lagna" && isGrahaKey(planetKey) ? (
+                            <GrahaPlanetIcon graha={planetKey} size={18} />
+                          ) : null}
+                          {labelL}
+                          <GrahaStatusBadges
+                            planetKey={planetKey}
+                            isRetrograde={isRetrograde}
+                            isCombust={isCombust}
+                            size={13}
+                          />
+                        </span>
+                        <span className={cn(patroMono, "min-w-0 text-sm tabular-nums leading-tight break-all [overflow-wrap:anywhere]")}>
+                          {coordText}
+                        </span>
+                      </div>
                     {(nakWithPada || lordText) && (
                       <div className="flex items-baseline justify-between gap-1.5 text-sm leading-tight">
                         <span className="min-w-0 truncate">{nakWithPada}</span>
@@ -798,6 +829,7 @@ export function DayTimeline({
                         ) : null}
                       </div>
                     )}
+                    </div>
                   </div>
                 );
               },

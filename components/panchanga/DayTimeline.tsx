@@ -6,6 +6,9 @@ import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import type { PanchangaDay } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { GrahaStatusBadges } from "@/components/graha/GrahaStatusBadges";
+import type { GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
@@ -46,6 +49,20 @@ const SUN_R = 6;
 const GHATI_TICKS = Array.from({ length: 16 }, (_, i) => i * 4);
 const FONT = "Mukta_600SemiBold";
 const FONT_SM = "Mukta_500Medium";
+
+function isGrahaKey(key: string): key is GrahaKey {
+  return (
+    key === "sun" ||
+    key === "moon" ||
+    key === "mars" ||
+    key === "mercury" ||
+    key === "jupiter" ||
+    key === "venus" ||
+    key === "saturn" ||
+    key === "rahu" ||
+    key === "ketu"
+  );
+}
 const SECTION_H_PAD = 16;
 const PERIOD_CARD_GAP = 8;
 const PLANET_CARD_GAP = 6;
@@ -698,6 +715,8 @@ export function DayTimeline({
                 nakshatraLordEn,
                 nakshatraSubLordNe,
                 nakshatraSubLordEn,
+                isRetrograde,
+                isCombust,
               }) => {
                 const labelL = pick(label, labelEn);
                 const isLagna = planetKey === "lagna";
@@ -740,11 +759,26 @@ export function DayTimeline({
                       backgroundColor: isLagna ? "rgba(11,86,90,0.12)" : "rgba(26,20,16,0.04)",
                     }}
                   >
-                    <View className="flex-row items-baseline justify-between gap-1.5">
-                      <Text className="shrink-0 text-sm font-bold text-foreground" numberOfLines={1} style={nepaliTextStyle(14)}>
-                        {labelL}
-                      </Text>
-                      <Text className="min-w-0 flex-1 text-right text-sm font-semibold text-foreground" numberOfLines={1}>
+                    <View className="flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-1">
+                        {isGrahaKey(planetKey) ? (
+                          <GrahaPlanetIcon graha={planetKey} size={18} />
+                        ) : null}
+                        <Text
+                          className="shrink-0 text-sm font-bold text-foreground"
+                          numberOfLines={1}
+                          style={nepaliTextStyle(14)}
+                        >
+                          {labelL}
+                        </Text>
+                        <GrahaStatusBadges
+                          planetKey={planetKey}
+                          isRetrograde={isRetrograde}
+                          isCombust={isCombust}
+                          size={13}
+                        />
+                      </View>
+                      <Text className="min-w-0 text-sm font-semibold text-foreground" numberOfLines={1}>
                         {coordText}
                       </Text>
                     </View>

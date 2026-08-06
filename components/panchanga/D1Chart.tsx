@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { View } from "react-native";
 import Svg, { G, Line, Polygon, Rect, Text as SvgText } from "react-native-svg";
+import { GrahaStatusMarksSvg } from "@/components/graha/GrahaStatusMarksSvg";
+import { GrahaStatusLegend } from "@/components/graha/GrahaStatusLegend";
 import type { BhavaHouse } from "@/lib/bhava";
+import { bhavaHousesHaveStatusMarks } from "@/lib/graha-status";
 import {
   NI_HOUSE_POLYGONS,
   planetGridLayout,
@@ -48,6 +51,7 @@ export function D1Chart({ houses }: Props) {
   const { pick, digits } = useLocale();
   const colors = useThemeColors();
   const byHouse = useMemo(() => new Map(houses.map((h) => [h.house, h])), [houses]);
+  const showLegend = useMemo(() => bhavaHousesHaveStatusMarks(houses), [houses]);
 
   return (
     <View className="w-full items-center">
@@ -89,26 +93,39 @@ export function D1Chart({ houses }: Props) {
                 const col = i - rowStart;
                 const x = cx + (col - (itemsInRow - 1) / 2) * layout.colGap;
                 const y = cy + row * layout.rowGap;
+                const markSize = layout.fontSize * 0.5;
                 return (
-                  <SvgText
-                    key={planet.key}
-                    x={x}
-                    y={y}
-                    fill={colors.foreground}
-                    fontSize={layout.fontSize}
-                    textAnchor="middle"
-                  >
-                    {pick(
-                      PLANET_ABBR_NE[planet.key] ?? planet.labelNe.slice(0, 2),
-                      PLANET_ABBR_EN[planet.key] ?? planet.labelNe.slice(0, 2),
-                    )}
-                  </SvgText>
+                  <G key={planet.key}>
+                    <SvgText
+                      x={x}
+                      y={y}
+                      fill={colors.foreground}
+                      fontSize={layout.fontSize}
+                      textAnchor="middle"
+                    >
+                      {pick(
+                        PLANET_ABBR_NE[planet.key] ?? planet.labelNe.slice(0, 2),
+                        PLANET_ABBR_EN[planet.key] ?? planet.labelNe.slice(0, 2),
+                      )}
+                    </SvgText>
+                    <GrahaStatusMarksSvg
+                      planetKey={planet.key}
+                      isRetrograde={planet.isRetrograde}
+                      isCombust={planet.isCombust}
+                      x={x + layout.fontSize * 0.42}
+                      y={y - markSize - layout.fontSize * 0.05}
+                      size={markSize}
+                      vakriColor={colors.secondary}
+                      astaColor={colors.danger}
+                    />
+                  </G>
                 );
               })}
             </G>
           );
         })}
       </Svg>
+      {showLegend ? <GrahaStatusLegend className="mt-2 w-full" /> : null}
     </View>
   );
 }

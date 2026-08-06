@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -10,6 +10,13 @@ import {
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { Text } from "@/components/ui/Text";
+import {
+  TableCell,
+  TableColumnsHeader,
+  TableRow,
+  TableScrollShell,
+  type TableColumn,
+} from "@/components/ui/DataTable";
 import { fetchGrahaSthiti, grahaDetailKeys, type GrahaSthitiRow } from "@/lib/api";
 import {
   grahaSthitiLord,
@@ -21,12 +28,11 @@ import {
 } from "@/lib/graha-sthiti-display";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 
-const COLUMNS = [
+const COLUMNS: TableColumn[] = [
   { key: "graha", ne: "ग्रह", en: "Graha", width: 132 },
   { key: "longitude", ne: "रेखांश", en: "Longitude", width: 176 },
   { key: "nakshatra_pada", ne: "नक्षत्र / पद", en: "Nakshatra / Pada", width: 148 },
@@ -36,7 +42,7 @@ const COLUMNS = [
   { key: "speed", ne: "गति °/दिन", en: "Speed °/day", width: 104 },
   { key: "right_ascension", ne: "विषुवांश", en: "R.A.", width: 96 },
   { key: "declination", ne: "क्रान्ति", en: "Decl.", width: 96 },
-] as const;
+];
 
 function signed(value: number | undefined, digits: (v: number | string) => string): string {
   if (value == null) return "—";
@@ -44,76 +50,65 @@ function signed(value: number | undefined, digits: (v: number | string) => strin
   return `${s}${digits(Math.abs(value).toFixed(2))}`;
 }
 
-function GrahaRow({ row }: { row: GrahaSthitiRow }) {
+function GrahaRow({ row, index }: { row: GrahaSthitiRow; index: number }) {
   const { lang, digits } = useLocale();
   const colors = useThemeColors();
   const isLagna = row.graha === "lagna";
 
   return (
-    <View
-      style={isLagna ? { backgroundColor: colorWithAlpha("#0b565a", 0.06) } : undefined}
-      className="flex-row border-t border-border"
-    >
-      <View style={{ width: COLUMNS[0].width }} className="flex-row items-center gap-1 px-3 py-2">
-        <Text className="text-xs text-muted-foreground">{row.symbol}</Text>
-        <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(13)}>
-          {grahaSthitiName(row, lang)}
-        </Text>
-        {row.is_retrograde ? (
-          <Text style={{ color: colors.danger }} className="text-xs">
-            ↺
+    <TableRow rowIndex={index} highlight={isLagna}>
+      <TableCell width={COLUMNS[0].width}>
+        <View className="flex-row items-center gap-1">
+          <Text className="text-xs text-muted-foreground">{row.symbol}</Text>
+          <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(13)}>
+            {grahaSthitiName(row, lang)}
           </Text>
-        ) : null}
-        {row.is_combust ? <Text className="text-xs">🔥</Text> : null}
-      </View>
-      <Cell width={COLUMNS[1].width} num>
-        {digits(grahaSthitiRekhamsha(row, lang))}
-      </Cell>
-      <Cell width={COLUMNS[2].width}>
-        {grahaSthitiNakshatra(row, lang)}
-        <Text className="text-muted-foreground"> · {digits(row.pada)}</Text>
-      </Cell>
-      <Cell width={COLUMNS[3].width}>
-        {grahaSthitiLord(row, lang)}
-        <Text className="text-muted-foreground"> / {grahaSthitiSubLord(row, lang)}</Text>
-      </Cell>
-      <Cell width={COLUMNS[4].width} num>
-        {digits(row.full_degree.toFixed(2))}
-      </Cell>
-      <Cell width={COLUMNS[5].width} num>
-        {digits(grahaSthitiShara(row, lang))}
-      </Cell>
-      <Cell width={COLUMNS[6].width} num color={row.is_retrograde ? colors.danger : undefined}>
-        {signed(row.speed_deg_day, digits)}
-      </Cell>
-      <Cell width={COLUMNS[7].width} num>
-        {row.right_ascension != null ? digits(row.right_ascension.toFixed(2)) : "—"}
-      </Cell>
-      <Cell width={COLUMNS[8].width} num>
-        {signed(row.declination, digits)}
-      </Cell>
-    </View>
-  );
-}
-
-function Cell({
-  width,
-  num,
-  color,
-  children,
-}: {
-  width: number;
-  num?: boolean;
-  color?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Text
-      style={{ width, ...(color ? { color } : {}), ...nepaliTextStyle(13) }}
-      className={num ? "px-3 py-2 font-num text-sm text-foreground" : "px-3 py-2 text-sm text-foreground"}
-    >
-      {children}
-    </Text>
+          {row.is_retrograde ? (
+            <Text style={{ color: colors.danger }} className="text-xs">
+              ↺
+            </Text>
+          ) : null}
+          {row.is_combust ? <Text className="text-xs">🔥</Text> : null}
+        </View>
+      </TableCell>
+      <TableCell width={COLUMNS[1].width}>
+        <Text className="font-num text-sm text-foreground">{digits(grahaSthitiRekhamsha(row, lang))}</Text>
+      </TableCell>
+      <TableCell width={COLUMNS[2].width}>
+        <Text className="text-sm text-foreground" style={nepaliTextStyle(13)}>
+          {grahaSthitiNakshatra(row, lang)}
+          <Text className="text-muted-foreground"> · {digits(row.pada)}</Text>
+        </Text>
+      </TableCell>
+      <TableCell width={COLUMNS[3].width}>
+        <Text className="text-sm text-foreground" style={nepaliTextStyle(13)}>
+          {grahaSthitiLord(row, lang)}
+          <Text className="text-muted-foreground"> / {grahaSthitiSubLord(row, lang)}</Text>
+        </Text>
+      </TableCell>
+      <TableCell width={COLUMNS[4].width}>
+        <Text className="font-num text-sm text-foreground">{digits(row.full_degree.toFixed(2))}</Text>
+      </TableCell>
+      <TableCell width={COLUMNS[5].width}>
+        <Text className="font-num text-sm text-foreground">{digits(grahaSthitiShara(row, lang))}</Text>
+      </TableCell>
+      <TableCell width={COLUMNS[6].width}>
+        <Text
+          className="font-num text-sm"
+          style={{ color: row.is_retrograde ? colors.danger : colors.foreground }}
+        >
+          {signed(row.speed_deg_day, digits)}
+        </Text>
+      </TableCell>
+      <TableCell width={COLUMNS[7].width}>
+        <Text className="font-num text-sm text-foreground">
+          {row.right_ascension != null ? digits(row.right_ascension.toFixed(2)) : "—"}
+        </Text>
+      </TableCell>
+      <TableCell width={COLUMNS[8].width}>
+        <Text className="font-num text-sm text-foreground">{signed(row.declination, digits)}</Text>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -164,25 +159,13 @@ export default function GrahaSthitiScreen() {
           {pick("लोड हुँदै…", "Loading…")}
         </Text>
       ) : query.data ? (
-        <View className="mt-2 overflow-hidden rounded-xl border border-border">
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View>
-              <View style={{ backgroundColor: colorWithAlpha("#0b565a", 0.09) }} className="flex-row">
-                {COLUMNS.map((col) => (
-                  <Text
-                    key={col.key}
-                    style={{ width: col.width, ...nepaliTextStyle(11) }}
-                    className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-muted-foreground"
-                  >
-                    {pick(col.ne, col.en)}
-                  </Text>
-                ))}
-              </View>
-              {query.data.rows.map((row) => (
-                <GrahaRow key={row.graha} row={row} />
-              ))}
-            </View>
-          </ScrollView>
+        <View className="mt-2">
+          <TableScrollShell>
+            <TableColumnsHeader columns={COLUMNS} />
+            {query.data.rows.map((row, index) => (
+              <GrahaRow key={row.graha} row={row} index={index} />
+            ))}
+          </TableScrollShell>
         </View>
       ) : (
         <Text style={{ color: colors.destructive, ...nepaliTextStyle(14) }} className="text-sm">

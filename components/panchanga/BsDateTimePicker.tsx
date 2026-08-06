@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Pressable, View } from "react-native"
 import { Text } from "@/components/ui/Text"
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +14,8 @@ import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 import { BsNativeSelect } from "@/components/ui/BsNativeSelect";
+import { PatroYearEraToggle } from "@/components/patro-date/PatroYearEraToggle";
+import type { PatroBrowseEra } from "@/lib/patro-era";
 import { formatClockParts, parseClockParts } from "@/components/panchanga/use-panchanga-mode";
 
 const WEEKDAYS_NE = ["आइत", "सोम", "मंगल", "बुध", "बिही", "शुक्र", "शनि"];
@@ -34,6 +36,12 @@ type Props = {
   minuteAriaLabel?: string;
   showTime: boolean;
   onDone: () => void;
+  /** When true, apply date/time immediately (embedded on panchanga page). */
+  live?: boolean;
+  /** Bottom sheet: web-style picker; outer sheet owns Done. */
+  embeddedInSheet?: boolean;
+  browseEra?: PatroBrowseEra;
+  onBrowseEraChange?: (era: PatroBrowseEra) => void;
 };
 
 function to12h(hour24: number): { hour12: number; meridiem: "AM" | "PM" } {
@@ -62,13 +70,24 @@ export function BsDateTimePicker({
   minuteAriaLabel,
   showTime,
   onDone,
+  live = false,
+  embeddedInSheet = false,
+  browseEra,
+  onBrowseEraChange,
 }: Props) {
+  const pushDraft = live || embeddedInSheet;
   const colors = useThemeColors();
   const { lang, pick, digits } = useLocale();
   const { isTablet, width: windowWidth } = useBreakpoint();
   const calendarMaxWidth = Math.min(windowWidth - 32, isTablet ? 320 : 380);
   const dayRowHeight = isTablet ? 34 : 36;
   const [draft, setDraft] = useState({ year, month, day, clock: clock ?? "" });
+
+  useEffect(() => {
+    if (!pushDraft) return;
+    setDraft({ year, month, day, clock: clock ?? "" });
+  }, [pushDraft, year, month, day, clock]);
+
   const { year: dYear, month: dMonth, day: dDay } = draft;
 
   const monthLen = getBSMonthLength(dYear, dMonth);
@@ -90,8 +109,11 @@ export function BsDateTimePicker({
   const yearSelectOptions = yearOptions.map((y) => ({ value: y, label: digits(y) }));
   const weekdays = lang === "en" ? WEEKDAYS_EN : WEEKDAYS_NE;
 
-  const setMonthYear = (y: number, m: number) =>
-    setDraft((d) => ({ ...d, year: y, month: m, day: Math.min(d.day, getBSMonthLength(y, m)) }));
+  const setMonthYear = (y: number, m: number) => {
+    const nextDay = Math.min(dDay, getBSMonthLength(y, m));
+    setDraft((d) => ({ ...d, year: y, month: m, day: nextDay }));
+    if (pushDraft) onSelectDate(y, m, nextDay);
+  };
 
   const stepMonth = (delta: number) => {
     let m = dMonth + delta;
@@ -120,16 +142,21 @@ export function BsDateTimePicker({
     value: i,
     label: digits(String(i).padStart(2, "0")),
   }));
-  const setTime = (nextHour12: number, nextMinute: number, nextMeridiem: "AM" | "PM") =>
-    setDraft((d) => ({ ...d, clock: formatClockParts(from12h(nextHour12, nextMeridiem), nextMinute) }));
+  const setTime = (nextHour12: number, nextMinute: number, nextMeridiem: "AM" | "PM") => {
+    const nextClock = formatClockParts(from12h(nextHour12, nextMeridiem), nextMinute);
+    setDraft((d) => ({ ...d, clock: nextClock }));
+    if (pushDraft) onClockChange?.(nextClock);
+  };
 
-  const goDraftToday = () =>
-    setDraft((d) => ({
-      ...d,
+  const goDraftToday = () => {
+    const next = {
       year: todayBs.year,
       month: todayBs.month,
       day: todayBs.day,
-    }));
+    };
+    setDraft((d) => ({ ...d, ...next }));
+    if (live) onSelectDate(next.year, next.month, next.day);
+  };
 
   const commit = () => {
     const dateChanged = draft.year !== year || draft.month !== month || draft.day !== day;
@@ -141,10 +168,10 @@ export function BsDateTimePicker({
 
   return (
     <View
-      className="gap-2.5 self-center px-4 pb-4"
-      style={{ width: "100%", maxWidth: calendarMaxWidth }}
+      className={cn("gap-2.5 self-center w-full", embeddedInSheet ? "px-0 pb-0" : "px-4 pb-4")}
+      style={embeddedInSheet ? undefined : { maxWidth: calendarMaxWidth }}
     >
-      <View className="flex-row items-center gap-1.5">
+      <View className="flex-row items-center gap-1">
         <Pressable
           disabled={prevDisabled}
           onPress={() => stepMonth(-1)}
@@ -169,8 +196,11 @@ export function BsDateTimePicker({
           options={yearSelectOptions}
           ariaLabel={yearAriaLabel}
           onChange={(y) => setMonthYear(y, dMonth)}
-          minWidth={68}
+          minWidth={60}
         />
+        {browseEra && onBrowseEraChange ? (
+          <PatroYearEraToggle era={browseEra} onEraChange={onBrowseEraChange} compact />
+        ) : null}
         <Pressable
           disabled={nextDisabled}
           onPress={() => stepMonth(1)}
@@ -225,7 +255,10 @@ export function BsDateTimePicker({
             return (
               <Pressable
                 key={`${d}-${i}`}
-                onPress={() => setDraft((prev) => ({ ...prev, day: d }))}
+                onPress={() => {
+                  setDraft((prev) => ({ ...prev, day: d }));
+                  if (pushDraft) onSelectDate(dYear, dMonth, d);
+                }}
                 accessibilityLabel={digits(d)}
                 accessibilityState={{ selected: isSelected }}
                 className="w-[14.28%] items-center justify-center border-b border-r border-border p-0.5"
@@ -261,10 +294,10 @@ export function BsDateTimePicker({
 
       {showTime && hourAriaLabel && minuteAriaLabel ? (
         <View className="gap-1.5 border-t border-border pt-2.5">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <Text className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             {pick("समय", "Time")}
           </Text>
-          <View className="flex-row items-center gap-1.5">
+          <View className="flex-row items-center justify-center gap-1.5">
             <BsNativeSelect
               value={hour12}
               options={hour12Options}
@@ -280,7 +313,7 @@ export function BsDateTimePicker({
               onChange={(m) => setTime(hour12, m, meridiem)}
               minWidth={56}
             />
-            <View className="ml-auto flex-row overflow-hidden rounded-md border border-border">
+            <View className="flex-row overflow-hidden rounded-md border border-border">
               {(["AM", "PM"] as const).map((mer) => (
                 <Pressable
                   key={mer}
@@ -305,20 +338,27 @@ export function BsDateTimePicker({
         </View>
       ) : null}
 
-      <View className="flex-row items-center gap-2 border-t border-border pt-2.5">
+      {!embeddedInSheet ? (
+      <View className={cn("flex-row items-center gap-2 border-t border-border pt-2.5", live && "justify-center")}>
         <Pressable
           onPress={goDraftToday}
-          className="h-9 flex-1 items-center justify-center rounded-md border border-border bg-card active:bg-muted"
+          className={cn(
+            "h-9 items-center justify-center rounded-md border border-border bg-card active:bg-muted",
+            live ? "min-w-[8rem] flex-1" : "flex-1",
+          )}
         >
           <Text className="text-sm font-semibold text-foreground">{pick("आज", "Today")}</Text>
         </Pressable>
-        <Pressable
-          onPress={commit}
-          className="h-9 flex-1 items-center justify-center rounded-md bg-secondary active:opacity-90"
-        >
-          <Text className="text-sm font-semibold text-secondary-foreground">{pick("भयो", "Done")}</Text>
-        </Pressable>
+        {!live ? (
+          <Pressable
+            onPress={commit}
+            className="h-9 flex-1 items-center justify-center rounded-md bg-secondary active:opacity-90"
+          >
+            <Text className="text-sm font-semibold text-secondary-foreground">{pick("भयो", "Done")}</Text>
+          </Pressable>
+        ) : null}
       </View>
+      ) : null}
     </View>
   );
 }

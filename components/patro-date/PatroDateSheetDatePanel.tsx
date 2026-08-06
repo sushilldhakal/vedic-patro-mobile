@@ -1,13 +1,11 @@
-import { Pressable, View } from "react-native";
-import { Text } from "@/components/ui/Text";
+import { View } from "react-native";
 import type { SelectOption } from "@/components/ui/BsNativeSelect";
-import { BsDateTimePicker } from "@/components/panchanga/BsDateTimePicker";
-import { useLocale } from "@/lib/i18n";
-import { nepaliTextStyle } from "@/lib/nepali-text";
-import { windowedBrowseYears } from "@/lib/patro-browse-years";
+import { getBSMonthLength } from "@/lib/bs-calendar";
+import { clampBrowseYear } from "@/lib/patro-browse-years";
 import type { PatroBrowseEra } from "@/lib/patro-era";
-import { cn } from "@/lib/utils";
 import type { PatroDateNavMode } from "./types";
+import { PatroSheetDayTimeFields } from "./PatroSheetDayTimeFields";
+import { PatroSheetMonthGrid } from "./PatroSheetMonthGrid";
 import { PatroYearSheetStepper } from "./PatroYearSheetStepper";
 
 export type PatroDateSheetDraft = {
@@ -34,45 +32,44 @@ export function PatroDateSheetDatePanel({
   draft,
   onDraftChange,
   monthOptions,
-  todayAd,
   showTime,
   onYearTypingPreviewChange,
   onYearInputFocus,
 }: Props) {
-  const { pick, lang } = useLocale();
-  const yearOptions = windowedBrowseYears(draft.era, draft.year);
-
   const yearStepperProps = {
     era: draft.era,
     year: draft.year,
-    onEraChange: (era: PatroBrowseEra) => onDraftChange({ era }),
-    onYearChange: (year: number) => onDraftChange({ year }),
+    onEraChange: (era: PatroBrowseEra) => {
+      const year = clampBrowseYear(era, draft.year);
+      const day = Math.min(draft.day, getBSMonthLength(year, draft.month));
+      onDraftChange({ era, year, day });
+    },
+    onYearChange: (year: number) => {
+      const safeDay = Math.min(draft.day, getBSMonthLength(year, draft.month));
+      onDraftChange({ year, day: safeDay });
+    },
     onYearTypingPreviewChange,
     onYearInputFocus,
   };
 
+  const pickMonth = (month: number) => {
+    const safeDay = Math.min(draft.day, getBSMonthLength(draft.year, month));
+    onDraftChange({ month, day: safeDay });
+  };
+
   if (mode === "year-month-time") {
     return (
-      <View>
-        <View className="mx-4 mt-2 mb-2">
-          <PatroYearSheetStepper {...yearStepperProps} />
-        </View>
-        <BsDateTimePicker
-          key={`${draft.era}-${draft.year}-${draft.month}-${draft.day}-${draft.clock}`}
+      <View className="gap-2 px-4 py-4">
+        <PatroSheetMonthGrid month={draft.month} monthOptions={monthOptions} onMonthChange={pickMonth} />
+        <PatroYearSheetStepper {...yearStepperProps} />
+        <PatroSheetDayTimeFields
           year={draft.year}
           month={draft.month}
           day={draft.day}
-          yearOptions={yearOptions}
-          todayAd={todayAd}
-          onSelectDate={(y, m, d) => onDraftChange({ year: y, month: m, day: d })}
-          monthAriaLabel={pick("महिना", "Month")}
-          yearAriaLabel={pick("वर्ष", "Year")}
           clock={draft.clock}
-          onClockChange={(clock) => onDraftChange({ clock })}
-          hourAriaLabel={pick("घण्टा", "Hour")}
-          minuteAriaLabel={pick("मिनेट", "Minute")}
           showTime={showTime}
-          onDone={() => {}}
+          onDayChange={(day) => onDraftChange({ day })}
+          onClockChange={(clock) => onDraftChange({ clock })}
         />
       </View>
     );
@@ -82,36 +79,7 @@ export function PatroDateSheetDatePanel({
     <View>
       {mode === "year-month" ? (
         <View className="gap-2 px-4 py-4">
-          <View className="flex-row flex-wrap gap-2">
-            {monthOptions.map((option) => {
-              const selected = option.value === draft.month;
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => onDraftChange({ month: option.value })}
-                  className={cn(
-                    "min-w-[30%] flex-1 items-center rounded-lg border px-2 py-2.5",
-                    selected ? "border-secondary bg-secondary" : "border-border bg-card active:bg-muted",
-                  )}
-                  style={{ maxWidth: "32%" }}
-                >
-                  <Text
-                    numberOfLines={1}
-                    className={cn(
-                      "text-sm font-semibold",
-                      selected ? "text-secondary-foreground" : "text-foreground",
-                    )}
-                    style={[
-                      { textAlign: "center", width: "100%" },
-                      lang === "en" ? undefined : nepaliTextStyle(14),
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <PatroSheetMonthGrid month={draft.month} monthOptions={monthOptions} onMonthChange={pickMonth} />
           <PatroYearSheetStepper {...yearStepperProps} />
         </View>
       ) : (

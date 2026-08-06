@@ -885,6 +885,8 @@ export type PlanetRow = {
   nakshatraLordEn?: string;
   nakshatraSubLordNe?: string;
   nakshatraSubLordEn?: string;
+  isRetrograde?: boolean;
+  isCombust?: boolean;
 };
 
 const RASHI_EN_NAMES = [
@@ -1011,6 +1013,8 @@ export function getPlanetRows(p: PanchangaDay): PlanetRow[] {
         rashiEn,
         coords,
         siderealLongitude,
+        isRetrograde: info.is_retrograde ?? info.retrograde ?? false,
+        isCombust: info.is_combust ?? false,
         ...planetNakshatraFields(info),
       };
     });

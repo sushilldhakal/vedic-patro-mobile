@@ -39,6 +39,10 @@ export type PatroDateNavBaseProps = {
   toolbar?: React.ReactNode;
   /** Phone row 1 right slot (e.g. day-cycle toggle on panchanga). */
   mobileToolbar?: React.ReactNode;
+  /** Phone row 2 right slot — location chip (web `mobileToolbarLower`). */
+  mobileToolbarLower?: React.ReactNode;
+  /** Hide location in the nav row when it lives in `mobileToolbarLower` / desktop aside. */
+  hideNavLocation?: boolean;
   className?: string;
 };
 

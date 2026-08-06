@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import type { Column } from "@/components/ui/DataTable";
+import { DataTable } from "@/components/ui/DataTable";
 import { Text } from "@/components/ui/Text";
 import type {
   AshtakavargaData,
   BhavaBalaData,
-  DashaTreeNode,
   JanmaAvakahadaData,
   KundaliYoga,
   ShadbalaResponse,
@@ -15,14 +16,13 @@ import type {
 } from "@/lib/api";
 import { buildBhavaTable, type BhavaTableRow, RASHI_QUALITIES } from "@/lib/bhava";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
+import { kundaliLabel, type KundaliI18nKey } from "@/lib/kundali/kundali-i18n";
 import { useLocale } from "@/lib/i18n";
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { formatRashiByNumber, rashiNeFromNumber } from "@/lib/rashi-i18n";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
-
-const SECONDARY = "#0b565a";
 
 export function grahaName(key: string, lang: "ne" | "en"): string {
   const meta = GRAHA_NAME[key as GrahaKey];
@@ -31,23 +31,20 @@ export function grahaName(key: string, lang: "ne" | "en"): string {
   return lang === "en" ? meta.en : meta.ne;
 }
 
-function nakshatraLabel(index: number, lang: "ne" | "en"): string {
-  const icon = NAKSHATRA_ICONS[index - 1];
-  if (!icon) return "—";
-  return lang === "en" ? icon.en : icon.ne;
-}
-
 /** Card shell with a title bar — the mobile stand-in for the web PanchangaSection. */
 export function KundaliSection({
   title,
   subtitle,
   icon,
   children,
+  edgeToEdgeContent = false,
 }: {
   title: string;
   subtitle?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   children: React.ReactNode;
+  /** Tables flush to card horizontal edges (no side padding). */
+  edgeToEdgeContent?: boolean;
 }) {
   const colors = useThemeColors();
   return (
@@ -65,68 +62,20 @@ export function KundaliSection({
           ) : null}
         </View>
       </View>
-      <View className="p-3">{children}</View>
+      <View className={edgeToEdgeContent ? "pb-3 pt-1" : "p-3"}>{children}</View>
     </View>
   );
 }
 
 /* ── generic scrollable table ──────────────────────────────────────────── */
 
-export type Column = { key: string; ne: string; en: string; width: number };
+export type { Column, TableColumn } from "@/components/ui/DataTable";
+export { DataTable } from "@/components/ui/DataTable";
 
-export function DataTable({
-  columns,
-  rows,
-}: {
-  columns: Column[];
-  rows: { key: string; cells: React.ReactNode[]; highlight?: boolean }[];
-}) {
-  const { pick } = useLocale();
-  const colors = useThemeColors();
-
-  return (
-    <View className="overflow-hidden rounded-xl border border-border">
-      <ScrollView horizontal showsHorizontalScrollIndicator>
-        <View>
-          <View className="flex-row bg-muted">
-            {columns.map((c) => (
-              <Text
-                key={c.key}
-                numberOfLines={2}
-                style={{ width: c.width, ...nepaliTextStyle(11) }}
-                className="px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-              >
-                {pick(c.ne, c.en)}
-              </Text>
-            ))}
-          </View>
-          {rows.map((r) => (
-            <View
-              key={r.key}
-              style={r.highlight ? { backgroundColor: colorWithAlpha(SECONDARY, 0.07) } : undefined}
-              className="flex-row border-t border-border"
-            >
-              {r.cells.map((cell, i) => (
-                <View key={i} style={{ width: columns[i]?.width ?? 90 }} className="px-2.5 py-2">
-                  {typeof cell === "string" || typeof cell === "number" ? (
-                    <Text
-                      className="text-xs text-foreground"
-                      style={nepaliTextStyle(12)}
-                      numberOfLines={2}
-                    >
-                      {cell}
-                    </Text>
-                  ) : (
-                    cell
-                  )}
-                </View>
-              ))}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-    </View>
-  );
+function nakshatraLabel(index: number, lang: "ne" | "en"): string {
+  const icon = NAKSHATRA_ICONS[index];
+  if (!icon) return "—";
+  return lang === "en" ? icon.en : icon.ne;
 }
 
 /* ── graha positions (D1) ──────────────────────────────────────────────── */
@@ -188,7 +137,7 @@ export function GrahaAstroTable({
     };
   });
 
-  return <DataTable columns={columns} rows={rows} />;
+  return <DataTable stretch columns={columns} rows={rows} />;
 }
 
 /* ── bhava (house) table ───────────────────────────────────────────────── */
@@ -228,31 +177,32 @@ export function BhavaTable({
   if (rows.length === 0) return null;
 
   const columns: Column[] = [
-    { key: "house", ne: "भाव", en: "House", width: 68 },
-    { key: "rashi", ne: "राशि", en: "Rashi", width: 104 },
-    { key: "qual", ne: "स्वभाव", en: "Qualities", width: 132 },
-    { key: "owner", ne: "स्वामी", en: "Lord", width: 104 },
-    { key: "residents", ne: "स्थित ग्रह", en: "Residents", width: 168 },
-    { key: "aspect", ne: "दृष्टि", en: "Aspected by", width: 168 },
+    { key: "house", ne: "भाव", en: "House", width: 48 },
+    { key: "residents", ne: "बासिन्दा", en: "Residents", width: 104 },
+    { key: "owner", ne: "स्वामी", en: "Lord", width: 72 },
+    { key: "rashi", ne: "राशि", en: "Rashi", width: 68 },
+    { key: "qual", ne: "गुण", en: "Qualities", width: 88 },
+    { key: "aspect", ne: "दृष्टि", en: "Aspected by", width: 108 },
   ];
 
   return (
     <DataTable
+      compact
       columns={columns}
       rows={rows.map((r) => ({
         key: String(r.house),
         highlight: r.house === 1,
         cells: [
-          <Text key="h" className="font-num text-xs font-semibold text-foreground">
+          <Text key="h" className="font-num text-[11px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
             {digits(r.house)}
-            {r.badge ? <Text className="text-muted-foreground"> {r.badge}</Text> : null}
+            {r.badge ? <Text className="text-muted-foreground"> ({r.badge})</Text> : null}
           </Text>,
-          formatRashiByNumber(r.rashi, lang),
-          pick(RASHI_QUALITIES[r.rashi - 1]?.ne ?? "", RASHI_QUALITIES[r.rashi - 1]?.en ?? ""),
-          r.owner ? grahaName(r.owner, lang) : "—",
           r.residents.length
             ? r.residents.map((p) => grahaName(p.key, lang)).join(", ")
             : "—",
+          r.owner ? grahaName(r.owner, lang) : "—",
+          formatRashiByNumber(r.rashi, lang),
+          pick(RASHI_QUALITIES[r.rashi - 1]?.ne ?? "—", RASHI_QUALITIES[r.rashi - 1]?.en ?? "—"),
           r.aspectedBy.length ? r.aspectedBy.map((k) => grahaName(k, lang)).join(", ") : "—",
         ],
       }))}
@@ -276,6 +226,7 @@ export function UpagrahaTable({ rows }: { rows: UpagrahaDetailRow[] }) {
 
   return (
     <DataTable
+      stretch
       columns={columns}
       rows={rows.map((r) => ({
         key: r.key,
@@ -565,28 +516,26 @@ export function YogaList({ yogas }: { yogas: KundaliYoga[] }) {
 /* ── avakahada (janma) ─────────────────────────────────────────────────── */
 
 export function AvakahadaCard({ data }: { data: JanmaAvakahadaData }) {
-  const { lang, pick, digits } = useLocale();
+  const { lang, digits } = useLocale();
+  const t = (key: KundaliI18nKey) => kundaliLabel(key, lang);
 
   const rows: { label: string; value: string }[] = [
     {
-      label: pick("नक्षत्र", "Nakshatra"),
-      value: `${lang === "en" ? data.nakshatra.en : data.nakshatra.ne} · ${pick("पद", "pada")} ${digits(data.pada)}`,
+      label: t("nakshatra"),
+      value: `${lang === "en" ? data.nakshatra.en : data.nakshatra.ne} · ${t("pada")} ${digits(data.pada)}`,
     },
-    { label: pick("राशि पाया", "Rashi paya"), value: lang === "en" ? data.rashiPaya.en : data.rashiPaya.ne },
-    {
-      label: pick("नक्षत्र पाया", "Nakshatra paya"),
-      value: lang === "en" ? data.nakshatraPaya.en : data.nakshatraPaya.ne,
-    },
-    { label: pick("तत्त्व", "Tattva"), value: lang === "en" ? data.tattva.en : data.tattva.ne },
-    { label: pick("युञ्ज", "Yunja"), value: lang === "en" ? data.yunja.en : data.yunja.ne },
-    { label: pick("वश्य", "Vashya"), value: lang === "en" ? data.vashya.en : data.vashya.ne },
-    { label: pick("तारा", "Tara"), value: lang === "en" ? data.tara.en : data.tara.ne },
-    { label: pick("गण", "Gana"), value: lang === "en" ? data.gana.en : data.gana.ne },
-    { label: pick("नामाक्षर", "Akshara"), value: lang === "en" ? data.akshara.en : data.akshara.ne },
-    { label: pick("नाडी", "Nadi"), value: lang === "en" ? data.nadi.en : data.nadi.ne },
-    { label: pick("आसन", "Asana"), value: lang === "en" ? data.asana.en : data.asana.ne },
-    { label: pick("योनि", "Yoni"), value: lang === "en" ? data.yoni.en : data.yoni.ne },
-    { label: pick("जाति", "Jati"), value: lang === "en" ? data.jati.en : data.jati.ne },
+    { label: t("rashi_paya"), value: lang === "en" ? data.rashiPaya.en : data.rashiPaya.ne },
+    { label: t("nakshatra_paya"), value: lang === "en" ? data.nakshatraPaya.en : data.nakshatraPaya.ne },
+    { label: t("tattva"), value: lang === "en" ? data.tattva.en : data.tattva.ne },
+    { label: t("yunja"), value: lang === "en" ? data.yunja.en : data.yunja.ne },
+    { label: t("vashya"), value: lang === "en" ? data.vashya.en : data.vashya.ne },
+    { label: t("tara"), value: lang === "en" ? data.tara.en : data.tara.ne },
+    { label: t("gana"), value: lang === "en" ? data.gana.en : data.gana.ne },
+    { label: t("akshara"), value: lang === "en" ? data.akshara.en : data.akshara.ne },
+    { label: t("nadi"), value: lang === "en" ? data.nadi.en : data.nadi.ne },
+    { label: t("asana"), value: lang === "en" ? data.asana.en : data.asana.ne },
+    { label: t("yoni"), value: lang === "en" ? data.yoni.en : data.yoni.ne },
+    { label: t("jati"), value: lang === "en" ? data.jati.en : data.jati.ne },
   ];
 
   return (
@@ -605,91 +554,80 @@ export function AvakahadaCard({ data }: { data: JanmaAvakahadaData }) {
   );
 }
 
-/* ── dasha tree ────────────────────────────────────────────────────────── */
+/* ── vimshopaka ─────────────────────────────────────────────────────────── */
 
-function formatDashaDate(iso: string, lang: "ne" | "en"): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString(lang === "en" ? "en-US" : "ne-NP", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+const VIMSHOPAKA_GRADE: Record<string, { ne: string; en: string; tone: string }> = {
+  full: { ne: "पूर्ण", en: "Full", tone: "#2e7d32" },
+  mediocre: { ne: "मध्यम", en: "Mediocre", tone: "#0284c7" },
+  little: { ne: "अल्प", en: "Little", tone: "#d97706" },
+  incapable: { ne: "असमर्थ", en: "Incapable", tone: "#c62828" },
+};
 
-function DashaRow({ node, depth, nowMs }: { node: DashaTreeNode; depth: number; nowMs: number }) {
-  const { lang, pick } = useLocale();
-  const colors = useThemeColors();
-  const [open, setOpen] = useState(false);
+const PLANET_ORDER = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn"];
 
-  const start = new Date(node.start).getTime();
-  const end = new Date(node.end).getTime();
-  const current = Number.isFinite(start) && Number.isFinite(end) && start <= nowMs && nowMs < end;
-  const children = node.children ?? [];
+export function VimshopakaCard({ data }: { data: import("@/lib/api").VimshopakaData }) {
+  const { lang, pick, digits } = useLocale();
+  const classes = data.classifications;
+  const rows = PLANET_ORDER.map((key) => data.planets.find((p) => p.key === key)).filter(Boolean);
 
   return (
-    <View>
-      <Pressable
-        disabled={children.length === 0}
-        onPress={() => setOpen((v) => !v)}
-        style={{
-          paddingLeft: 8 + depth * 14,
-          backgroundColor: current ? colorWithAlpha(SECONDARY, 0.1) : undefined,
-        }}
-        className="flex-row items-center gap-2 border-b border-border py-2 pr-2 active:opacity-80"
-      >
-        {children.length > 0 ? (
-          <Ionicons
-            name={open ? "chevron-down" : "chevron-forward"}
-            size={13}
-            color={colors.mutedForeground}
-          />
-        ) : (
-          <View style={{ width: 13 }} />
-        )}
-        <Text
-          numberOfLines={1}
-          style={{
-            color: current ? colors.secondary : colors.foreground,
-            ...nepaliTextStyle(13),
-          }}
-          className="min-w-0 flex-1 text-sm font-semibold"
-        >
-          {lang === "en" ? node.lord : node.lord_ne}
-          {current ? (
-            <Text className="text-xs font-normal"> · {pick("चलिरहेको", "current")}</Text>
-          ) : null}
-        </Text>
-        <Text className="font-num text-[11px] text-muted-foreground">
-          {formatDashaDate(node.start, lang)} – {formatDashaDate(node.end, lang)}
-        </Text>
-      </Pressable>
-      {open
-        ? children.map((c, i) => (
-            <DashaRow key={`${c.lord}-${c.start}-${i}`} node={c} depth={depth + 1} nowMs={nowMs} />
-          ))
-        : null}
-    </View>
-  );
-}
-
-export function DashaTree({ tree }: { tree: DashaTreeNode[] }) {
-  const [nowMs] = useState(() => Date.now());
-  const { pick } = useLocale();
-
-  if (!tree.length) {
-    return (
-      <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
-        {pick("दशा उपलब्ध छैन।", "Dasha is not available.")}
+    <View className="gap-3">
+      <Text className="text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
+        {pick("विंशोपक बल", "Vimshopaka bala")}
       </Text>
-    );
-  }
-
-  return (
-    <View className="overflow-hidden rounded-xl border border-border">
-      {tree.map((n, i) => (
-        <DashaRow key={`${n.lord}-${n.start}-${i}`} node={n} depth={0} nowMs={nowMs} />
-      ))}
+      <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+        {pick(
+          `वर्गीय बल — ${digits(data.max_score)} अंकमा`,
+          `Divisional strength on a ${data.max_score}-point scale`,
+        )}
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View>
+          <View className="flex-row border-b border-border">
+            <View style={{ width: 88 }} className="px-2 py-2">
+              <Text className="text-xs font-semibold text-muted-foreground">{pick("ग्रह", "Graha")}</Text>
+            </View>
+            {classes.map((c) => (
+              <View key={c.key} style={{ width: 72 }} className="px-1 py-2">
+                <Text numberOfLines={2} className="text-center text-[10px] font-semibold text-muted-foreground">
+                  {lang === "en" ? c.label : c.label_ne}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {rows.map((p) => {
+            if (!p) return null;
+            return (
+              <View key={p.key} className="flex-row border-b border-border/60">
+                <View style={{ width: 88 }} className="justify-center px-2 py-2">
+                  <Text className="text-xs font-semibold text-foreground">
+                    {grahaName(p.key, lang)}
+                  </Text>
+                </View>
+                {classes.map((c) => {
+                  const s = p.scores[c.key];
+                  if (!s) {
+                    return (
+                      <View key={c.key} style={{ width: 72 }} className="items-center justify-center px-1 py-2">
+                        <Text className="text-xs text-muted-foreground">—</Text>
+                      </View>
+                    );
+                  }
+                  const grade = VIMSHOPAKA_GRADE[s.grade] ?? VIMSHOPAKA_GRADE.incapable;
+                  return (
+                    <View key={c.key} style={{ width: 72 }} className="items-center justify-center px-1 py-2">
+                      <Text className="font-num text-xs font-bold text-foreground">{digits(s.score)}</Text>
+                      <Text style={{ color: grade.tone, ...nepaliTextStyle(10) }} className="text-[10px]">
+                        {pick(grade.ne, grade.en)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
     </View>
   );
 }

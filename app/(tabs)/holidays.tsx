@@ -11,6 +11,12 @@ import { nepaliTextStyle } from "@/lib/nepali-text";
 import { formatHolidayBsDisplay } from "@/lib/panchanga-format";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
+import {
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+  TableScrollShell,
+} from "@/components/ui/DataTable";
 import { cn } from "@/lib/utils";
 
 type Tab = "holidays" | "festivals";
@@ -201,41 +207,34 @@ export default function HolidaysScreen() {
           {pick("लोड हुँदै…", "Loading…")}
         </Text>
       ) : (
-        <View className="overflow-hidden rounded-xl border border-border">
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View>
-              <View className="flex-row border-b border-border bg-muted/50">
-                {columns.map((col) => {
-                  const active = sort.key === col.key;
-                  return (
-                    <Pressable
-                      key={col.key}
-                      onPress={() => toggleSort(col.key as keyof Row)}
-                      style={{ width: col.width }}
-                      className="flex-row items-center gap-1 px-4 py-3 active:opacity-70"
-                    >
-                      <Text
-                        numberOfLines={2}
-                        className="shrink text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                        style={nepaliTextStyle(11)}
-                      >
-                        {pick(col.ne, col.en)}
-                      </Text>
-                      <Ionicons
-                        name={
-                          active
-                            ? sort.dir === "asc"
-                              ? "chevron-up"
-                              : "chevron-down"
-                            : "swap-vertical"
-                        }
-                        size={11}
-                        color={active ? colors.foreground : colors.mutedForeground}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </View>
+        <TableScrollShell>
+          <TableHeader className="border-b border-border">
+            {columns.map((col) => {
+              const active = sort.key === col.key;
+              return (
+                <TableHeaderCell
+                  key={col.key}
+                  width={col.width}
+                  onPress={() => toggleSort(col.key as keyof Row)}
+                >
+                  <Text
+                    numberOfLines={2}
+                    className="shrink text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                    style={nepaliTextStyle(11)}
+                  >
+                    {pick(col.ne, col.en)}
+                  </Text>
+                  <Ionicons
+                    name={
+                      active ? (sort.dir === "asc" ? "chevron-up" : "chevron-down") : "swap-vertical"
+                    }
+                    size={11}
+                    color={active ? colors.foreground : colors.mutedForeground}
+                  />
+                </TableHeaderCell>
+              );
+            })}
+          </TableHeader>
 
               {rows.length === 0 ? (
                 <View className="px-4 py-8">
@@ -244,8 +243,13 @@ export default function HolidaysScreen() {
                   </Text>
                 </View>
               ) : (
-                rows.map((row) => (
-                  <View key={row.key} className="flex-row border-b border-border">
+                rows.map((row, rowIndex) => (
+                  <TableRow
+                    key={row.key}
+                    rowIndex={rowIndex}
+                    borderTop={false}
+                    className="border-b border-border"
+                  >
                     {columns.map((col) => {
                       if (col.key === "type") {
                         return (
@@ -289,12 +293,10 @@ export default function HolidaysScreen() {
                         </Text>
                       );
                     })}
-                  </View>
+                  </TableRow>
                 ))
               )}
-            </View>
-          </ScrollView>
-        </View>
+        </TableScrollShell>
       )}
     </AppShell>
   );

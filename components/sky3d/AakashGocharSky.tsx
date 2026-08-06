@@ -16,9 +16,11 @@ import { Canvas } from "@/components/sky3d/GeocentricSkyCanvas";
 import { Text } from "@/components/ui/Text";
 import type { GocharGraha } from "@/lib/api";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
-import { adToBS, bsMonthLabel, WEEKDAYS_SHORT_NE } from "@/lib/bs-calendar";
-import { useLocale } from "@/lib/i18n";
+import { bsMonthLabel, WEEKDAYS_SHORT_NE } from "@/lib/bs-calendar";
+import { bikramFromSun } from "@/lib/sky3d/bikram-solar";
+import { NAKSHATRA_SHORT } from "@/lib/sky3d/nakshatra-stars";
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
+import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { nativeWindThemeVars } from "@/lib/nativewind-theme-vars";
 import { formatRashiByNumber } from "@/lib/rashi-i18n";
@@ -26,14 +28,21 @@ import { useTheme, useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 import { GRAHA_COLOR } from "@/lib/sky3d/geocentric-model";
 import { KATHMANDU, type Observer } from "@/lib/sky3d/horizon";
-import { calibrate, type SkyCalibration } from "@/lib/sky3d/orbital-model";
+import {
+  ayanamsa,
+  calibrate,
+  daysSinceJ2000,
+  type SkyCalibration,
+} from "@/lib/sky3d/orbital-model";
 import { RASHI_ICONS } from "@/lib/sky3d/rashi-icons";
-import { getZonedTimeParts, todayAdStringInTimezone } from "@/lib/zoned-time";
+import { getZonedTimeParts } from "@/lib/zoned-time";
 import { SOLAR_STATIONS } from "@/lib/sky3d/sky-geometry";
+import { POLE_STARS } from "@/lib/sky3d/pole-stars";
 import {
   AakashGocharScene,
   type FocusKey,
   type SceneToggles,
+  type ScreenLabel,
   type SimState,
   type SkyMode,
   type SkySample,
@@ -57,6 +66,10 @@ const LABEL_COLOR = {
   cardinal: "#ff8a8a",
   azimuth: "#7ea9d8",
   station: "#ffd166",
+  tilt: "#ffd166",
+  axis: "#9fc4f0",
+  poleStar: "#cfe0ff",
+  asterism: "#e6efff",
   tropic: "#e2d264",
   hud: "#ffffff",
   hudDim: "rgba(255,255,255,0.72)",
@@ -74,6 +87,16 @@ const SPEED_LADDER = [
   { seconds: 172800, ne: "२ दिन/से", en: "2 days/s" },
   { seconds: 604800, ne: "१ हप्ता/से", en: "1 week/s" },
   { seconds: 5184000, ne: "२ महिना/से", en: "2 months/s" },
+  /* The top two rungs are for one thing: precession. The ayanamsa moves a
+     degree in seventy-two years, so at any calendar speed the belt looks
+     nailed down. At 20 years a second मेष visibly walks away from वसन्त
+     सम्पात, and the whole 26,000-year turn takes about twenty minutes. */
+  { seconds: 63113904, ne: "२ वर्ष/से", en: "2 years/s" },
+  { seconds: 631139040, ne: "२० वर्ष/से", en: "20 years/s" },
+  /* The top rung is precession at one degree a second: the ayanamsa moves a
+     degree in 72 years, so मेष crosses a whole rashi boundary every half
+     minute and the pole hands over its star while you watch. */
+  { seconds: 2272100544, ne: "७२ वर्ष/से", en: "72 years/s" },
 ];
 /** Camera distance that frames the whole system in the space view. */
 const SYSTEM_DISTANCE = 26;
@@ -85,6 +108,11 @@ const GLOBE_VIEW = 78;
 export type AakashGocharSkyProps = {
   /** Gochar rows for {@link date} — the API longitudes the model is pinned to. */
   gochar?: Record<string, GocharGraha>;
+  /**
+   * The server's Lahiri ayanamsa for {@link date}, degrees — where the sidereal
+   * zero stands against the equinox. The scene pins its own fit to it.
+   */
+  ayanamsaDeg?: number;
   /** The date the gochar rows describe; the simulation starts here. */
   date: Date;
   /** Where the sky is being watched from. Drives the whole horizon view. */
@@ -96,6 +124,7 @@ export type AakashGocharSkyProps = {
 
 export function AakashGocharSky({
   gochar,
+  ayanamsaDeg,
   date,
   observer = KATHMANDU,
   timeZone = "Asia/Kathmandu",
@@ -109,6 +138,15 @@ export function AakashGocharSky({
   const calibration: SkyCalibration = useMemo(
     () => (gochar ? calibrate(date, gochar) : {}),
     [gochar, date],
+  );
+
+  /* Same idea for the frame the longitudes live in: the offset that carries the
+     scene's own Lahiri fit onto the server's value for this date. The fit is
+     already sub-arcminute near now, but it drifts by a third of a degree a
+     thousand years out — enough to slide the whole belt off its stars. */
+  const ayanamsaShift = useMemo(
+    () => (ayanamsaDeg == null ? 0 : ayanamsaDeg - ayanamsa(daysSinceJ2000(date))),
+    [ayanamsaDeg, date],
   );
 
   const sim = useRef<SimState>({
@@ -129,9 +167,15 @@ export function AakashGocharSky({
     belts: true,
     grid: true,
     lockStars: true,
+    asterisms: true,
+    poleStars: true,
+    tilt: true,
     labels: true,
   });
   const [fullscreen, setFullscreen] = useState(false);
+  /* Fullscreen only: the whole control row folds away to a single chevron, so
+     the sky can have the entire screen when you just want to watch it. */
+  const [controlsOpen, setControlsOpen] = useState(true);
 
   // Following the date nav above the canvas keeps the two in step.
   useEffect(() => {
@@ -228,27 +272,73 @@ export function AakashGocharSky({
      insets do not always report from inside a modal. */
   const overlayTop = fullscreen ? Math.max(insets.top, 28) + 16 : 12;
   const simDate = sample ? new Date(sample.timeMs) : date;
+  /* The Sun the scene has already computed — the calendar past the table's end. */
+  const sunLongitude = sample?.sky.sun.longitude;
+  const sunSpeed = sample?.sky.sun.speedDegPerDay;
+
+  /**
+   * The place's offset from UT, taken once at the date the page is on.
+   *
+   * The simulation runs tens of thousands of years either way, where asking a
+   * timezone database what the offset "was" is meaningless — and Kathmandu has
+   * never had DST anyway. One offset, applied throughout, is both the honest
+   * answer and the only one that survives the trip.
+   */
+  const zoneOffsetMs = useMemo(() => {
+    const zoned = getZonedTimeParts(date, timeZone);
+    const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+    let delta = zoned.hour * 60 + zoned.minute - utcMinutes;
+    if (delta > 840) delta -= 1440;
+    if (delta <= -720) delta += 1440;
+    return delta * 60000;
+  }, [date, timeZone]);
 
   /**
    * The clock reading, in the calendar the reader is using and on the wall of
    * the place they picked — not UTC, and not the device's own zone.
+   *
+   * Everything here is arithmetic on the instant. Formatting a far date and
+   * parsing it back does not survive: `new Date("20143-08-06T12:00:00")` is an
+   * Invalid Date, and Intl quietly drops the era, so 2829 BC came back as AD
+   * 2830. Hence UTC getters on a shifted instant, and a weekday counted in
+   * days from the epoch.
    */
   const simStamp = useMemo(() => {
-    const dateAd = todayAdStringInTimezone(simDate, timeZone);
-    const { hour, minute } = getZonedTimeParts(simDate, timeZone);
-    const clock = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-    const weekday = new Date(`${dateAd}T12:00:00Z`).getUTCDay();
+    const local = new Date(simDate.getTime() + zoneOffsetMs);
+    const y = local.getUTCFullYear();
+    const mo = String(local.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(local.getUTCDate()).padStart(2, "0");
+    const clock = `${String(local.getUTCHours()).padStart(2, "0")}:${String(
+      local.getUTCMinutes(),
+    ).padStart(2, "0")}`;
+    // 1 Jan 1970 was a Thursday, and 0 is Sunday.
+    const dayIndex = Math.floor((simDate.getTime() + zoneOffsetMs) / 86400000);
+    const weekday = (((dayIndex + 4) % 7) + 7) % 7;
     const place = timeZone.split("/").pop()?.replace(/_/g, " ") ?? timeZone;
+    // Proleptic Gregorian throughout, as everywhere else in the app; year 0 is
+    // 1 BC, so anything at or below it reads with the era spelled out.
+    const adYear = y > 0 ? `${y}` : `${1 - y} BC`;
 
     if (lang === "en") {
-      return { date: dateAd, time: `${clock} · ${place}` };
+      return { date: `${adYear}-${mo}-${d}`, time: `${clock} · ${place}` };
     }
-    const bs = adToBS(new Date(`${dateAd}T12:00:00`));
+
+    const adYearNe = y > 0 ? `${digits(y)} ई.` : `${digits(1 - y)} ई.पू.`;
+
+    /* Past बि.सं. २२०० the compiled table has nothing, so the Sun becomes the
+       calendar it always was — see [[bikram-solar]]. Marked with ≈ so it never
+       passes for the almanac. */
+    const bs = bikramFromSun(simDate, sunLongitude ?? 0, sunSpeed);
+    const mark = bs.approximate ? "≈" : "";
     return {
-      date: `${digits(bs.year)} ${bsMonthLabel(bs.month, "ne")} ${digits(bs.day)}, ${WEEKDAYS_SHORT_NE[weekday]}बार`,
-      time: `${digits(clock)} · ${place}`,
+      date: `${mark}${digits(bs.year)} ${bsMonthLabel(bs.month, "ne")} ${digits(bs.day)}, ${
+        WEEKDAYS_SHORT_NE[weekday]
+      }बार`,
+      // Out past the table the AD year rides along, so the reading can be
+      // checked against a calendar the reader already knows.
+      time: `${digits(clock)} · ${place}${bs.approximate ? ` · ${adYearNe}` : ""}`,
     };
-  }, [simDate, timeZone, lang, digits]);
+  }, [simDate, zoneOffsetMs, timeZone, lang, digits, sunLongitude, sunSpeed]);
 
   const isDay = mode === "horizon" && (sample?.sunAltitude ?? -90) > -0.5;
 
@@ -258,6 +348,131 @@ export function AakashGocharSky({
 
   // Fullscreen gives the sky the whole window and floats the controls over it.
   const canvasHeight = fullscreen ? windowHeight : height;
+
+  /* The controls are built once and placed twice — a pinned row over the sky in
+     fullscreen, a panel under it otherwise — so the two layouts can never drift
+     apart in what they offer. */
+  const transport = (
+    <>
+      <IconButton
+        name="play-back"
+        label={pick("पछाडि छिटो", "Faster backward")}
+        active={!playing ? false : reverse && speedIndex > 0}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={() => stepSpeed("back")}
+      />
+      <IconButton
+        name={playing ? "pause" : "play"}
+        label={playing ? pick("रोक्नुहोस्", "Pause") : pick("चलाउनुहोस्", "Play")}
+        active={playing}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={togglePlay}
+      />
+      <IconButton
+        name="play-forward"
+        label={pick("अगाडि छिटो", "Faster forward")}
+        active={!playing ? false : !reverse && speedIndex > 0}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={() => stepSpeed("forward")}
+      />
+      <IconButton
+        name="refresh"
+        label={pick("मितिमा फर्कनुहोस्", "Back to the chosen date")}
+        active={false}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={() => {
+          /* The nav above starts on today, so with no date chosen this is
+             simply "back to now". */
+          sim.current.timeMs = date.getTime();
+        }}
+      />
+    </>
+  );
+
+  const viewChips = (
+    <>
+      <Chip
+        active={mode === "space"}
+        label={pick("अन्तरिक्ष", "Space")}
+        onPress={() => {
+          setMode("space");
+          setFocusKey("earth");
+          view.current = { yaw: 0.5, pitch: 0.62, distance: SYSTEM_DISTANCE };
+        }}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={mode === "globe"}
+        label={pick("पृथ्वी गोला", "Earth globe")}
+        onPress={() => {
+          setMode("globe");
+          setFocusKey("earth");
+          view.current = { yaw: 0.6, pitch: 0.42, distance: GLOBE_VIEW };
+        }}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+    </>
+  );
+
+  const toggleChips = (
+    <>
+      <Chip
+        active={toggles.labels}
+        label={pick("नाम", "Labels")}
+        onPress={() => setToggles((t) => ({ ...t, labels: !t.labels }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={toggles.belts}
+        label={pick("राशि/नक्षत्र", "Zodiac")}
+        onPress={() => setToggles((t) => ({ ...t, belts: !t.belts }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={toggles.asterisms}
+        label={pick("तारापुञ्ज", "Star groups")}
+        onPress={() => setToggles((t) => ({ ...t, asterisms: !t.asterisms }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={toggles.poleStars}
+        label={pick("ध्रुव तारा", "Pole stars")}
+        onPress={() => setToggles((t) => ({ ...t, poleStars: !t.poleStars }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={toggles.tilt}
+        label={pick("अक्ष झुकाव", "Axial tilt")}
+        onPress={() => setToggles((t) => ({ ...t, tilt: !t.tilt }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={toggles.grid}
+        label={pick("दिक् ग्रिड", "Alt-az grid")}
+        onPress={() => setToggles((t) => ({ ...t, grid: !t.grid }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
+        active={toggles.lockStars}
+        label={pick("तारा स्थिर", "Lock to stars")}
+        onPress={() => setToggles((t) => ({ ...t, lockStars: !t.lockStars }))}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+    </>
+  );
 
   const body = (
     <View className={fullscreen ? "flex-1 bg-background" : "overflow-hidden rounded-2xl border border-border"}>
@@ -274,6 +489,7 @@ export function AakashGocharSky({
               mode={mode}
               observer={observer}
               calibration={calibration}
+              ayanamsaShift={ayanamsaShift}
               selectedKey={selectedKey}
               focusKey={focusKey}
               toggles={toggles}
@@ -285,118 +501,7 @@ export function AakashGocharSky({
 
         {/* Labels ride over the canvas rather than in it — real Devanagari type,
             positioned from the scene's own projection of each anchor. */}
-        {toggles.labels && sample ? (
-          <View style={{ position: "absolute", inset: 0 }} pointerEvents="none">
-            {sample.labels.map((label) => {
-              if (label.kind === "rashi" && label.index) {
-                const Icon = RASHI_ICONS[label.index - 1];
-                return (
-                  <View
-                    key={label.id}
-                    style={{ position: "absolute", left: label.x - 34, top: label.y - 12, width: 68 }}
-                    className="items-center"
-                  >
-                    <Icon width={16} height={16} color="#f4c542" />
-                    <Text
-                      className="text-[10px] font-bold"
-                      style={[nepaliTextStyle(10), { color: LABEL_COLOR.rashi }]}
-                      numberOfLines={1}
-                    >
-                      {formatRashiByNumber(label.index, lang)}
-                    </Text>
-                  </View>
-                );
-              }
-              if (label.kind === "nakshatra" && label.index) {
-                const nak = NAKSHATRA_ICONS[label.index - 1];
-                return (
-                  <Text
-                    key={label.id}
-                    style={[
-                      { position: "absolute", left: label.x - 40, top: label.y - 6, width: 80, textAlign: "center", color: LABEL_COLOR.nakshatra },
-                      nepaliTextStyle(9),
-                    ]}
-                    className="text-[9px]"
-                    numberOfLines={1}
-                  >
-                    {nak ? (lang === "en" ? nak.en : nak.ne) : ""}
-                  </Text>
-                );
-              }
-              if (label.kind === "cardinal") {
-                return (
-                  <Text
-                    key={label.id}
-                    style={{ position: "absolute", left: label.x - 14, top: label.y - 10, width: 28, textAlign: "center", color: LABEL_COLOR.cardinal }}
-                    className="text-sm font-bold"
-                  >
-                    {label.text}
-                  </Text>
-                );
-              }
-              if (label.kind === "station") {
-                const st = SOLAR_STATIONS.find((x) => x.id === label.text);
-                return (
-                  <Text
-                    key={label.id}
-                    style={[
-                      { position: "absolute", left: label.x - 60, top: label.y - 7, width: 120, textAlign: "center", color: LABEL_COLOR.station },
-                      nepaliTextStyle(10),
-                    ]}
-                    className="text-[10px] font-bold"
-                    numberOfLines={2}
-                  >
-                    {st ? (lang === "en" ? st.en : st.ne) : ""}
-                  </Text>
-                );
-              }
-              if (label.kind === "tropic") {
-                return (
-                  <Text
-                    key={label.id}
-                    style={[
-                      { position: "absolute", left: label.x - 55, top: label.y - 7, width: 110, textAlign: "center", color: LABEL_COLOR.tropic },
-                      nepaliTextStyle(9),
-                    ]}
-                    className="text-[9px]"
-                    numberOfLines={1}
-                  >
-                    {label.text === "cancer"
-                      ? pick("कर्कट रेखा · २३.४४°उ", "Tropic of Cancer · 23.44°N")
-                      : pick("मकर रेखा · २३.४४°द", "Tropic of Capricorn · 23.44°S")}
-                  </Text>
-                );
-              }
-              if (label.kind === "azimuth") {
-                return (
-                  <Text
-                    key={label.id}
-                    style={{ position: "absolute", left: label.x - 16, top: label.y - 6, width: 32, textAlign: "center", color: LABEL_COLOR.azimuth }}
-                    className="text-[9px]"
-                  >
-                    {label.text}
-                  </Text>
-                );
-              }
-              if (label.kind === "graha" && label.key) {
-                return (
-                  <Text
-                    key={label.id}
-                    style={[
-                      { position: "absolute", left: label.x - 45, top: label.y + 10, width: 90, textAlign: "center", color: GRAHA_COLOR[label.key] },
-                      nepaliTextStyle(10),
-                    ]}
-                    className="text-[10px] font-bold"
-                    numberOfLines={1}
-                  >
-                    {lang === "en" ? GRAHA_NAME[label.key].en : GRAHA_NAME[label.key].ne}
-                  </Text>
-                );
-              }
-              return null;
-            })}
-          </View>
-        ) : null}
+        {toggles.labels && sample ? <SkyLabels labels={sample.labels} /> : null}
 
         {/* HUD — the simulated instant, which drifts away from the nav once it runs. */}
         <View
@@ -439,108 +544,89 @@ export function AakashGocharSky({
 
       {/* Floating over the canvas, this panel is always dark glass — so it runs
           on the dark tokens whatever the app theme is, or light-mode text would
-          come out near-black on it. */}
+          come out near-black on it.
+
+          Fullscreen gets one row, not three. Stacked, the controls ate a third
+          of a landscape phone's height — the sky is the point, so the transport
+          stays pinned and everything else scrolls past it, with a chevron to
+          drop the lot down to a single button. */}
       <View
         className={
           fullscreen
-            ? "dark absolute inset-x-0 bottom-0 gap-2.5 px-3 pb-5 pt-3"
+            ? "dark absolute inset-x-0 bottom-0 px-2 pt-2"
             : "gap-2.5 border-t border-border bg-card px-3 py-3"
         }
         style={
           fullscreen
-            ? [nativeWindThemeVars("dark"), { backgroundColor: "rgba(4, 9, 12, 0.62)" }]
+            ? [
+                nativeWindThemeVars("dark"),
+                {
+                  backgroundColor: controlsOpen ? "rgba(4, 9, 12, 0.62)" : "transparent",
+                  paddingBottom: Math.max(insets.bottom, 8),
+                },
+              ]
             : undefined
         }
       >
-        {/* View */}
-        <View className="flex-row items-center gap-2">
-          <Chip
-            active={mode === "space"}
-            label={pick("अन्तरिक्ष दृश्य", "Space view")}
-            onPress={() => {
-              setMode("space");
-              setFocusKey("earth");
-              view.current = { yaw: 0.5, pitch: 0.62, distance: SYSTEM_DISTANCE };
-            }}
-            overlay={fullscreen}
-          />
-          <Chip
-            active={mode === "globe"}
-            label={pick("पृथ्वी गोला", "Earth globe")}
-            onPress={() => {
-              setMode("globe");
-              setFocusKey("earth");
-              view.current = { yaw: 0.6, pitch: 0.42, distance: GLOBE_VIEW };
-            }}
-            overlay={fullscreen}
-          />
-        </View>
+        {fullscreen ? (
+          <View className="flex-row items-center gap-1.5">
+            {controlsOpen ? (
+              <>
+                {transport}
+                <View className="h-6 w-px bg-white/15" />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerClassName="items-center gap-1.5 pr-1"
+                  className="flex-1"
+                >
+                  {viewChips}
+                  <View className="mx-0.5 h-5 w-px bg-white/15" />
+                  {toggleChips}
+                </ScrollView>
+              </>
+            ) : (
+              /* Collapsed: enough to stop the clock, and the way back. */
+              <>
+                <IconButton
+                  name={playing ? "pause" : "play"}
+                  label={playing ? pick("रोक्नुहोस्", "Pause") : pick("चलाउनुहोस्", "Play")}
+                  active={playing}
+                  overlay
+                  compact
+                  onPress={togglePlay}
+                />
+                <View className="flex-1" />
+              </>
+            )}
+            <IconButton
+              name={controlsOpen ? "chevron-down" : "chevron-up"}
+              label={controlsOpen ? pick("नियन्त्रण लुकाउनुहोस्", "Hide controls") : pick("नियन्त्रण देखाउनुहोस्", "Show controls")}
+              active={false}
+              overlay
+              compact
+              onPress={() => setControlsOpen((o) => !o)}
+            />
+          </View>
+        ) : (
+          <>
+            {/* Transport — each press of a fast button steps further up the
+                speed ladder; pause drops back to normal. */}
+            <View className="flex-row items-center gap-1">{transport}</View>
 
-        {/* Transport — one row, all icons. Each press of a fast button steps
-            further up the speed ladder; pause drops back to normal. */}
-        <View className="flex-row items-center gap-1">
-          <IconButton
-            name="play-back"
-            label={pick("पछाडि छिटो", "Faster backward")}
-            active={!playing ? false : reverse && speedIndex > 0}
-            overlay={fullscreen}
-            onPress={() => stepSpeed("back")}
-          />
-          <IconButton
-            name={playing ? "pause" : "play"}
-            label={playing ? pick("रोक्नुहोस्", "Pause") : pick("चलाउनुहोस्", "Play")}
-            active={playing}
-            overlay={fullscreen}
-            onPress={togglePlay}
-          />
-          <IconButton
-            name="play-forward"
-            label={pick("अगाडि छिटो", "Faster forward")}
-            active={!playing ? false : !reverse && speedIndex > 0}
-            overlay={fullscreen}
-            onPress={() => stepSpeed("forward")}
-          />
-          <View className="w-2" />
-          <IconButton
-            name="refresh"
-            label={pick("मितिमा फर्कनुहोस्", "Back to the chosen date")}
-            active={false}
-            overlay={fullscreen}
-            onPress={() => {
-              /* The nav above starts on today, so with no date chosen this is
-                 simply "back to now". */
-              sim.current.timeMs = date.getTime();
-            }}
-          />
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
-          <Chip
-            active={toggles.labels}
-            label={pick("नाम", "Labels")}
-            onPress={() => setToggles((t) => ({ ...t, labels: !t.labels }))}
-            overlay={fullscreen}
-          />
-          <Chip
-            active={toggles.belts}
-            label={pick("राशि/नक्षत्र", "Zodiac")}
-            onPress={() => setToggles((t) => ({ ...t, belts: !t.belts }))}
-            overlay={fullscreen}
-          />
-          <Chip
-            active={toggles.grid}
-            label={pick("दिक् ग्रिड", "Alt-az grid")}
-            onPress={() => setToggles((t) => ({ ...t, grid: !t.grid }))}
-            overlay={fullscreen}
-          />
-          <Chip
-            active={toggles.lockStars}
-            label={pick("तारा स्थिर", "Lock to stars")}
-            onPress={() => setToggles((t) => ({ ...t, lockStars: !t.lockStars }))}
-            overlay={fullscreen}
-          />
-        </ScrollView>
-
+            {/* View and layers share one scroller: two short rows of chips were
+                a row too many. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerClassName="items-center gap-2"
+            >
+              {viewChips}
+              <View className="mx-1 h-5 w-px bg-border" />
+              {toggleChips}
+            </ScrollView>
+          </>
+        )}
       </View>
     </View>
   );
@@ -567,31 +653,259 @@ export function AakashGocharSky({
   );
 }
 
+/**
+ * The text over the canvas. Memoised, and fed an array the scene only replaces
+ * when a label has actually moved a pixel: the HUD clock ticks five times a
+ * second, and re-rendering fifty Devanagari labels alongside it would stutter
+ * the very animation they are labelling.
+ */
+/**
+ * The year a star takes its turn as pole star, in the reader's era. Nepali gets
+ * बिक्रम सम्वत्, which is where every other year in the app is quoted.
+ */
+function formatPoleYear(
+  year: number | undefined,
+  lang: string,
+  digits: (v: string | number) => string,
+): string {
+  if (year == null) return "";
+  if (lang === "en") {
+    return year < 0 ? `${Math.abs(year).toLocaleString("en-US")} BC` : `AD ${year.toLocaleString("en-US")}`;
+  }
+  const bs = year + 57;
+  const abs = digits(Math.abs(bs).toLocaleString("en-US"));
+  return bs < 0 ? `${abs} बि.सं. पूर्व` : `${abs} बि.सं.`;
+}
+
+const SkyLabels = memo(function SkyLabels({ labels }: { labels: ScreenLabel[] }) {
+  const { lang, pick, digits } = useLocale();
+
+  return (
+    <View style={{ position: "absolute", inset: 0 }} pointerEvents="none">
+      {labels.map((label) => {
+        if (label.kind === "rashi" && label.index) {
+          const Icon = RASHI_ICONS[label.index - 1];
+          return (
+            <View
+              key={label.id}
+              style={{ position: "absolute", left: label.x - 34, top: label.y - 12, width: 68 }}
+              className="items-center"
+            >
+              <Icon width={16} height={16} color="#f4c542" />
+              <Text
+                className="text-[10px] font-bold"
+                style={[nepaliTextStyle(10), { color: LABEL_COLOR.rashi }]}
+                numberOfLines={1}
+              >
+                {formatRashiByNumber(label.index, lang)}
+              </Text>
+            </View>
+          );
+        }
+        if (label.kind === "nakshatra" && label.index) {
+          const nak = NAKSHATRA_ICONS[label.index - 1];
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 40, top: label.y - 6, width: 80, textAlign: "center", color: LABEL_COLOR.nakshatra },
+                nepaliTextStyle(9),
+              ]}
+              className="text-[9px]"
+              numberOfLines={1}
+            >
+              {nak ? (lang === "en" ? nak.en : nak.ne) : ""}
+            </Text>
+          );
+        }
+        if (label.kind === "asterism" && label.index) {
+          /* The name of the star group itself, sitting on the stars. Short, so
+             it does not smother the figure it belongs to. */
+          const nak = NAKSHATRA_SHORT[label.index - 1];
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 30, top: label.y + 6, width: 60, textAlign: "center", color: LABEL_COLOR.asterism },
+                nepaliTextStyle(10),
+              ]}
+              className="text-[10px] font-bold"
+              numberOfLines={1}
+            >
+              {nak ? (lang === "en" ? nak.en : nak.ne) : ""}
+            </Text>
+          );
+        }
+        if (label.kind === "cardinal") {
+          return (
+            <Text
+              key={label.id}
+              style={{ position: "absolute", left: label.x - 14, top: label.y - 10, width: 28, textAlign: "center", color: LABEL_COLOR.cardinal }}
+              className="text-sm font-bold"
+            >
+              {label.text}
+            </Text>
+          );
+        }
+        if (label.kind === "station") {
+          const st = SOLAR_STATIONS.find((x) => x.id === label.text);
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 60, top: label.y - 7, width: 120, textAlign: "center", color: LABEL_COLOR.station },
+                nepaliTextStyle(10),
+              ]}
+              className="text-[10px] font-bold"
+              numberOfLines={2}
+            >
+              {st ? (lang === "en" ? st.en : st.ne) : ""}
+            </Text>
+          );
+        }
+        if (label.kind === "axis") {
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 60, top: label.y - 16, width: 120, textAlign: "center", color: LABEL_COLOR.axis },
+                nepaliTextStyle(9),
+              ]}
+              className="text-[9px] font-bold"
+              numberOfLines={2}
+            >
+              {label.text === "earth"
+                ? pick("पृथ्वीको अक्ष", "Earth's axis")
+                : pick("कक्षाको लम्ब", "Orbit's perpendicular")}
+            </Text>
+          );
+        }
+        if (label.kind === "obliquity") {
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 45, top: label.y - 7, width: 90, textAlign: "center", color: LABEL_COLOR.tilt },
+                nepaliTextStyle(11),
+              ]}
+              className="text-[11px] font-bold"
+              numberOfLines={1}
+            >
+              {`${digits((label.deg ?? 23.44).toFixed(2))}°`}
+            </Text>
+          );
+        }
+        if (label.kind === "polestar") {
+          const star = POLE_STARS.find((p) => p.en === label.text);
+          if (!star) return null;
+          // index 1 marks the star the pole is nearest right now.
+          const reigning = label.index === 1;
+          return (
+            <View
+              key={label.id}
+              style={{ position: "absolute", left: label.x - 55, top: label.y + 8, width: 110 }}
+              className="items-center"
+            >
+              <Text
+                style={[
+                  { color: reigning ? LABEL_COLOR.station : LABEL_COLOR.poleStar },
+                  nepaliTextStyle(reigning ? 11 : 9),
+                ]}
+                className={reigning ? "text-[11px] font-bold" : "text-[9px]"}
+                numberOfLines={1}
+              >
+                {lang === "en" ? star.en.replace(/\s*\(.*\)$/, "") : star.ne}
+              </Text>
+              <Text
+                style={[{ color: LABEL_COLOR.overlayDim }, nepaliTextStyle(8)]}
+                className="text-[8px]"
+                numberOfLines={1}
+              >
+                {formatPoleYear(label.year, lang, digits)}
+              </Text>
+            </View>
+          );
+        }
+        if (label.kind === "tropic") {
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 55, top: label.y - 7, width: 110, textAlign: "center", color: LABEL_COLOR.tropic },
+                nepaliTextStyle(9),
+              ]}
+              className="text-[9px]"
+              numberOfLines={1}
+            >
+              {label.text === "cancer"
+                ? pick("कर्कट रेखा · २३.४४°उ", "Tropic of Cancer · 23.44°N")
+                : pick("मकर रेखा · २३.४४°द", "Tropic of Capricorn · 23.44°S")}
+            </Text>
+          );
+        }
+        if (label.kind === "azimuth") {
+          return (
+            <Text
+              key={label.id}
+              style={{ position: "absolute", left: label.x - 16, top: label.y - 6, width: 32, textAlign: "center", color: LABEL_COLOR.azimuth }}
+              className="text-[9px]"
+            >
+              {label.text}
+            </Text>
+          );
+        }
+        if (label.kind === "graha" && label.key) {
+          return (
+            <Text
+              key={label.id}
+              style={[
+                { position: "absolute", left: label.x - 45, top: label.y + 10, width: 90, textAlign: "center", color: GRAHA_COLOR[label.key] },
+                nepaliTextStyle(10),
+              ]}
+              className="text-[10px] font-bold"
+              numberOfLines={1}
+            >
+              {lang === "en" ? GRAHA_NAME[label.key].en : GRAHA_NAME[label.key].ne}
+            </Text>
+          );
+        }
+        return null;
+      })}
+    </View>
+  );
+});
+
 function Chip({
   active,
   label,
   onPress,
   overlay,
+  compact,
 }: {
   active: boolean;
   label: string;
   onPress: () => void;
   /** Floating over the canvas: force light text, whatever the app theme is. */
   overlay?: boolean;
+  /** Tighter, for the single row that floats over a fullscreen sky. */
+  compact?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className={`rounded-full border px-3 py-1.5 active:opacity-70 ${
-        active ? "border-secondary bg-secondary/15" : "border-border bg-background"
-      }`}
+      className={`rounded-full border active:opacity-70 ${
+        compact ? "px-2.5 py-1" : "px-3 py-1.5"
+      } ${active ? "border-secondary bg-secondary/15" : "border-border bg-background"}`}
       style={overlay ? { backgroundColor: "rgba(255,255,255,0.08)" } : undefined}
       accessibilityRole="button"
     >
       <Text
-        className={`text-xs font-medium ${active ? "text-secondary" : "text-muted-foreground"}`}
+        className={`font-medium ${compact ? "text-[11px]" : "text-xs"} ${
+          active ? "text-secondary" : "text-muted-foreground"
+        }`}
+        numberOfLines={1}
         style={[
-          nepaliTextStyle(11),
+          nepaliTextStyle(compact ? 10 : 11),
           overlay ? { color: active ? LABEL_COLOR.rashi : LABEL_COLOR.overlayText } : null,
         ]}
       >
@@ -607,12 +921,15 @@ function IconButton({
   label,
   active,
   overlay,
+  compact,
   onPress,
 }: {
   name: keyof typeof Ionicons.glyphMap;
   label: string;
   active: boolean;
   overlay?: boolean;
+  /** Tighter, for the single row that floats over a fullscreen sky. */
+  compact?: boolean;
   onPress: () => void;
 }) {
   const colors = useThemeColors();
@@ -627,14 +944,14 @@ function IconButton({
   return (
     <Pressable
       onPress={onPress}
-      className={`h-10 w-10 items-center justify-center rounded-full border active:opacity-70 ${
-        active ? "border-secondary bg-secondary/15" : "border-border bg-background"
-      }`}
+      className={`items-center justify-center rounded-full border active:opacity-70 ${
+        compact ? "h-8 w-8" : "h-10 w-10"
+      } ${active ? "border-secondary bg-secondary/15" : "border-border bg-background"}`}
       style={overlay ? { backgroundColor: "rgba(255,255,255,0.08)" } : undefined}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Ionicons name={name} size={20} color={tint} />
+      <Ionicons name={name} size={compact ? 17 : 20} color={tint} />
     </Pressable>
   );
 }

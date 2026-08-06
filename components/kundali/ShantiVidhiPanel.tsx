@@ -8,6 +8,12 @@ import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
 import { NAVAGRAHA_SHANTI, getGrahaShanti } from "@/lib/shanti/navagraha-shanti";
+import {
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+  TableScrollShell,
+} from "@/components/ui/DataTable";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
@@ -394,29 +400,25 @@ export function ShantiVidhiPanel({
         <Text className="mb-3 text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
           {pick("नवग्रह शान्ति तालिका", "Navagraha Shanti table")}
         </Text>
-        <View className="overflow-hidden rounded-xl border border-border">
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View>
-              <View className="flex-row bg-muted">
-                {SHANTI_COLUMNS.map((col) => (
-                  <Text
-                    key={col.key}
-                    style={{ width: col.width, ...nepaliTextStyle(11) }}
-                    className="px-2.5 py-2 text-xs font-semibold text-muted-foreground"
-                  >
-                    {pick(col.ne, col.en)}
-                  </Text>
-                ))}
-              </View>
-              {NAVAGRAHA_SHANTI.map((g) => {
-                const active = g.key === selectedKey;
-                return (
-                  <Pressable
-                    key={g.key}
-                    onPress={() => setSelectedKey(g.key)}
-                    style={active ? { backgroundColor: colorWithAlpha("#0b565a", 0.1) } : undefined}
-                    className="flex-row border-t border-border active:opacity-80"
-                  >
+        <TableScrollShell>
+          <TableHeader>
+            {SHANTI_COLUMNS.map((col) => (
+              <TableHeaderCell key={col.key} width={col.width} compact>
+                <Text style={nepaliTextStyle(11)} className="text-xs font-semibold text-muted-foreground">
+                  {pick(col.ne, col.en)}
+                </Text>
+              </TableHeaderCell>
+            ))}
+          </TableHeader>
+          {NAVAGRAHA_SHANTI.map((g, rowIndex) => {
+            const active = g.key === selectedKey;
+            return (
+              <TableRow
+                key={g.key}
+                rowIndex={rowIndex}
+                highlight={active}
+                onPress={() => setSelectedKey(g.key)}
+              >
                     <Cell width={SHANTI_COLUMNS[0].width} bold>
                       {pick(g.nameNe, g.nameEn)}
                     </Cell>
@@ -429,12 +431,10 @@ export function ShantiVidhiPanel({
                     <Cell width={SHANTI_COLUMNS[7].width}>
                       {pick(g.daan.join(", "), g.daanEn.join(", "))}
                     </Cell>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-        </View>
+              </TableRow>
+            );
+          })}
+        </TableScrollShell>
         <Text className="mt-2 text-sm leading-relaxed text-muted-foreground" style={nepaliTextStyle(14)}>
           {pick(
             "सूचना: माथिका विवरण शास्त्रीय नवग्रह शान्ति परम्परामा आधारित छन्। रत्नधारण वा विधिवत् हवन गर्नुअघि योग्य ज्योतिषी/पुरोहितसँग परामर्श गर्नुहोस्।",

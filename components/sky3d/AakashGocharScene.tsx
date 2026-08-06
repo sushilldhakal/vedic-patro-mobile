@@ -42,7 +42,7 @@ import {
   BODY_RADIUS,
   daysSinceJ2000,
   GEO_BODY_ORDER,
-  geocentricBody,
+  geocentricPointAt,
   geocentricSky,
   shellRadius,
   type GeoBody,
@@ -68,6 +68,13 @@ import {
   type EclipticPoint,
   type HorizonPoint,
 } from "@/lib/sky3d/sky-geometry";
+import { flattenAsterisms, precessionSinceJ2000 } from "@/lib/sky3d/nakshatra-stars";
+import {
+  placedPoleStars,
+  poleStarEpoch,
+  poleTrackPoints,
+  reigningPoleStar,
+} from "@/lib/sky3d/pole-stars";
 import {
   SKY_TEXTURE_KEYS,
   SKY_TEXTURE_SOURCES,
@@ -155,11 +162,29 @@ export type ViewState = { yaw: number; pitch: number; distance: number };
 /** A 3D anchor projected to canvas pixels, for the text overlay. */
 export type ScreenLabel = {
   id: string;
-  kind: "rashi" | "nakshatra" | "graha" | "cardinal" | "azimuth" | "station" | "tropic";
-  /** 1–12 for rashi, 1–27 for nakshatra. */
+  kind:
+    | "rashi"
+    | "nakshatra"
+    | "graha"
+    | "cardinal"
+    | "azimuth"
+    | "station"
+    | "tropic"
+    | "polestar"
+    | "obliquity"
+    | "axis"
+    | "asterism";
+  /**
+   * 1–12 for rashi, 1–27 for nakshatra; for a pole star, 1 marks the one the
+   * pole is nearest at the moment on screen.
+   */
   index?: number;
   key?: GrahaKey;
   text?: string;
+  /** Pole stars only: the Gregorian year the pole passes closest to this one. */
+  year?: number;
+  /** The obliquity marker: the angle it is calling out, degrees. */
+  deg?: number;
   x: number;
   y: number;
 };
@@ -182,6 +207,24 @@ export type SceneToggles = {
    * fast; locked, the zodiac holds still and only the grahas move along it.
    */
   lockStars: boolean;
+  /**
+   * The 27 नक्षत्र drawn as the star groups they are named for, each at its own
+   * place on the belt — रोहिणी as Aldebaran and the Hyades, ज्येष्ठा as
+   * Antares, कृत्तिका as the Pleiades.
+   */
+  asterisms: boolean;
+  /**
+   * The ध्रुव तारा and the circle the pole walks between them — the other half
+   * of precession, the one the ayanamsa does not show.
+   */
+  poleStars: boolean;
+  /**
+   * The obliquity, drawn as the angle it is: the Earth's axis against the
+   * perpendicular to its orbit. In the globe view the Earth is held upright and
+   * the ecliptic is what tilts, so without this the 23.44° is in the picture
+   * but nothing in it looks tilted.
+   */
+  tilt: boolean;
   labels: boolean;
 };
 
@@ -212,24 +255,34 @@ function makeLine(points: THREE.Vector3[], color: string, opacity: number) {
   );
 }
 
-/** A line whose points are rewritten every frame. */
+/**
+ * A line whose points are rewritten every frame.
+ *
+ * Frustum culling is off: it would need a bounding sphere recomputed on every
+ * rewrite — a second pass over every vertex — to save nothing, since these
+ * lines are the dome and the zodiac and are on screen anyway.
+ */
 function makeDynamicLine(count: number, color: string, opacity: number, width = 1) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(count * 3), 3));
-  return new THREE.Line(
+  const line = new THREE.Line(
     geometry,
     new THREE.LineBasicMaterial({ color, transparent: true, opacity, linewidth: width }),
   );
+  line.frustumCulled = false;
+  return line;
 }
 
 /** The same, as disconnected pairs — dividers, ticks, grid cage. */
 function makeDynamicSegments(count: number, color: string, opacity: number) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(count * 3), 3));
-  return new THREE.LineSegments(
+  const segments = new THREE.LineSegments(
     geometry,
     new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
   );
+  segments.frustumCulled = false;
+  return segments;
 }
 
 function setPoint(line: THREE.Line, i: number, v: [number, number, number]) {
@@ -240,7 +293,63 @@ function setPoint(line: THREE.Line, i: number, v: [number, number, number]) {
 function flushLine(line: THREE.Line) {
   const attr = line.geometry.getAttribute("position") as THREE.BufferAttribute;
   attr.needsUpdate = true;
-  line.geometry.computeBoundingSphere();
+}
+
+/**
+ * A cloud of stars whose positions are rewritten with the sky. Point size is in
+ * pixels rather than world units — a star has no apparent size, so it must not
+ * grow as you zoom in on it.
+ */
+function makeStarPoints(count: number, color: string, size: number, opacity: number) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(count * 3), 3));
+  /* A raw GL point is a square. Rather than ship a sprite texture — which the
+     native GL bridge would have to decode — the fragment shader throws away
+     everything outside the disc and feathers the last of it, which is both
+     rounder and softer than a bitmap of this size would be. */
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uSize: { value: size },
+      uOpacity: { value: opacity },
+      uPixelRatio: { value: 1 },
+    },
+    vertexShader: `
+      uniform float uSize;
+      uniform float uPixelRatio;
+      void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = uSize * uPixelRatio;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      void main() {
+        vec2 d = gl_PointCoord - vec2(0.5);
+        float r2 = dot(d, d);
+        if (r2 > 0.25) discard;
+        // Solid core, soft rim — a star, not a disc.
+        float alpha = smoothstep(0.25, 0.02, r2);
+        gl_FragColor = vec4(uColor, uOpacity * alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+  });
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  return points;
+}
+
+/** Write one vertex of any position-buffered object. */
+function setVertex(
+  object: THREE.Object3D & { geometry: THREE.BufferGeometry },
+  i: number,
+  v: [number, number, number],
+) {
+  const attr = object.geometry.getAttribute("position") as THREE.BufferAttribute;
+  attr.setXYZ(i, v[0], v[1], v[2]);
 }
 
 /** A flat annulus lying in the ecliptic plane (space view only). */
@@ -428,6 +537,31 @@ const SIDEREAL_DAY_S = 86164.0905;
 /** Points along the ecliptic great circle in the horizon view. */
 const ECLIPTIC_STEPS = 180;
 
+/**
+ * Angles are compared at this resolution before the zodiac band is re-projected
+ * — 18 arcseconds, which on the dome is a small fraction of a pixel at any zoom
+ * the view allows, so nothing visibly steps.
+ */
+const BELT_ANGLE_STEP = 0.005;
+
+/** Segments in the little arc that calls out the obliquity. */
+const TILT_ARC_STEPS = 24;
+
+const quantizeDeg = (deg: number) => Math.round(deg / BELT_ANGLE_STEP);
+
+/**
+ * Whether a freshly projected label list differs from the one on screen by
+ * enough to be worth re-rendering — a pixel, in either axis.
+ */
+function labelsMoved(prev: ScreenLabel[], next: ScreenLabel[]): boolean {
+  if (prev.length !== next.length) return true;
+  for (let i = 0; i < next.length; i += 1) {
+    const a = prev[i];
+    const b = next[i];
+    if (a.id !== b.id || Math.abs(a.x - b.x) >= 1 || Math.abs(a.y - b.y) >= 1) return true;
+  }
+  return false;
+}
 
 export function AakashGocharScene({
   sim,
@@ -435,6 +569,7 @@ export function AakashGocharScene({
   mode,
   observer,
   calibration,
+  ayanamsaShift = 0,
   selectedKey,
   focusKey,
   toggles,
@@ -446,6 +581,11 @@ export function AakashGocharScene({
   mode: SkyMode;
   observer: Observer;
   calibration: SkyCalibration;
+  /**
+   * Degrees to add to the scene's own Lahiri fit so it agrees with the server
+   * for the date on screen. Zero until the gochar response has arrived.
+   */
+  ayanamsaShift?: number;
   selectedKey: GrahaKey | null;
   focusKey: FocusKey;
   toggles: SceneToggles;
@@ -545,6 +685,80 @@ export function AakashGocharScene({
     };
   }, []);
 
+  /**
+   * The नक्षत्र star groups: three point clouds by brightness so the योगतारा
+   * and the first-magnitude stars carry the shape, plus the figure lines.
+   *
+   * Every star is held at its ecliptic longitude for J2000 and precessed in the
+   * frame loop, which is what keeps it fixed against the belt while the pair of
+   * them drift away from the equinox together.
+   */
+  const starField = useMemo(() => {
+    const { stars, links } = flattenAsterisms();
+    const junction: number[] = [];
+    const bright: number[] = [];
+    const faint: number[] = [];
+    stars.forEach((s, i) => {
+      if (s.junction) junction.push(i);
+      else if (s.mag <= 3.2) bright.push(i);
+      else faint.push(i);
+    });
+    /* Which stars belong to which नक्षत्र, so the group can be named as a group
+       — the label goes on the figure, not on the belt segment below it. */
+    const byNakshatra = new Map<number, number[]>();
+    stars.forEach((s, i) => {
+      const list = byNakshatra.get(s.nakshatra);
+      if (list) list.push(i);
+      else byNakshatra.set(s.nakshatra, [i]);
+    });
+    return {
+      stars,
+      links,
+      byNakshatra: [...byNakshatra.entries()],
+      groups: [
+        { indices: junction, object: makeStarPoints(junction.length, "#ffd98a", 5.5, 0.95) },
+        { indices: bright, object: makeStarPoints(bright.length, "#eaf2ff", 3.6, 0.85) },
+        { indices: faint, object: makeStarPoints(faint.length, "#c8d8ee", 2.4, 0.6) },
+      ],
+      lines: makeDynamicSegments(links.length * 2, "#7f9dc4", 0.32),
+    };
+  }, []);
+
+  /**
+   * The ध्रुव तारा, and the circle the celestial pole walks between them.
+   *
+   * The circle is fixed in the sky — ecliptic latitude 90° − ε all the way
+   * round — and the stars sitting on or near it are exactly the ones that get a
+   * turn as pole star. Running the clock walks the pole along it.
+   */
+  const poleField = useMemo(() => {
+    const stars = placedPoleStars(23.4392911);
+    return {
+      stars,
+      track: poleTrackPoints(23.4392911),
+      trackLine: makeDynamicLine(181, "#8ab4f8", 0.3),
+      points: makeStarPoints(stars.length, "#dceaff", 4, 0.9),
+      /* The reigning one is drawn on top of its own dot, larger and gold. */
+      crown: makeStarPoints(1, "#ffd166", 8, 1),
+    };
+  }, []);
+
+  /**
+   * The obliquity, drawn as an angle rather than left implicit.
+   *
+   * The globe's axis is +Y and the ecliptic pole sits `eps` off it, so the gap
+   * between those two lines *is* the tilt — and it is also the centre of the
+   * circle the pole stars stand on, which is why the two read together.
+   */
+  const tiltMarks = useMemo(
+    () => ({
+      /** The perpendicular to the orbit: where the axis would point untilted. */
+      eclipticAxis: makeDynamicLine(2, "#8ab4f8", 0.55),
+      arc: makeDynamicLine(TILT_ARC_STEPS + 1, "#ffd166", 0.9),
+    }),
+    [],
+  );
+
   /** Earth centre → Sun, and where that ray lands on the globe. */
   const sunRay = useMemo(() => makeDynamicLine(2, "#ffd166", 0.75), []);
 
@@ -608,6 +822,21 @@ export function AakashGocharScene({
   const lockedLst = useRef<number | null>(null);
   const lastSample = useRef(0);
   const lastTrailKey = useRef("");
+  /**
+   * Which graha the trail sweep is up to — one per frame, never all at once.
+   * Starts finished, so nothing is drawn before there is an epoch to draw it at.
+   */
+  const trailCursor = useRef(GEO_BODY_ORDER.length);
+  /** The instant the sweep in progress is drawing, so all nine lines agree. */
+  const trailBaseDt = useRef(0);
+  /**
+   * The sky mapping the zodiac band was last projected with. The band is a
+   * couple of thousand vertices; re-projecting it when nothing has moved is the
+   * single most expensive thing this loop can do, and outside the horizon view
+   * nothing does move — the ring only creeps by the ayanamsa, a degree in 72
+   * years. `null` forces the next frame to rebuild.
+   */
+  const lastBelt = useRef<{ mode: SkyMode; lst: number; ayan: number; eps: number } | null>(null);
   const labels = useRef<ScreenLabel[]>([]);
   const scratch = useRef(new THREE.Vector3());
   const target = useRef(new THREE.Vector3());
@@ -617,7 +846,14 @@ export function AakashGocharScene({
   useEffect(() => {
     lastTrailKey.current = "";
     lockedLst.current = null;
-  }, [selectedKey, calibration, mode, observer]);
+    lastBelt.current = null;
+  }, [selectedKey, calibration, mode, observer, ayanamsaShift]);
+
+  // Turning the band or its labels back on has to redraw it: while it was off
+  // the projection was skipped, so the vertices are wherever they were left.
+  useEffect(() => {
+    lastBelt.current = null;
+  }, [toggles.belts, toggles.asterisms]);
 
   useFrame((state, delta) => {
     try {
@@ -642,7 +878,12 @@ export function AakashGocharScene({
        it; only the space view uses the schematic shells. */
     const zodiac = horizon || globe;
 
-    const ayan = ayanamsa(dtDays);
+    /* The server's Lahiri value for the date on screen, carried as an offset on
+       the local fit: exact where the API spoke, and evolving at the right rate
+       either side of it. This is the number that decides where the sidereal
+       zero — the start of मेष — sits against the equinox, so the whole belt
+       hangs off it. */
+    const ayan = ayanamsa(dtDays) + ayanamsaShift;
     const eps = obliquity(dtDays);
     /* Locked, the sky keeps the sidereal time it had when the lock went on, so
        the belt stays put and only the grahas walk along it. */
@@ -770,15 +1011,118 @@ export function AakashGocharScene({
     }
 
     /* ── the banded zodiac, the equator and the alt-az cage ──────────── */
-    if (zodiac && toggles.belts) {
-      for (const { src, object } of skyLines) {
-        for (let i = 0; i < src.length; i += 1) {
-          setPoint(object, i, place(src[i].lon, src[i].lat, 0));
+    /* Re-projected only when the mapping has actually changed. Inside the dome
+       that is every frame — the sky wheels past — but the globe's ring is drawn
+       in the Earth's own frame and nailed to the stars, so there it is built
+       once and then left alone, which is what keeps the spin smooth when the
+       sky is unlocked. Sidereal time therefore only counts in the dome. */
+    const beltLst = horizon ? quantizeDeg(lst) : 0;
+    const beltAyan = quantizeDeg(ayan);
+    const beltEps = quantizeDeg(eps);
+    const beltMoved =
+      !lastBelt.current ||
+      lastBelt.current.mode !== mode ||
+      lastBelt.current.lst !== beltLst ||
+      lastBelt.current.ayan !== beltAyan ||
+      lastBelt.current.eps !== beltEps;
+
+    if (zodiac && beltMoved) {
+      lastBelt.current = { mode, lst: beltLst, ayan: beltAyan, eps: beltEps };
+
+      if (toggles.belts) {
+        for (const { src, object } of skyLines) {
+          for (let i = 0; i < src.length; i += 1) {
+            setPoint(object, i, place(src[i].lon, src[i].lat, 0));
+          }
+          flushLine(object);
         }
-        flushLine(object);
       }
 
-      if (horizon) {
+      /* ── the नक्षत्र star groups ──────────────────────────────────────
+         A star is fixed against the equinox, not against the belt: its
+         longitude of date is its J2000 longitude plus the precession since,
+         and `place` then takes the ayanamsa back off to reach the sidereal
+         frame everything is drawn in. Do it in that order and the belt stays
+         glued to its stars while both walk away from वसन्त सम्पात — which is
+         the whole thing the ayanamsa measures. */
+      if (toggles.asterisms) {
+        const precession = precessionSinceJ2000(dtDays);
+        const dpr = state.gl.getPixelRatio();
+        for (const { indices, object } of starField.groups) {
+          (object.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = dpr;
+          for (let i = 0; i < indices.length; i += 1) {
+            const star = starField.stars[indices[i]];
+            setVertex(object, i, place(star.lon + precession - ayan, star.lat, DOME * 0.995));
+          }
+          (object.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+        }
+        for (let i = 0; i < starField.links.length; i += 1) {
+          const [a, b] = starField.links[i];
+          const sa = starField.stars[a];
+          const sb = starField.stars[b];
+          setVertex(starField.lines, i * 2, place(sa.lon + precession - ayan, sa.lat, DOME * 0.995));
+          setVertex(starField.lines, i * 2 + 1, place(sb.lon + precession - ayan, sb.lat, DOME * 0.995));
+        }
+        flushLine(starField.lines);
+      }
+
+      /* ── the tilt, as an angle you can read ────────────────────────────
+         The axis is +Y and the ecliptic pole is `eps` off it, in the plane of
+         the solstices. Draw that second line and put an arc between them and
+         the obliquity stops being an implicit property of the ring. */
+      if (globe && toggles.tilt) {
+        const c = Math.cos(eps * DEG);
+        const s2 = Math.sin(eps * DEG);
+        const reach = GLOBE_R * 1.3;
+        setPoint(tiltMarks.eclipticAxis, 0, [0, -reach * c, reach * s2]);
+        setPoint(tiltMarks.eclipticAxis, 1, [0, reach * c, -reach * s2]);
+        flushLine(tiltMarks.eclipticAxis);
+
+        const arcR = GLOBE_R * 1.12;
+        for (let i = 0; i <= TILT_ARC_STEPS; i += 1) {
+          const t = (eps * (i / TILT_ARC_STEPS)) * DEG;
+          setPoint(tiltMarks.arc, i, [0, arcR * Math.cos(t), -arcR * Math.sin(t)]);
+        }
+        flushLine(tiltMarks.arc);
+      }
+
+      /* ── the ध्रुव तारा ────────────────────────────────────────────────
+         Same transform as any other fixed star. In this frame the Earth's axis
+         is what stands still, so it is the pole *circle* that wheels past it —
+         the equivalent picture to the axis sweeping its cone, and the one that
+         shows you which star is on duty. */
+      if (toggles.poleStars) {
+        const precession = precessionSinceJ2000(dtDays);
+        const dpr = state.gl.getPixelRatio();
+        for (const object of [poleField.points, poleField.crown]) {
+          (object.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = dpr;
+        }
+        for (let i = 0; i < poleField.stars.length; i += 1) {
+          const s = poleField.stars[i];
+          setVertex(poleField.points, i, place(s.lon + precession - ayan, s.lat, DOME * 0.995));
+        }
+        (poleField.points.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate =
+          true;
+
+        for (let i = 0; i < poleField.track.length; i += 1) {
+          const p = poleField.track[i];
+          setPoint(poleField.trackLine, i, place(p.lon + precession - ayan, p.lat, DOME * 0.995));
+        }
+        flushLine(poleField.trackLine);
+
+        const reigning = reigningPoleStar(poleField.stars, dtDays, eps);
+        if (reigning) {
+          setVertex(
+            poleField.crown,
+            0,
+            place(reigning.star.lon + precession - ayan, reigning.star.lat, DOME * 0.995),
+          );
+          (poleField.crown.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate =
+            true;
+        }
+      }
+
+      if (horizon && toggles.belts) {
         for (let i = 0; i <= ECLIPTIC_STEPS; i += 1) {
           // Declination 0 all the way round — the celestial equator, which the
           // ecliptic crosses at the two equinoxes and nowhere else. On the
@@ -835,6 +1179,78 @@ export function AakashGocharScene({
       }
     }
 
+    /* Each star group's own name, anchored on the group.
+       The mean of the members lands inside the sphere, so it is pushed back out
+       to where the stars are — otherwise the text would sit at a different
+       depth from the figure it names and drift against it as the view turns. */
+    if (collect && zodiac && toggles.asterisms) {
+      const precession = precessionSinceJ2000(dtDays);
+      for (const [nak, indices] of starField.byNakshatra) {
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        let radius = 0;
+        for (const i of indices) {
+          const s = starField.stars[i];
+          const p = place(s.lon + precession - ayan, s.lat, DOME * 0.995);
+          x += p[0];
+          y += p[1];
+          z += p[2];
+          radius = Math.hypot(p[0], p[1], p[2]);
+        }
+        const len = Math.hypot(x, y, z) || 1;
+        const at: [number, number, number] = [
+          (x / len) * radius,
+          (y / len) * radius,
+          (z / len) * radius,
+        ];
+        if (labelVisible(at)) {
+          project({ id: `ast-${nak}`, kind: "asterism", index: nak }, at);
+        }
+      }
+    }
+
+    /* The two axes and the angle between them, named. */
+    if (collect && globe && toggles.tilt) {
+      const c = Math.cos(eps * DEG);
+      const s2 = Math.sin(eps * DEG);
+      project({ id: "axis-earth", kind: "axis", text: "earth" }, [0, GLOBE_R * 1.38, 0]);
+      project({ id: "axis-ecliptic", kind: "axis", text: "ecliptic" }, [
+        0,
+        GLOBE_R * 1.38 * c,
+        -GLOBE_R * 1.38 * s2,
+      ]);
+      // On the arc's midpoint, pushed out a little so it clears the curve.
+      const mid = (eps / 2) * DEG;
+      project({ id: "obliquity", kind: "obliquity", deg: eps }, [
+        0,
+        GLOBE_R * 1.24 * Math.cos(mid),
+        -GLOBE_R * 1.24 * Math.sin(mid),
+      ]);
+    }
+
+    /* Pole-star names, with the year each takes its turn. The reigning one is
+       flagged so the overlay can crown it. */
+    if (collect && zodiac && toggles.poleStars) {
+      const precession = precessionSinceJ2000(dtDays);
+      const simYear = 2000 + dtDays / 365.25;
+      const reigning = reigningPoleStar(poleField.stars, dtDays, eps);
+      for (const s of poleField.stars) {
+        const at = place(s.lon + precession - ayan, s.lat, DOME * 0.995);
+        if (!labelVisible(at)) continue;
+        project(
+          {
+            id: `pole-${s.en}`,
+            kind: "polestar",
+            text: s.en,
+            year: Math.round(poleStarEpoch(s.lon, simYear)),
+            index: reigning && reigning.star.en === s.en ? 1 : 0,
+          },
+          at,
+        );
+      }
+    }
+
     if (collect && globe) {
       /* The four turning points of the solar year, marked on the ring where
          they actually fall: the sampat on the equator, the ayana ends level
@@ -869,6 +1285,15 @@ export function AakashGocharScene({
     if (spaceOnlyRef.current) spaceOnlyRef.current.visible = space;
     if (globeRootRef.current) globeRootRef.current.visible = globe;
     for (const { object } of skyLines) object.visible = zodiac && toggles.belts;
+    // The star groups belong to the sky, so they live wherever the belt does.
+    for (const { object } of starField.groups) object.visible = zodiac && toggles.asterisms;
+    starField.lines.visible = zodiac && toggles.asterisms;
+    poleField.points.visible = zodiac && toggles.poleStars;
+    poleField.crown.visible = zodiac && toggles.poleStars;
+    poleField.trackLine.visible = zodiac && toggles.poleStars;
+    // The tilt is only drawn where the Earth is: the globe view.
+    tiltMarks.eclipticAxis.visible = globe && toggles.tilt;
+    tiltMarks.arc.visible = globe && toggles.tilt;
     equatorLine.visible = horizon && !globe && toggles.belts;
     gridSegments.object.visible = horizon && !globe && toggles.grid;
     horizonRing.visible = horizon && !globe;
@@ -909,7 +1334,10 @@ export function AakashGocharScene({
     }
 
     if (earthRef.current) {
-      earthRef.current.rotation.y = ((dtDays * 86400) / SIDEREAL_DAY_S) * Math.PI * 2;
+      // Wrapped: tens of thousands of turns since J2000 is a large angle to be
+      // taking a sine of, and only its remainder means anything.
+      earthRef.current.rotation.y =
+        (((dtDays * 86400) / SIDEREAL_DAY_S) * Math.PI * 2) % (Math.PI * 2);
     }
     if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.04;
 
@@ -985,30 +1413,43 @@ export function AakashGocharScene({
     frame.current += 1;
 
     /* ── trails ─────────────────────────────────────────────────────── */
-    if (frame.current % 12 === 0) {
-      const epoch = `${mode}:${Math.floor(dtDays / 2)}`;
-      if (epoch !== lastTrailKey.current) {
-        lastTrailKey.current = epoch;
-        for (const key of GEO_BODY_ORDER) {
-          const line = trails[key];
-          for (let i = 0; i <= TRAIL_STEPS; i += 1) {
-            const offsetDays = -TRAIL_DAYS + (i / TRAIL_STEPS) * TRAIL_DAYS * 2;
-            const at = new Date(s.timeMs + offsetDays * 86400000);
-            const b = geocentricBody(key, at, calibration);
-            if (space) {
-              setPoint(line, i, eclipticToVec3(b.longitude, b.latitude, shellRadius(key, b.distanceAu)));
-            } else {
-              // Held at the current sidereal time, so the trail shows the
-              // graha's own motion against the stars, not the Earth's spin.
-              setPoint(line, i, place(b.longitude, b.latitude, DOME * 0.99));
-            }
-          }
-          flushLine(line);
+    /* Nine paths of ninety points is far too much orbital arithmetic for one
+       frame — done together it drops a frame every time the epoch turns over,
+       which at the fast speeds is several times a second. So the sweep is
+       spread: one graha per frame, all of them off the same instant. */
+    const epoch = `${mode}:${Math.floor(dtDays / 2)}`;
+    const sweeping = trailCursor.current < GEO_BODY_ORDER.length;
+    /* At the fast speeds the epoch turns over faster than a sweep can finish;
+       letting it restart would mean only the Moon ever got redrawn, so a sweep
+       always runs to the end before the next one begins. */
+    if (epoch !== lastTrailKey.current && !sweeping) {
+      lastTrailKey.current = epoch;
+      trailCursor.current = 0;
+      trailBaseDt.current = dtDays;
+    }
+    if (trailCursor.current < GEO_BODY_ORDER.length) {
+      const key = GEO_BODY_ORDER[trailCursor.current];
+      trailCursor.current += 1;
+      const line = trails[key];
+      const shift = calibration[key] ?? 0;
+      for (let i = 0; i <= TRAIL_STEPS; i += 1) {
+        const offsetDays = -TRAIL_DAYS + (i / TRAIL_STEPS) * TRAIL_DAYS * 2;
+        const b = geocentricPointAt(key, trailBaseDt.current + offsetDays, shift);
+        if (space) {
+          setPoint(line, i, eclipticToVec3(b.longitude, b.latitude, shellRadius(key, b.distanceAu)));
+        } else {
+          // Held at the current sidereal time, so the trail shows the
+          // graha's own motion against the stars, not the Earth's spin.
+          setPoint(line, i, place(b.longitude, b.latitude, DOME * 0.99));
         }
       }
+      flushLine(line);
     }
 
-    if (collect) labels.current = collected;
+    /* Keep the previous array whenever nothing has moved a pixel. The overlay
+       is fifty-odd Devanagari text nodes; handing React a new array re-renders
+       every one of them, on the same thread that is drawing the sky. */
+    if (collect && labelsMoved(labels.current, collected)) labels.current = collected;
 
     if (state.clock.elapsedTime - lastSample.current > 0.2) {
       lastSample.current = state.clock.elapsedTime;
@@ -1140,6 +1581,21 @@ export function AakashGocharScene({
         <primitive key={`band-${i}`} object={object} />
       ))}
       <primitive object={equatorLine} />
+
+      {/* The नक्षत्र star groups, and the figures joining them. */}
+      <primitive object={starField.lines} />
+      {starField.groups.map(({ object }, i) => (
+        <primitive key={`stars-${i}`} object={object} />
+      ))}
+
+      {/* The obliquity: the orbit's perpendicular, and the angle off it. */}
+      <primitive object={tiltMarks.eclipticAxis} />
+      <primitive object={tiltMarks.arc} />
+
+      {/* The ध्रुव तारा, and the circle the pole walks between them. */}
+      <primitive object={poleField.trackLine} />
+      <primitive object={poleField.points} />
+      <primitive object={poleField.crown} />
 
       {GEO_BODY_ORDER.map((key) => (
         <GrahaBody

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, Switch, Text, TextInput, View } from "react-native";
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { Button } from "@/components/ui/Button";
+import { EmailTextInput } from "@/components/ui/EmailTextInput";
 import { formatDateInput, formatTimeInput } from "@/lib/birth-date";
 import {
   createProfile,
@@ -147,6 +148,7 @@ export function ProfileForm({
   onSaved: (saved: Profile) => void;
 }) {
   const { pick } = useLocale();
+  const colors = useThemeColors();
   const [form, setForm] = useState<ProfileInput>(initial);
   const [birthLocation, setBirthLocation] = useState<PanchangaLocation>(() => inputToLocation(initial));
   const [busy, setBusy] = useState(false);
@@ -214,10 +216,13 @@ export function ProfileForm({
       <View className="gap-4 sm:flex-row">
         <View className="min-w-0 flex-1 gap-1.5">
           <FieldLabel>{pick("इमेल", "Email")}</FieldLabel>
-          <FieldInput
+          <EmailTextInput
             value={form.email ?? ""}
             onChangeText={(v) => set("email", v)}
-            keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.mutedForeground}
+            className="rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground"
+            style={nepaliTextStyle(14)}
           />
         </View>
         <View className="min-w-0 flex-1 gap-1.5">

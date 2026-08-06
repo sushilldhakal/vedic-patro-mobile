@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { apiForgotPassword } from "@/lib/auth/client";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
+import { EmailTextInput } from "@/components/ui/EmailTextInput";
 import { SocialSignInButtons } from "./SocialSignInButtons";
 
 type Mode = "login" | "signup" | "forgot";
@@ -224,14 +225,11 @@ export function AuthDialog({
             ) : null}
 
             <Field
+              email
               label={pick("इमेल", "Email")}
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              textContentType="emailAddress"
             />
 
             {mode !== "forgot" ? (
@@ -316,13 +314,15 @@ export function AuthDialog({
 
 function Field({
   label,
+  email,
   ...props
-}: React.ComponentProps<typeof TextInput> & { label: string }) {
+}: React.ComponentProps<typeof TextInput> & { label: string; email?: boolean }) {
   const colors = useThemeColors();
+  const Input = email ? EmailTextInput : TextInput;
   return (
     <View className="mt-3 gap-1.5">
       <Text className="text-sm text-foreground">{label}</Text>
-      <TextInput
+      <Input
         placeholderTextColor={colors.mutedForeground}
         className="h-12 rounded-lg border px-3 text-base text-foreground"
         style={{

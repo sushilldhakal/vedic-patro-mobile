@@ -1,5 +1,6 @@
-import { View } from "react-native"
-import { Text } from "@/components/ui/Text"
+import { View } from "react-native";
+import { Text } from "@/components/ui/Text";
+import { NakshatraGlyphIcon, RashiGlyphIcon } from "@/components/panchanga/element/ElementGlyphIcon";
 import type { BalamCardItem } from "@/lib/balam-cards";
 import { findCurrentBalamCard } from "@/lib/balam-cards";
 import { formatNavataraQuality, formatNavataraTara } from "@/lib/navatara-bala";
@@ -10,11 +11,13 @@ export function NavataraBalamCardGrid({
   clock,
   formatName,
   lang,
+  variant = "chandrabala",
 }: {
   cards: BalamCardItem[];
   clock?: string;
   formatName: (card: BalamCardItem) => string;
   lang?: string;
+  variant?: "chandrabala" | "tarabala";
 }) {
   const current = findCurrentBalamCard(cards, clock);
   if (!cards.length) return null;
@@ -32,6 +35,12 @@ export function NavataraBalamCardGrid({
             ) : null}
           </Text>
         );
+        const icon =
+          variant === "tarabala" ? (
+            <NakshatraGlyphIcon name={card.name} number={card.number} size={24} />
+          ) : (
+            <RashiGlyphIcon name={card.name} number={card.number} size={24} />
+          );
         return (
           <PanchangaBalamCard
             key={card.key}
@@ -39,6 +48,7 @@ export function NavataraBalamCardGrid({
             subtitleLine={subtitle}
             tone={card.tone}
             isCurrent={current?.key === card.key}
+            icon={icon}
           />
         );
       })}

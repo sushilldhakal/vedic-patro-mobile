@@ -241,6 +241,26 @@ export function geocentricSky(date: Date, calibration: SkyCalibration = {}): Rec
   return out;
 }
 
+/**
+ * Where one graha *is* at `dt`, without asking how fast it is going.
+ *
+ * {@link geocentricBody} evaluates the orbit twice — once for the position and
+ * once half a day later, for the speed that decides vakri. A trail wants ninety
+ * positions and no speeds, so it uses this and does half the work.
+ */
+export function geocentricPointAt(
+  key: GrahaKey,
+  dt: number,
+  shift = 0,
+): { longitude: number; latitude: number; distanceAu: number } {
+  const now = tropicalOf(key, dt);
+  return {
+    longitude: normalizeDeg(now.lon - ayanamsa(dt) + shift),
+    latitude: now.lat,
+    distanceAu: now.r,
+  };
+}
+
 /** One graha at one instant — the per-body form of {@link geocentricSky}. */
 export function geocentricBody(
   key: GrahaKey,
