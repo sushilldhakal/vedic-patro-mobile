@@ -34,7 +34,9 @@ type Props = {
   onEraChange?: (era: PatroBrowseEra) => void;
   /** Udaya day payload — drives headline (वि.सं., संवत्सर, AD) from server. */
   wheelData?: PanchangaDay;
-  adDateStr: string;
+  /** Civil AD for headline fallback; defaults from `date`. */
+  adDateStr?: string;
+  hideNavLocation?: boolean;
 };
 
 /** Panchanga day header — {@link PatroDateNav} mode `year-month-time` (web `PatroDayTimeNav`). */
@@ -52,7 +54,8 @@ export function PanchangaDateNav({
   era: eraProp = "bs",
   onEraChange,
   wheelData,
-  adDateStr,
+  adDateStr: adDateStrProp,
+  hideNavLocation,
 }: Props) {
   const [browseEra, setBrowseEra] = useState<PatroBrowseEra>(eraProp);
   const handleEraChange = onEraChange ?? setBrowseEra;
@@ -69,6 +72,8 @@ export function PanchangaDateNav({
   const navYear = vikram?.year ?? fallbackBs.year;
   const navMonth = vikram?.month ?? fallbackBs.month;
   const navDay = vikram?.day ?? fallbackBs.day;
+
+  const adDateStr = adDateStrProp ?? toAdStr(date);
 
   const crossEraSubtitle = useMemo(() => {
     if (gregorian?.year && gregorian.month && gregorian.day) {
@@ -122,6 +127,7 @@ export function PanchangaDateNav({
       samvatsara={wheelData?.samvatsara as import("@/lib/samvatsara").SamvatsaraPayload | undefined}
       toolbar={toolbar}
       mobileToolbar={mobileToolbar}
+      hideNavLocation={hideNavLocation}
     />
   );
 }

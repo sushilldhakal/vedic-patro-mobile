@@ -7,8 +7,9 @@ import {
   GrahaColumnCard,
   GrahaDescription,
 } from "@/components/graha/GrahaPageParts";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
+import { getCurrentBs } from "@/lib/bs-calendar";
 import { Text } from "@/components/ui/Text";
 import {
   fetchGrahaAstaYear,
@@ -114,7 +115,7 @@ export default function GrahaAstaScreen() {
   const colors = useThemeColors();
   const { width } = useBreakpoint();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
 
   const query = useQuery({
     queryKey: grahaDetailKeys.asta(year, location.params),
@@ -134,10 +135,7 @@ export default function GrahaAstaScreen() {
   }
 
   return (
-    <AppShell
-      title={pick("ग्रह अस्त", "Graha Asta")}
-      subtitle={pick("वर्षभरका अस्त–उदय अवधि", "The year's combustion windows")}
-    >
+    <AppShell title={pick("ग्रह अस्त", "Graha Asta")} showHeader={false}>
       <GrahaBanner
         icon="sunny-outline"
         title={pick("ग्रह अस्त", "Graha Asta")}
@@ -147,8 +145,15 @@ export default function GrahaAstaScreen() {
         )}
       />
 
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <BsYearPicker year={year} onYearChange={setYear} />
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        onToday={() => setYear(getCurrentBs().year)}
+      />
 
       {query.isLoading && !query.data ? (
         <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>

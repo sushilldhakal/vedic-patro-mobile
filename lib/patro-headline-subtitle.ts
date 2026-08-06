@@ -113,3 +113,26 @@ export function formatPatroCivilDayLabel(
 export function patroHeadlineDigits(lang: string): (n: number | string) => string {
   return lang.slice(0, 2) === "en" ? String : toNepaliDigits;
 }
+
+/** Vikram year headline AD span (web `formatPatroYearGregorianRange`). */
+export function formatPatroYearGregorianRange(
+  startIso: string,
+  endIso: string,
+  lang: string,
+  digitFn: (n: number | string) => string = String,
+): string {
+  const start = parseCivilIso(startIso);
+  const end = parseCivilIso(endIso);
+  const slash = (p: { year: number; month: number; day: number }) => {
+    const y = p.year <= 0 ? Math.abs(p.year) : p.year;
+    return `${digitFn(y)}/${digitFn(p.month)}/${digitFn(p.day)}`;
+  };
+  const a = slash(start);
+  const b = slash(end);
+  if (start.year <= 0 && end.year <= 0) {
+    const bc = lang.slice(0, 2) === "en" ? " BC" : " ई.पू.";
+    return `${a}-${b}${bc}`;
+  }
+  const ad = lang.slice(0, 2) === "en" ? " AD" : "";
+  return `${a}–${b}${ad}`;
+}

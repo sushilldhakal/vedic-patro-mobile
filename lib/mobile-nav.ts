@@ -40,8 +40,11 @@ export function floatingNavBottomPadding(isTablet: boolean): number {
   return isTablet ? 112 : FLOATING_NAV_BOTTOM_PADDING;
 }
 
-/** Kundali list + detail share the bottom tab; milan is a stack screen. */
-export const KUNDALI_SIDEBAR_SPLIT = 992;
+/** Panchanga / kundali left rail — matches web `min-[992px]` sidebar. */
+export const PANCHANGA_SIDEBAR_MIN_WIDTH = 992;
+
+/** @deprecated use PANCHANGA_SIDEBAR_MIN_WIDTH */
+export const KUNDALI_SIDEBAR_SPLIT = PANCHANGA_SIDEBAR_MIN_WIDTH;
 
 /** Normalize expo-router pathnames (strip group segments like `/(tabs)`). */
 export function normalizeMobilePathname(pathname: string): string {

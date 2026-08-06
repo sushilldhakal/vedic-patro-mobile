@@ -3,10 +3,10 @@ import { ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { PatroDateNav } from "@/components/patro-date/PatroDateNav";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
 import { Text } from "@/components/ui/Text";
 import { fetchYearSunTimes, sunTimesKeys, type SunYearDay, type SunYearMonth } from "@/lib/api";
-import { BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
+import { BS_MONTH_NAMES, BS_MONTHS_NE, getCurrentBs } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import {
@@ -18,11 +18,10 @@ import {
 import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import { useThemeColors } from "@/lib/theme-context";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
-import { stepPatroBrowseYear } from "@/lib/patro-year-browse-step";
 
-/** Matches the web grid's fixed column widths so month headers line up. */
-const DAY_COL = 44;
-const MONTH_COL = 82;
+const DAY_COL = 36;
+const MONTH_COL = 92;
+const CELL_MIN_H = 40;
 
 const AYANA_NORTH = "#2e7d32";
 const AYANA_SOUTH = "#c62828";
@@ -95,24 +94,15 @@ export default function SuryakrantiScreen() {
   const maxDay = Math.max(30, ...(months ?? []).map((m) => m.month_length));
 
   return (
-    <AppShell
-      title={pick("सूर्य क्रान्ति", "Sun Revolution")}
-      subtitle={pick(
-        `वार्षिक सूर्योदय–सूर्यास्त · वि.सं. ${digits(year)}`,
-        `Annual sunrise & sunset · B.S. ${year}`,
-      )}
-      headerRight={<Ionicons name="sunny-outline" size={26} color={colors.secondary} />}
-    >
-      <PatroDateNav
-        mode="year"
+    <AppShell title={pick("सूर्य क्रान्ति", "Sun Revolution")} showHeader={false}>
+      <PatroYearNavBlock
         era={era}
         onEraChange={setEra}
         year={year}
         onYearChange={setYear}
         location={location}
         onLocationChange={setLocation}
-        onPrev={() => setYear(stepPatroBrowseYear(era, year, "prev"))}
-        onNext={() => setYear(stepPatroBrowseYear(era, year, "next"))}
+        onToday={() => setYear(getCurrentBs().year)}
       />
 
       <View className="overflow-hidden rounded-xl border border-border bg-card">
@@ -164,19 +154,24 @@ export default function SuryakrantiScreen() {
               <View className="flex-row border-b border-border">
                 <Text
                   style={{ width: DAY_COL, ...nepaliTextStyle(11) }}
-                  className="border-r border-border bg-card px-2 py-2 text-center text-xs font-bold text-foreground"
+                  className="border-r border-border bg-card px-1 py-2 text-center text-xs font-bold text-foreground"
                 >
                   {pick("दिन", "Day")}
                 </Text>
                 {monthLabels.map((name, idx) => (
-                  <Text
+                  <View
                     key={`sun-month-${idx + 1}`}
-                    numberOfLines={1}
-                    style={{ width: MONTH_COL, ...nepaliTextStyle(11) }}
-                    className="border-r border-border bg-card px-1 py-2 text-center text-xs font-bold text-foreground"
+                    style={{ width: MONTH_COL }}
+                    className="items-center justify-center border-r border-border bg-card px-0.5 py-1.5"
                   >
-                    {name || " "}
-                  </Text>
+                    <Text
+                      numberOfLines={2}
+                      style={{ ...nepaliTextStyle(10), textAlign: "center" }}
+                      className="text-[10px] font-bold leading-tight text-foreground"
+                    >
+                      {name || " "}
+                    </Text>
+                  </View>
                 ))}
               </View>
 
@@ -186,7 +181,7 @@ export default function SuryakrantiScreen() {
                   <View key={day} className="flex-row border-b border-border">
                     <Text
                       style={{ width: DAY_COL }}
-                      className="border-r border-border bg-card px-2 py-2 text-center font-num text-xs font-bold text-foreground"
+                      className="border-r border-border bg-card px-1 py-2 text-center font-num text-xs font-bold text-foreground"
                     >
                       {digits(day)}
                     </Text>
@@ -196,7 +191,12 @@ export default function SuryakrantiScreen() {
                         return (
                           <View
                             key={month}
-                            style={{ width: MONTH_COL, backgroundColor: colors.surfaceMuted, opacity: 0.45 }}
+                            style={{
+                              width: MONTH_COL,
+                              minHeight: CELL_MIN_H,
+                              backgroundColor: colors.surfaceMuted,
+                              opacity: 0.45,
+                            }}
                             className="border-r border-border"
                           />
                         );
@@ -205,13 +205,15 @@ export default function SuryakrantiScreen() {
                       return (
                         <View
                           key={month}
-                          style={{ width: MONTH_COL }}
-                          className="border-r border-border px-1 py-1.5"
+                          style={{ width: MONTH_COL, minHeight: CELL_MIN_H }}
+                          className="justify-center border-r border-border px-0.5 py-1"
                         >
                           <Text
                             numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.75}
                             style={{ color: colors.primary }}
-                            className="text-center font-num text-[11px]"
+                            className="text-center font-num text-[10px] leading-tight"
                           >
                             {cell?.sunriseDisplay ?? "—"}
                             {cell?.ayanaMark ? (
@@ -221,7 +223,7 @@ export default function SuryakrantiScreen() {
                                     ? AYANA_NORTH
                                     : AYANA_SOUTH,
                                 }}
-                                className="text-[10px] font-bold"
+                                className="text-[9px] font-bold"
                               >
                                 {" "}
                                 {formatAyanaMarkShort(cell.ayanaMark, lang)}
@@ -230,8 +232,10 @@ export default function SuryakrantiScreen() {
                           </Text>
                           <Text
                             numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.75}
                             style={{ color: colors.destructive }}
-                            className="text-center font-num text-[11px]"
+                            className="text-center font-num text-[10px] leading-tight"
                           >
                             {cell?.sunsetDisplay ?? "—"}
                           </Text>

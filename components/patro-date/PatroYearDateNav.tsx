@@ -1,10 +1,11 @@
-import { PatroDateNav } from "./PatroDateNav";
 import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
-import { usePanchangaLocation } from "@/lib/use-panchanga-location";
-import { stepPatroBrowseYear } from "@/lib/patro-year-browse-step";
 import type { PatroBrowseEra } from "@/lib/patro-era";
+import { PatroYearBrowseNav, type PatroYearBrowseNavProps } from "./PatroYearBrowseNav";
 
-type Props = {
+type Props = Omit<
+  PatroYearBrowseNavProps,
+  "era" | "onEraChange" | "year" | "onYearChange"
+> & {
   era?: PatroBrowseEra;
   onEraChange?: (era: PatroBrowseEra) => void;
   year: number;
@@ -12,31 +13,27 @@ type Props = {
   className?: string;
 };
 
-/** Year-only browse bar — wraps {@link PatroDateNav} mode `year`. */
+/** Year-only browse bar — {@link PatroYearBrowseNav} with optional internal era state. */
 export function PatroYearDateNav({
   era: eraProp,
   onEraChange: onEraChangeProp,
   year,
   onYearChange,
   className,
+  ...rest
 }: Props) {
   const browse = usePatroYearBrowse(year);
   const era = eraProp ?? browse.era;
   const setEra = onEraChangeProp ?? browse.setEra;
-  const { location, setLocation } = usePanchangaLocation();
 
   return (
-    <PatroDateNav
+    <PatroYearBrowseNav
       className={className}
-      mode="year"
       era={era}
       onEraChange={setEra}
       year={year}
       onYearChange={onYearChange}
-      location={location}
-      onLocationChange={setLocation}
-      onPrev={() => onYearChange(stepPatroBrowseYear(era, year, "prev"))}
-      onNext={() => onYearChange(stepPatroBrowseYear(era, year, "next"))}
+      {...rest}
     />
   );
 }

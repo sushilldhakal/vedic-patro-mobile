@@ -7,7 +7,6 @@ import {
   GrahaBanner,
   GrahaDescription,
 } from "@/components/graha/GrahaPageParts";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { Text } from "@/components/ui/Text";
 import {
@@ -135,13 +134,7 @@ export default function GrahaSthitiScreen() {
   });
 
   return (
-    <AppShell
-      title={pick("ग्रह स्थिति", "Graha Sthiti")}
-      subtitle={pick(
-        "नौ ग्रह र लग्नको दैनिक स्पष्ट स्थिति",
-        "Daily sphuta of the nine grahas and the ascendant",
-      )}
-    >
+    <AppShell title={pick("ग्रह स्थिति", "Graha Sthiti")} showHeader={false}>
       <GrahaBanner
         icon="planet-outline"
         title={pick("ग्रह स्थिति", "Graha Sthiti")}
@@ -151,8 +144,13 @@ export default function GrahaSthitiScreen() {
         )}
       />
 
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <PanchangaDateNav date={date} onDateChange={setDate} todayAd={todayAd} />
+      <PanchangaDateNav
+        date={date}
+        onDateChange={setDate}
+        todayAd={todayAd}
+        location={location}
+        onLocationChange={setLocation}
+      />
 
       {query.isLoading && !query.data ? (
         <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>

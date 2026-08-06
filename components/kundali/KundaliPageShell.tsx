@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
-import { floatingNavBottomPadding, KUNDALI_SIDEBAR_SPLIT, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
-import { nepaliTextStyle } from "@/lib/nepali-text";
-import { useBreakpoint } from "@/lib/responsive";
-import { useThemeColors } from "@/lib/theme-context";
-import { PanchangaSidebarNav } from "@/components/panchanga/PanchangaSidebarNav";
-import { KundaliSectionNav } from "./KundaliSectionNav";
+import { ScrollView, View } from "react-native";
+import { KundaliSectionNav } from "@/components/kundali/KundaliSectionNav";
+import { PanchangaSplitShell, useShowPanchangaSidebar } from "@/components/panchanga/PanchangaSplitShell";
 import type { KundaliSectionId } from "@/lib/kundali/kundali-section-nav";
-
-const SIDEBAR_RAIL_WIDTH = 224;
+import { Text } from "@/components/ui/Text";
+import { nepaliTextStyle } from "@/lib/nepali-text";
 
 type SectionNavProps = {
   activeId: KundaliSectionId;
@@ -25,7 +21,7 @@ type Props = {
   sectionNav?: SectionNavProps;
 };
 
-/** Kundali pages — same sidebar shell as `PanchangaShellLayout` / web panchanga layout. */
+/** Kundali pages — panchanga sidebar rail at ≥992px (web parity). */
 export function KundaliPageShell({
   eyebrow,
   title,
@@ -35,20 +31,8 @@ export function KundaliPageShell({
   variant = "list",
   sectionNav,
 }: Props) {
-  const colors = useThemeColors();
-  const { width, isTablet, isLandscape } = useBreakpoint();
-  const showSidebar = width >= KUNDALI_SIDEBAR_SPLIT || isLandscape;
+  const showSidebar = useShowPanchangaSidebar();
   const isDetail = variant === "detail";
-
-  const mainScrollProps = {
-    className: "flex-1 bg-background" as const,
-    contentContainerClassName: "mx-auto w-full max-w-[1600px] pt-4",
-    contentContainerStyle: {
-      paddingBottom: floatingNavBottomPadding(isTablet),
-      paddingHorizontal: PAGE_HORIZONTAL_PADDING,
-    },
-    showsVerticalScrollIndicator: false as const,
-  };
 
   const mainColumn = (
     <View className="gap-4">
@@ -94,34 +78,13 @@ export function KundaliPageShell({
     </View>
   );
 
-  if (!showSidebar) {
-    return <ScrollView {...mainScrollProps}>{mainColumn}</ScrollView>;
-  }
-
   return (
-    <View className="flex-1 flex-row bg-background">
-      <View
-        style={{
-          width: SIDEBAR_RAIL_WIDTH,
-          paddingTop: 16,
-          paddingBottom: 12,
-          paddingLeft: PAGE_HORIZONTAL_PADDING,
-          paddingRight: 8,
-          borderRightWidth: 1,
-          borderRightColor: colors.border,
-          backgroundColor: colors.background,
-        }}
-      >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-          <PanchangaSidebarNav
-            className="w-full border-0 shadow-none"
-            compact
-            kundaliSectionNav={isDetail ? sectionNav : undefined}
-          />
-        </ScrollView>
-      </View>
-
-      <ScrollView {...mainScrollProps}>{mainColumn}</ScrollView>
-    </View>
+    <PanchangaSplitShell
+      mainScroll
+      compact
+      kundaliSectionNav={isDetail && showSidebar ? sectionNav : undefined}
+    >
+      {mainColumn}
+    </PanchangaSplitShell>
   );
 }

@@ -3,7 +3,7 @@ import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell, LangToggle } from "@/components/AppShell";
-import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
 import { Text } from "@/components/ui/Text";
 import { apiKeys, fetchFestivals, fetchHolidays, type Festival, type Holiday } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
@@ -11,12 +11,15 @@ import { nepaliTextStyle } from "@/lib/nepali-text";
 import { formatHolidayBsDisplay } from "@/lib/panchanga-format";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import {
   TableHeader,
   TableHeaderCell,
   TableRow,
   TableScrollShell,
+  TableCell,
 } from "@/components/ui/DataTable";
+import { useBreakpoint } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
 
 type Tab = "holidays" | "festivals";
@@ -73,7 +76,8 @@ function toRow(
 export default function HolidaysScreen() {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
-  const { year, setYear } = useBsYear();
+  const { isCalendarWide } = useBreakpoint();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
   const [tab, setTab] = useState<Tab>("holidays");
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<{ key: keyof Row; dir: SortDir }>({ key: "adDate", dir: "asc" });
@@ -96,6 +100,11 @@ export default function HolidaysScreen() {
   const holidays = holidaysQ.data?.holidays ?? [];
   const festivals = festivalsQ.data?.festivals ?? [];
   const columns = tab === "holidays" ? HOLIDAY_COLUMNS : FESTIVAL_COLUMNS;
+
+  const gregorianRange =
+    (tab === "holidays" ? holidaysQ.data?.gregorian_range : festivalsQ.data?.gregorian_range) ??
+    holidaysQ.data?.gregorian_range ??
+    festivalsQ.data?.gregorian_range;
 
   const rows = useMemo(() => {
     const source = tab === "holidays" ? holidays : festivals;
@@ -123,15 +132,20 @@ export default function HolidaysScreen() {
   ];
 
   return (
-    <AppShell
-      title={pick("बिदा तथा पर्वहरू", "Holidays & Festivals")}
-      subtitle={pick(
-        "विक्रम सम्बत् वर्षका नेपालका सार्वजनिक बिदा र धार्मिक पर्वहरू",
-        "Nepal public holidays and religious festivals for a BS year",
-      )}
-      headerRight={<LangToggle />}
-    >
-      <BsYearPicker year={year} onYearChange={setYear} />
+    <AppShell title={pick("बिदा तथा पर्व", "Holidays")} showHeader={false}>
+      {!isCalendarWide ? (
+        <View className="mb-3 flex-row justify-end">
+          <LangToggle />
+        </View>
+      ) : null}
+
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        gregorianRange={gregorianRange}
+      />
 
       <View className="mb-4 flex-row gap-1 border-b border-border">
         {tabs.map((item) => {
@@ -207,7 +221,7 @@ export default function HolidaysScreen() {
           {pick("लोड हुँदै…", "Loading…")}
         </Text>
       ) : (
-        <TableScrollShell>
+        <TableScrollShell stretch scroll={false}>
           <TableHeader className="border-b border-border">
             {columns.map((col) => {
               const active = sort.key === col.key;
@@ -253,20 +267,20 @@ export default function HolidaysScreen() {
                     {columns.map((col) => {
                       if (col.key === "type") {
                         return (
-                          <View key={col.key} style={{ width: col.width }} className="justify-center px-4 py-3">
+                          <TableCell key={col.key} width={col.width} align="left">
                             <View className="self-start rounded-full bg-muted px-2 py-0.5">
                               <Text className="text-xs capitalize text-foreground" style={nepaliTextStyle(11)}>
                                 {row.type}
                               </Text>
                             </View>
-                          </View>
+                          </TableCell>
                         );
                       }
                       if (col.key === "isPublic") {
                         return (
-                          <View key={col.key} style={{ width: col.width }} className="flex-row items-center gap-1 px-4 py-3">
+                          <TableCell key={col.key} width={col.width} align="left">
                             {row.isPublic ? (
-                              <>
+                              <View className="flex-row items-center gap-1">
                                 <Ionicons name="flag" size={11} color={colors.destructive} />
                                 <Text
                                   style={{ color: colors.destructive, ...nepaliTextStyle(11) }}
@@ -274,23 +288,23 @@ export default function HolidaysScreen() {
                                 >
                                   {pick("हो", "Yes")}
                                 </Text>
-                              </>
+                              </View>
                             ) : null}
-                          </View>
+                          </TableCell>
                         );
                       }
                       const mono = col.key === "bsDate" || col.key === "adDate";
+                      const value = row[col.key as keyof Row] as string;
                       return (
-                        <Text
-                          key={col.key}
-                          style={{ width: col.width, ...nepaliTextStyle(13) }}
-                          className={cn(
-                            "px-4 py-3 text-sm text-foreground",
-                            mono && "font-num text-xs",
-                          )}
-                        >
-                          {row[col.key as keyof Row] as string}
-                        </Text>
+                        <TableCell key={col.key} width={col.width} align="left">
+                          <Text
+                            numberOfLines={2}
+                            style={nepaliTextStyle(13)}
+                            className={cn("text-sm text-foreground", mono && "font-num text-xs")}
+                          >
+                            {value}
+                          </Text>
+                        </TableCell>
                       );
                     })}
                   </TableRow>

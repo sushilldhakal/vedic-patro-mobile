@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { AakashGocharSky } from "@/components/sky3d/AakashGocharSky";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
+import { defaultClockForTimezone, parseClockParts } from "@/components/panchanga/use-panchanga-mode";
 import { Text } from "@/components/ui/Text";
 import { fetchGochar, gocharKeys } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
@@ -28,6 +28,7 @@ export default function AakashGocharScreen() {
   const tz = resolveTimeZone(undefined, location.params.timezone);
   const todayAd = todayAdStringInTimezone(new Date(), tz);
   const [date, setDate] = useState(() => new Date(`${todayAd}T12:00:00`));
+  const [clock, setClock] = useState(() => defaultClockForTimezone(tz));
 
   const dateAd = useMemo(() => {
     const y = date.getFullYear();
@@ -35,6 +36,15 @@ export default function AakashGocharScreen() {
     const d = String(date.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }, [date]);
+
+  /* The scene reads a single instant — merge the picked day with the picked
+     clock so "Done" in the sheet actually moves the sky, not just the date. */
+  const sceneDate = useMemo(() => {
+    const { hour, minute } = parseClockParts(clock);
+    const d = new Date(date);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  }, [date, clock]);
 
   /* The horizon view needs real coordinates. Backend city ids carry none, so
      fall back through the local city table and finally to Kathmandu. */
@@ -51,15 +61,17 @@ export default function AakashGocharScreen() {
   });
 
   return (
-    <AppShell
-      title={pick("३D आकाश गोचर", "3D Aakash Gochar")}
-      subtitle={pick(
-        "पृथ्वीबाट देखिने भूकेन्द्रित आकाश — राशि र नक्षत्र वलय सहित",
-        "The geocentric sky as the Earth sees it, with the rashi and nakshatra belts",
-      )}
-    >
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <PanchangaDateNav date={date} onDateChange={setDate} todayAd={todayAd} />
+    <AppShell title={pick("३D आकाश गोचर", "3D Aakash Gochar")} showHeader={false}>
+      <PanchangaDateNav
+        date={date}
+        onDateChange={setDate}
+        todayAd={todayAd}
+        clock={clock}
+        onClockChange={setClock}
+        location={location}
+        onLocationChange={setLocation}
+        adDateStr={dateAd}
+      />
 
       {query.isLoading ? (
         <View className="items-center rounded-2xl border border-dashed border-border py-16">
@@ -71,7 +83,11 @@ export default function AakashGocharScreen() {
         <AakashGocharSky
           gochar={query.data?.gochar}
           ayanamsaDeg={query.data?.ayanamsa?.degrees}
-          date={date}
+          date={sceneDate}
+          onDateChange={setDate}
+          clock={clock}
+          onClockChange={setClock}
+          todayAd={todayAd}
           observer={observer}
           timeZone={tz}
           height={460}

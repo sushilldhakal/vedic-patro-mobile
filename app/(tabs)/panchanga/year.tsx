@@ -5,7 +5,6 @@ import { AppShell } from "@/components/AppShell";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { PanchangaWheel } from "@/components/panchanga/PanchangaWheel";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { fetchPanchanga, panchangaKeys } from "@/lib/api";
 import { adToBS } from "@/lib/bs-calendar";
 import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
@@ -32,12 +31,16 @@ export default function PanchangaYearScreen() {
   });
 
   return (
-    <AppShell
-      title={pick("वार्षिक पञ्चाङ्ग चक्र", "Annual panchanga wheel")}
-      subtitle={pick("दिन परिवर्तन गर्दै चक्र हेर्नुहोस्", "Scrub the day to explore the wheel")}
-    >
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <PanchangaDateNav date={date} onDateChange={setDate} todayAd={todayAd} />
+    <AppShell title={pick("वार्षिक पञ्चाङ्ग चक्र", "Annual panchanga wheel")} showHeader={false}>
+      <PanchangaDateNav
+        date={date}
+        onDateChange={setDate}
+        todayAd={todayAd}
+        location={location}
+        onLocationChange={setLocation}
+        wheelData={query.data}
+        adDateStr={dateAd}
+      />
       {query.isLoading ? (
         <LoadingState />
       ) : query.isError || !query.data ? (

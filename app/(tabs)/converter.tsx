@@ -29,7 +29,7 @@ type Mode = "ad-to-bs" | "bs-to-ad";
 export default function ConverterScreen() {
   const { pick, digits } = useLocale();
   const colors = useThemeColors();
-  const { width } = useBreakpoint();
+  const { width, isCalendarWide } = useBreakpoint();
   const today = todayAdString();
   const bs = adToBS(new Date());
   const todayBs = `${bs.year}-${String(bs.month).padStart(2, "0")}-${String(bs.day).padStart(2, "0")}`;
@@ -70,12 +70,14 @@ export default function ConverterScreen() {
   return (
     <AppShell
       title={pick("मिति रूपान्तर", "Date Converter")}
-      subtitle={pick(
-        "ईस्वी र विक्रम सम्वत् बिच मिति रूपान्तर गर्नुहोस्।",
-        "Convert dates between the Gregorian (AD) and Bikram Sambat (BS) calendars.",
-      )}
-      headerRight={<LangToggle />}
+      showHeader={false}
     >
+      {!isCalendarWide ? (
+        <View className="mb-3 flex-row justify-end">
+          <LangToggle />
+        </View>
+      ) : null}
+
       <View className="mb-4 w-fit flex-row self-start overflow-hidden rounded-xl border border-border">
         {(["ad-to-bs", "bs-to-ad"] as const).map((m) => {
           const active = mode === m;

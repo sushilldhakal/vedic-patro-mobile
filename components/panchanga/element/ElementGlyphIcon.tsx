@@ -43,6 +43,11 @@ import Revati from "@/assets/nakshatras/revati.svg";
 
 import { findNakshatraIcon, NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import { rashiNumberFromName } from "@/lib/rashi-i18n";
+import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { CalendarMoonPhaseIcon } from "@/components/panchanga/CalendarMoonPhaseIcon";
+import { tithiIndexFromElementSpan } from "@/lib/tithi-wheel-data";
+import { View } from "react-native";
 
 type SvgIcon = FC<ComponentProps<typeof Svg>>;
 
@@ -135,4 +140,106 @@ export function NakshatraGlyphIcon({
   const Icon = NAKSHATRA_GLYPH_ICONS[idx];
   if (!Icon) return null;
   return <Icon width={size} height={size} />;
+}
+
+function grahaKeyFromLabel(raw?: string | null): GrahaKey | undefined {
+  if (!raw?.trim()) return undefined;
+  const lower = raw.trim().toLowerCase();
+  const keys: GrahaKey[] = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn", "rahu", "ketu"];
+  for (const key of keys) {
+    const meta = GRAHA_NAME[key];
+    if (lower === key || lower.includes(meta.en.toLowerCase()) || raw.includes(meta.ne)) return key;
+  }
+  const hora: Record<string, GrahaKey> = {
+    ravi: "sun",
+    soma: "moon",
+    mangala: "mars",
+    budha: "mercury",
+    guru: "jupiter",
+    shukra: "venus",
+    shani: "saturn",
+  };
+  for (const [k, g] of Object.entries(hora)) {
+    if (lower.includes(k)) return g;
+  }
+  return undefined;
+}
+
+export function ElementPlanetIcon({
+  planet,
+  size = 26,
+}: {
+  planet?: string | null;
+  size?: number;
+}) {
+  const graha = grahaKeyFromLabel(planet);
+  if (!graha) return null;
+  return <GrahaPlanetIcon graha={graha} size={size} />;
+}
+
+export function ElementDayRowIcon({
+  elementId,
+  row,
+  size = 26,
+}: {
+  elementId?: string;
+  row: Record<string, unknown>;
+  size?: number;
+}) {
+  const num = typeof row.number === "number" ? row.number : undefined;
+
+  if (elementId === "hora") {
+    const planet = String(row.planet ?? row.planet_en ?? row.name ?? row.name_ne ?? "");
+    return <ElementPlanetIcon planet={planet} size={size} />;
+  }
+
+  if (
+    elementId === "lagna" ||
+    elementId === "udaya-lagna" ||
+    elementId === "pushkara" ||
+    elementId === "panchaka-rahita"
+  ) {
+    const rashiLabel = String(row.lagna_ne ?? row.lagna ?? row.name_ne ?? row.name ?? "");
+    return <RashiGlyphIcon name={rashiLabel} number={num} size={size} />;
+  }
+
+  return null;
+}
+
+export function ElementSpanIcon({
+  elementId,
+  span,
+  size = 32,
+}: {
+  elementId: string;
+  span: { name: string; name_ne: string; number: number; paksha?: string };
+  size?: number;
+}) {
+  if (elementId === "nakshatra") {
+    return (
+      <NakshatraGlyphIcon
+        name={span.name_ne || span.name}
+        number={span.number}
+        size={size}
+      />
+    );
+  }
+  if (elementId === "chandra-rashi") {
+    return (
+      <RashiGlyphIcon
+        name={span.name_ne || span.name}
+        number={span.number}
+        size={size}
+      />
+    );
+  }
+  if (elementId === "tithi") {
+    const tithiIndex = tithiIndexFromElementSpan(span);
+    return (
+      <View style={{ width: size, height: size }}>
+        <CalendarMoonPhaseIcon tithiIndex={tithiIndex} size={size} />
+      </View>
+    );
+  }
+  return null;
 }

@@ -16,7 +16,9 @@ import { Canvas } from "@/components/sky3d/GeocentricSkyCanvas";
 import { Text } from "@/components/ui/Text";
 import type { GocharGraha } from "@/lib/api";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
-import { bsMonthLabel, WEEKDAYS_SHORT_NE } from "@/lib/bs-calendar";
+import { adToBS, bsMonthLabel, bsToAD, WEEKDAYS_SHORT_NE } from "@/lib/bs-calendar";
+import { BsDateTimePicker } from "@/components/panchanga/BsDateTimePicker";
+import { windowedBrowseYears } from "@/lib/patro-browse-years";
 import { bikramFromSun } from "@/lib/sky3d/bikram-solar";
 import { NAKSHATRA_SHORT } from "@/lib/sky3d/nakshatra-stars";
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
@@ -115,6 +117,15 @@ export type AakashGocharSkyProps = {
   ayanamsaDeg?: number;
   /** The date the gochar rows describe; the simulation starts here. */
   date: Date;
+  /**
+   * Lets the transport row's calendar button jump the page to a new date —
+   * the only way to change dates once the sky is fullscreen, where the date
+   * nav above the canvas is out of reach.
+   */
+  onDateChange?: (date: Date) => void;
+  clock?: string;
+  onClockChange?: (clock: string) => void;
+  todayAd?: string;
   /** Where the sky is being watched from. Drives the whole horizon view. */
   observer?: Observer;
   /** The place's timezone — the clock in the HUD reads on its wall, not UTC. */
@@ -126,6 +137,10 @@ export function AakashGocharSky({
   gochar,
   ayanamsaDeg,
   date,
+  onDateChange,
+  clock,
+  onClockChange,
+  todayAd,
   observer = KATHMANDU,
   timeZone = "Asia/Kathmandu",
   height = 460,
@@ -176,6 +191,10 @@ export function AakashGocharSky({
   /* Fullscreen only: the whole control row folds away to a single chevron, so
      the sky can have the entire screen when you just want to watch it. */
   const [controlsOpen, setControlsOpen] = useState(true);
+  /* The transport row's own date picker — the date nav above the canvas is
+     unreachable once fullscreen, so this is the only way to jump dates there. */
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const dateBs = useMemo(() => adToBS(date), [date]);
 
   // Following the date nav above the canvas keeps the two in step.
   useEffect(() => {
@@ -243,14 +262,14 @@ export function AakashGocharSky({
              face you are looking at to the right, which means the camera has to
              go the other way round. */
           view.current.yaw = gestureStart.current.yaw - g.dx * 0.006;
-          /* The camera is kept north of the ecliptic in both the space and the
-             globe view. From the south side the zodiac reads backwards — the
-             rashi and every graha running clockwise — and that is never what
-             you want to be looking at. Only the horizon view, where you are
-             standing on the ground and may look anywhere, keeps the full range;
-             all of them clamp short of the pole so the view cannot flip over on
-             itself. */
-          const lowestPitch = modeRef.current === "horizon" ? -1.45 : 0.08;
+          /* The camera is kept north of the ecliptic only in the space view —
+             from the south side there the zodiac reads backwards, rashi and
+             every graha running clockwise, which is never what you want to be
+             looking at. The globe view is just the Earth sphere, with no such
+             concern, so it gets the same full range as the horizon view — you
+             can swing all the way round to the south pole. Both still clamp
+             short of true vertical so the view cannot flip over on itself. */
+          const lowestPitch = modeRef.current === "space" ? 0.08 : -1.45;
           view.current.pitch = Math.min(
             1.45,
             Math.max(lowestPitch, gestureStart.current.pitch + g.dy * 0.005),
@@ -390,6 +409,16 @@ export function AakashGocharSky({
           sim.current.timeMs = date.getTime();
         }}
       />
+      {onDateChange ? (
+        <IconButton
+          name="calendar-outline"
+          label={pick("मिति छान्नुहोस्", "Choose a date")}
+          active={datePickerOpen}
+          overlay={fullscreen}
+          compact={fullscreen}
+          onPress={() => setDatePickerOpen(true)}
+        />
+      ) : null}
     </>
   );
 
@@ -631,25 +660,72 @@ export function AakashGocharSky({
     </View>
   );
 
-  if (!fullscreen) return body;
-
-  return (
-    <Modal
-      visible
-      animationType="fade"
-      supportedOrientations={["portrait", "landscape"]}
-      onRequestClose={() => setFullscreen(false)}
-    >
-      {/* A modal renders outside the provider tree, so the theme tokens have to
-          be re-applied here or every chip loses its colours. The scene is
-          remounted too, but its textures come back out of the loader cache. */}
+  /* Its own modal, not the outer PatroDateNav's sheet — that sheet lives above
+     the canvas and is unreachable once the sky is fullscreen. Like the
+     fullscreen modal below, this one renders outside the provider tree, so the
+     theme tokens are re-applied here too. */
+  const datePicker = datePickerOpen ? (
+    <Modal visible transparent animationType="fade" onRequestClose={() => setDatePickerOpen(false)}>
       <View
-        className={cn("flex-1 bg-background", isDark && "dark")}
+        className={cn("flex-1 items-center justify-center bg-black/60 px-4", isDark && "dark")}
         style={nativeWindThemeVars(isDark ? "dark" : "light")}
       >
-        {body}
+        <Pressable
+          className="absolute inset-0"
+          onPress={() => setDatePickerOpen(false)}
+          accessibilityLabel={pick("बन्द गर्नुहोस्", "Close")}
+        />
+        <View className="w-full max-w-sm rounded-2xl border border-border bg-card p-4">
+          <BsDateTimePicker
+            year={dateBs.year}
+            month={dateBs.month}
+            day={dateBs.day}
+            yearOptions={windowedBrowseYears("bs", dateBs.year)}
+            todayAd={todayAd}
+            onSelectDate={(y, m, d) => onDateChange?.(bsToAD(y, m, d))}
+            monthAriaLabel={pick("महिना", "Month")}
+            yearAriaLabel={pick("वर्ष", "Year")}
+            clock={clock}
+            onClockChange={onClockChange}
+            hourAriaLabel={pick("घण्टा", "Hour")}
+            minuteAriaLabel={pick("मिनेट", "Minute")}
+            showTime={Boolean(onClockChange)}
+            onDone={() => setDatePickerOpen(false)}
+          />
+        </View>
       </View>
     </Modal>
+  ) : null;
+
+  if (!fullscreen) {
+    return (
+      <>
+        {body}
+        {datePicker}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Modal
+        visible
+        animationType="fade"
+        supportedOrientations={["portrait", "landscape"]}
+        onRequestClose={() => setFullscreen(false)}
+      >
+        {/* A modal renders outside the provider tree, so the theme tokens have to
+            be re-applied here or every chip loses its colours. The scene is
+            remounted too, but its textures come back out of the loader cache. */}
+        <View
+          className={cn("flex-1 bg-background", isDark && "dark")}
+          style={nativeWindThemeVars(isDark ? "dark" : "light")}
+        >
+          {body}
+        </View>
+      </Modal>
+      {datePicker}
+    </>
   );
 }
 

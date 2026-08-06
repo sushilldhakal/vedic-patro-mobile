@@ -35,6 +35,19 @@ export function formatClockParts(hour: number, minute: number): string {
   return `${pad2(hour)}:${pad2(minute)}`;
 }
 
+/** 24h hour → 12h hour + meridiem, for AM/PM pickers. */
+export function to12h(hour24: number): { hour12: number; meridiem: "AM" | "PM" } {
+  const meridiem = hour24 < 12 ? "AM" : "PM";
+  const base = hour24 % 12;
+  return { hour12: base === 0 ? 12 : base, meridiem };
+}
+
+/** 12h hour + meridiem → 24h hour, for storing back into a "HH:MM" clock string. */
+export function from12h(hour12: number, meridiem: "AM" | "PM"): number {
+  const base = hour12 % 12;
+  return meridiem === "AM" ? base : base + 12;
+}
+
 export function usePanchangaClock(
   defaultTimezone: string,
   initial?: { clock?: string },

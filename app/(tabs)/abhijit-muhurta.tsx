@@ -1,22 +1,17 @@
 import { useMemo } from "react";
 import { View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import {
-  BsMonthPicker,
-  BsYearPicker,
-  useBsMonth,
-  useBsYear,
-} from "@/components/pickers/BsYearMonthPicker";
+import { PatroMonthYearNavBlock } from "@/components/patro-date/PatroMonthYearNavBlock";
 import { Text } from "@/components/ui/Text";
-import { apiKeys, fetchMonthCalendar, type CalendarDay } from "@/lib/api";
 import { BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
+import { apiKeys, fetchMonthCalendar, type CalendarDay } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { formatPatroMonthCrossEraSubtitle } from "@/lib/patro-headline-subtitle";
 import { computeAbhijitFromSunTimes, formatClockNepali } from "@/lib/panchanga-format";
 import { civilIsoDayOfMonth } from "@/lib/patro-day";
+import { usePatroMonthBrowse } from "@/lib/use-patro-month-browse";
 import { useBreakpoint } from "@/lib/responsive";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
@@ -112,14 +107,18 @@ function AbhijitDayCard({
 }
 
 export default function AbhijitMuhurtaScreen() {
+  const { location, setLocation } = usePanchangaLocation();
+  const { era, setEra, year, setYear, month, setMonth, stepMonth, goToday } = usePatroMonthBrowse();
+  const tz = resolveTimeZone(undefined, location.params.timezone);
+  const todayAd = todayAdStringInTimezone(new Date(), tz);
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
   const { width } = useBreakpoint();
-  const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
-  const { month, setMonth } = useBsMonth();
-  const tz = resolveTimeZone(undefined, location.params.timezone);
-  const todayAd = todayAdStringInTimezone(new Date(), tz);
+
+  const crossEraSubtitle = useMemo(
+    () => formatPatroMonthCrossEraSubtitle(era, year, month, lang, digits),
+    [era, year, month, lang, digits],
+  );
 
   const monthQ = useQuery({
     queryKey: apiKeys.month(year, month, location.params),
@@ -141,17 +140,21 @@ export default function AbhijitMuhurtaScreen() {
   const cardWidth = `${(100 / cols - 1.5).toFixed(2)}%`;
 
   return (
-    <AppShell
-      title={pick("अभिजित् मुहूर्त", "Abhijit Moment")}
-      subtitle={pick(
-        "मासिक शुभ अभिजित् मुहूर्त — सूर्योदय र सूर्यास्त बीचको आठौँ मुहूर्त",
-        "Monthly auspicious Abhijit moment — the 8th daytime moment between sunrise and sunset",
-      )}
-      headerRight={<Ionicons name="sparkles-outline" size={26} color={colors.secondary} />}
-    >
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <BsYearPicker year={year} onYearChange={setYear} />
-      <BsMonthPicker month={month} onMonthChange={setMonth} />
+    <AppShell title={pick("अभिजित् मुहूर्त", "Abhijit Moment")} showHeader={false}>
+      <PatroMonthYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        month={month}
+        onMonthChange={setMonth}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        crossEraSubtitle={crossEraSubtitle}
+        onToday={() => goToday(todayAd)}
+        onPrev={() => stepMonth(-1)}
+        onNext={() => stepMonth(1)}
+      />
 
       {todayRow ? (
         <View

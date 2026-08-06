@@ -59,7 +59,7 @@ function parseAdStr(s: string): Date {
 
 export default function PanchangaScreen() {
   const { pick } = useLocale();
-  const { width, isTablet } = useBreakpoint();
+  const { width, isTablet, isCompact } = useBreakpoint();
   const splitSidebar = width >= PANCHANGA_SIDEBAR_SPLIT;
   const params = useLocalSearchParams<{ date?: string }>();
   const { location, setLocation, ready } = usePanchangaLocation();
@@ -189,6 +189,9 @@ export default function PanchangaScreen() {
             mobileToolbar={
               <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
             }
+            hideNavLocation={!isCompact}
+            location={location}
+            onLocationChange={setLocation}
           />
           {ephemeris && data ? <EphemerisModeBanner p={data} clock={clock} /> : null}
           {wheelData || showWheelSkeleton ? (

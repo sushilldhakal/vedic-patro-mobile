@@ -5,16 +5,20 @@ import type { Column } from "@/components/ui/DataTable";
 import { DataTable } from "@/components/ui/DataTable";
 import { Text } from "@/components/ui/Text";
 import type {
-  AshtakavargaData,
-  BhavaBalaData,
   JanmaAvakahadaData,
   KundaliYoga,
-  ShadbalaResponse,
   UpagrahaDetailRow,
   VargaChartEntry,
   VargaCharts,
 } from "@/lib/api";
 import { buildBhavaTable, type BhavaTableRow, RASHI_QUALITIES } from "@/lib/bhava";
+import {
+  GrahaInline,
+  GrahaInlineChildren,
+  GrahaKeysRow,
+  NakshatraInline,
+  RashiInline,
+} from "@/components/kundali/KundaliGlyphLabels";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { kundaliLabel, type KundaliI18nKey } from "@/lib/kundali/kundali-i18n";
 import { useLocale } from "@/lib/i18n";
@@ -109,7 +113,7 @@ export function GrahaAstroTable({
       key: e.key,
       highlight: e.key === "lagna",
       cells: [
-        <View key="g" className="flex-row items-center gap-1">
+        <GrahaInlineChildren grahaKey={e.key} size={20}>
           <Text
             className="text-xs font-semibold text-foreground"
             style={nepaliTextStyle(12)}
@@ -123,13 +127,17 @@ export function GrahaAstroTable({
             </Text>
           ) : null}
           {combust ? <Text className="text-[10px]">🔥</Text> : null}
-        </View>,
-        formatRashiByNumber(e.vargaRashi, lang),
+        </GrahaInlineChildren>,
+        <RashiInline key="r" rashiNum={e.vargaRashi} lang={lang} size={18} textSize={12} />,
         <Text key="d" className="font-num text-xs text-foreground">
           {dms}
         </Text>,
-        `${nakshatraLabel(e.nakshatraIndex, lang)} · ${digits(e.pada)}`,
-        `${grahaName(e.nakshatraLord, lang)} / ${grahaName(e.subLord, lang)}`,
+        <NakshatraInline index={e.nakshatraIndex} lang={lang} pada={e.pada} digits={digits} size={16} textSize={11} />,
+        <View key="lord" className="flex-row flex-wrap items-center gap-1">
+          <GrahaInline grahaKey={e.nakshatraLord} label={grahaName(e.nakshatraLord, lang)} size={14} textSize={11} />
+          <Text style={nepaliTextStyle(11)}>/</Text>
+          <GrahaInline grahaKey={e.subLord} label={grahaName(e.subLord, lang)} size={14} textSize={11} />
+        </View>,
         <Text key="l" className="font-num text-xs text-foreground">
           {point?.longitude != null ? digits(point.longitude.toFixed(2)) : "—"}
         </Text>,
@@ -197,13 +205,33 @@ export function BhavaTable({
             {digits(r.house)}
             {r.badge ? <Text className="text-muted-foreground"> ({r.badge})</Text> : null}
           </Text>,
-          r.residents.length
-            ? r.residents.map((p) => grahaName(p.key, lang)).join(", ")
-            : "—",
-          r.owner ? grahaName(r.owner, lang) : "—",
-          formatRashiByNumber(r.rashi, lang),
+          r.residents.length ? (
+            <GrahaKeysRow
+              keys={r.residents.map((p) => p.key)}
+              lang={lang}
+              nameForKey={(k) => grahaName(k, lang)}
+              size={14}
+            />
+          ) : (
+            <Text style={nepaliTextStyle(11)}>—</Text>
+          ),
+          r.owner ? (
+            <GrahaInline grahaKey={r.owner} label={grahaName(r.owner, lang)} size={14} textSize={11} />
+          ) : (
+            "—"
+          ),
+          <RashiInline key="rash" rashiNum={r.rashi} lang={lang} size={16} textSize={11} />,
           pick(RASHI_QUALITIES[r.rashi - 1]?.ne ?? "—", RASHI_QUALITIES[r.rashi - 1]?.en ?? "—"),
-          r.aspectedBy.length ? r.aspectedBy.map((k) => grahaName(k, lang)).join(", ") : "—",
+          r.aspectedBy.length ? (
+            <GrahaKeysRow
+              keys={r.aspectedBy}
+              lang={lang}
+              nameForKey={(k) => grahaName(k, lang)}
+              size={14}
+            />
+          ) : (
+            "—"
+          ),
         ],
       }))}
     />
@@ -232,224 +260,15 @@ export function UpagrahaTable({ rows }: { rows: UpagrahaDetailRow[] }) {
         key: r.key,
         cells: [
           lang === "en" ? (r.name ?? r.key) : (r.name_ne ?? r.name ?? r.key),
-          formatRashiByNumber(r.dms.rashiNum, lang),
+          <RashiInline key="rash" rashiNum={r.dms.rashiNum} lang={lang} size={16} textSize={11} />,
           <Text key="d" className="font-num text-xs text-foreground">
             {digits(r.dms.deg)}° {digits(r.dms.min)}′ {digits(r.dms.sec)}″
           </Text>,
-          `${nakshatraLabel(r.nakshatraIndex, lang)} · ${digits(r.pada)}`,
-          grahaName(r.nakshatraLord, lang),
+          <NakshatraInline index={r.nakshatraIndex} lang={lang} pada={r.pada} digits={digits} size={16} />,
+          <GrahaInline grahaKey={r.nakshatraLord} label={grahaName(r.nakshatraLord, lang)} size={14} textSize={11} />,
         ],
       }))}
     />
-  );
-}
-
-/* ── shadbala ──────────────────────────────────────────────────────────── */
-
-const SHADBALA_STATUS: Record<string, { ne: string; en: string; tone: string }> = {
-  Exceptional: { ne: "उत्कृष्ट", en: "Exceptional", tone: "#2e7d32" },
-  Strong: { ne: "बलियो", en: "Strong", tone: "#2e7d32" },
-  Adequate: { ne: "पर्याप्त", en: "Adequate", tone: "#d97706" },
-  Borderline: { ne: "सीमान्त", en: "Borderline", tone: "#d97706" },
-  Weak: { ne: "कमजोर", en: "Weak", tone: "#c62828" },
-};
-
-export function ShadbalaCard({ shadbala }: { shadbala: ShadbalaResponse }) {
-  const { lang, pick, digits } = useLocale();
-  const colors = useThemeColors();
-
-  return (
-    <View className="gap-3">
-      <View className="flex-row flex-wrap gap-2">
-        <Summary
-          label={pick("सबैभन्दा बलियो", "Strongest")}
-          value={lang === "en" ? shadbala.summary.strongest.name : shadbala.summary.strongest.name_ne}
-          sub={`${digits((shadbala.summary.strongest.ratio * 100).toFixed(0))}%`}
-          tone="#2e7d32"
-        />
-        <Summary
-          label={pick("सबैभन्दा कमजोर", "Weakest")}
-          value={lang === "en" ? shadbala.summary.weakest.name : shadbala.summary.weakest.name_ne}
-          sub={`${digits((shadbala.summary.weakest.ratio * 100).toFixed(0))}%`}
-          tone="#c62828"
-        />
-      </View>
-
-      <View className="gap-1.5">
-        {shadbala.planets.map((p) => {
-          const status = SHADBALA_STATUS[p.status] ?? {
-            ne: p.status,
-            en: p.status,
-            tone: colors.foreground,
-          };
-          const pct = Math.max(0, Math.min(1, p.ratio));
-          return (
-            <View key={p.key} className="gap-1">
-              <View className="flex-row items-baseline justify-between gap-2">
-                <Text className="text-xs font-semibold text-foreground" style={nepaliTextStyle(12)}>
-                  {lang === "en" ? p.name : p.name_ne}
-                </Text>
-                <View className="flex-row items-baseline gap-2">
-                  <Text style={{ color: status.tone, ...nepaliTextStyle(11) }} className="text-xs">
-                    {pick(status.ne, status.en)}
-                  </Text>
-                  <Text className="font-num text-xs text-muted-foreground">
-                    {digits(p.rupas.toFixed(2))} / {digits(p.required.toFixed(0))}
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={{ backgroundColor: colors.surfaceInset }}
-                className="h-2 overflow-hidden rounded-full"
-              >
-                <View
-                  style={{ width: `${pct * 100}%`, backgroundColor: status.tone }}
-                  className="h-full rounded-full"
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function Summary({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  tone: string;
-}) {
-  return (
-    <View
-      style={{ backgroundColor: colorWithAlpha(tone, 0.1), minWidth: 140 }}
-      className="flex-1 rounded-xl px-3 py-2.5"
-    >
-      <Text className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </Text>
-      <Text style={{ color: tone, ...nepaliTextStyle(15) }} className="text-base font-bold">
-        {value}
-      </Text>
-      <Text className="font-num text-xs text-muted-foreground">{sub}</Text>
-    </View>
-  );
-}
-
-/* ── bhava bala ────────────────────────────────────────────────────────── */
-
-export function BhavaBalaCard({ data }: { data: BhavaBalaData }) {
-  const { pick, digits } = useLocale();
-  const colors = useThemeColors();
-  const max = Math.max(...data.houses.map((h) => h.rupas), 1);
-
-  return (
-    <View className="gap-1.5">
-      {data.houses.map((h) => {
-        const strongest = h.house === data.strongest.house;
-        const weakest = h.house === data.weakest.house;
-        const tone = strongest ? "#2e7d32" : weakest ? "#c62828" : colors.secondary;
-        return (
-          <View key={h.house} className="flex-row items-center gap-2">
-            <Text className="w-8 font-num text-xs font-semibold text-foreground">
-              {digits(h.house)}
-            </Text>
-            <View
-              style={{ backgroundColor: colors.surfaceInset }}
-              className="h-2.5 flex-1 overflow-hidden rounded-full"
-            >
-              <View
-                style={{ width: `${(h.rupas / max) * 100}%`, backgroundColor: tone }}
-                className="h-full rounded-full"
-              />
-            </View>
-            <Text className="w-16 text-right font-num text-xs text-muted-foreground">
-              {digits(h.rupas.toFixed(1))}
-            </Text>
-          </View>
-        );
-      })}
-      <Text className="mt-1 text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
-        {pick(
-          `सबैभन्दा बलियो भाव ${digits(data.strongest.house)}, कमजोर ${digits(data.weakest.house)}`,
-          `Strongest house ${data.strongest.house}, weakest ${data.weakest.house}`,
-        )}
-      </Text>
-    </View>
-  );
-}
-
-/* ── ashtakavarga ──────────────────────────────────────────────────────── */
-
-export function AshtakavargaCard({ data }: { data: AshtakavargaData }) {
-  const { lang, pick, digits } = useLocale();
-  const [mode, setMode] = useState<"raw" | "reduced">("raw");
-  const colors = useThemeColors();
-
-  const rows = mode === "raw" ? data.raw : data.reduced;
-  if (!rows?.length) return null;
-
-  const planetKeys = Object.keys(rows[0]).filter(
-    (k) => k !== "rashi" && k !== "sign" && k !== "total",
-  );
-
-  const columns: Column[] = [
-    { key: "rashi", ne: "राशि", en: "Rashi", width: 104 },
-    ...planetKeys.map((k) => ({ key: k, ne: grahaName(k, "ne"), en: grahaName(k, "en"), width: 66 })),
-    { key: "total", ne: "जम्मा", en: "Total", width: 68 },
-  ];
-
-  return (
-    <View className="gap-3">
-      <View className="flex-row gap-1 self-start rounded-lg border border-border p-0.5">
-        {(["raw", "reduced"] as const).map((m) => {
-          const active = mode === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => setMode(m)}
-              style={{ backgroundColor: active ? colors.secondary : "transparent" }}
-              className="rounded-md px-3 py-1.5 active:opacity-80"
-            >
-              <Text
-                style={{ color: active ? "#ffffff" : colors.mutedForeground, ...nepaliTextStyle(12) }}
-                className="text-xs font-semibold"
-              >
-                {m === "raw" ? pick("प्रस्तार", "Raw") : pick("शोधित", "Reduced")}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <DataTable
-        columns={columns}
-        rows={rows.map((row, i) => {
-          const r = row as unknown as Record<string, number>;
-          const rashiNum = Number(r.rashi ?? r.sign ?? i + 1);
-          return {
-            key: String(i),
-            cells: [
-              formatRashiByNumber(rashiNum, lang),
-              ...planetKeys.map((k) => (
-                <Text key={k} className="font-num text-xs text-foreground">
-                  {digits(r[k] ?? 0)}
-                </Text>
-              )),
-              <Text key="t" className="font-num text-xs font-bold text-foreground">
-                {digits(r.total ?? 0)}
-              </Text>,
-            ],
-          };
-        })}
-      />
-    </View>
   );
 }
 
@@ -550,84 +369,6 @@ export function AvakahadaCard({ data }: { data: JanmaAvakahadaData }) {
           </Text>
         </View>
       ))}
-    </View>
-  );
-}
-
-/* ── vimshopaka ─────────────────────────────────────────────────────────── */
-
-const VIMSHOPAKA_GRADE: Record<string, { ne: string; en: string; tone: string }> = {
-  full: { ne: "पूर्ण", en: "Full", tone: "#2e7d32" },
-  mediocre: { ne: "मध्यम", en: "Mediocre", tone: "#0284c7" },
-  little: { ne: "अल्प", en: "Little", tone: "#d97706" },
-  incapable: { ne: "असमर्थ", en: "Incapable", tone: "#c62828" },
-};
-
-const PLANET_ORDER = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn"];
-
-export function VimshopakaCard({ data }: { data: import("@/lib/api").VimshopakaData }) {
-  const { lang, pick, digits } = useLocale();
-  const classes = data.classifications;
-  const rows = PLANET_ORDER.map((key) => data.planets.find((p) => p.key === key)).filter(Boolean);
-
-  return (
-    <View className="gap-3">
-      <Text className="text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
-        {pick("विंशोपक बल", "Vimshopaka bala")}
-      </Text>
-      <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
-        {pick(
-          `वर्गीय बल — ${digits(data.max_score)} अंकमा`,
-          `Divisional strength on a ${data.max_score}-point scale`,
-        )}
-      </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View>
-          <View className="flex-row border-b border-border">
-            <View style={{ width: 88 }} className="px-2 py-2">
-              <Text className="text-xs font-semibold text-muted-foreground">{pick("ग्रह", "Graha")}</Text>
-            </View>
-            {classes.map((c) => (
-              <View key={c.key} style={{ width: 72 }} className="px-1 py-2">
-                <Text numberOfLines={2} className="text-center text-[10px] font-semibold text-muted-foreground">
-                  {lang === "en" ? c.label : c.label_ne}
-                </Text>
-              </View>
-            ))}
-          </View>
-          {rows.map((p) => {
-            if (!p) return null;
-            return (
-              <View key={p.key} className="flex-row border-b border-border/60">
-                <View style={{ width: 88 }} className="justify-center px-2 py-2">
-                  <Text className="text-xs font-semibold text-foreground">
-                    {grahaName(p.key, lang)}
-                  </Text>
-                </View>
-                {classes.map((c) => {
-                  const s = p.scores[c.key];
-                  if (!s) {
-                    return (
-                      <View key={c.key} style={{ width: 72 }} className="items-center justify-center px-1 py-2">
-                        <Text className="text-xs text-muted-foreground">—</Text>
-                      </View>
-                    );
-                  }
-                  const grade = VIMSHOPAKA_GRADE[s.grade] ?? VIMSHOPAKA_GRADE.incapable;
-                  return (
-                    <View key={c.key} style={{ width: 72 }} className="items-center justify-center px-1 py-2">
-                      <Text className="font-num text-xs font-bold text-foreground">{digits(s.score)}</Text>
-                      <Text style={{ color: grade.tone, ...nepaliTextStyle(10) }} className="text-[10px]">
-                        {pick(grade.ne, grade.en)}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
     </View>
   );
 }

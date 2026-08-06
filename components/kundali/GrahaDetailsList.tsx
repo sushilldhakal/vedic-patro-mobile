@@ -3,6 +3,12 @@ import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { DataTable, type Column } from "@/components/ui/DataTable";
+import {
+  GrahaInline,
+  GrahaInlineChildren,
+  NakshatraInline,
+} from "@/components/kundali/KundaliGlyphLabels";
+import { RashiGlyphIcon } from "@/components/panchanga/element/ElementGlyphIcon";
 import type { VargaChartEntry, VargaCharts } from "@/lib/api";
 import { rashiToHouse } from "@/lib/bhava";
 import {
@@ -12,7 +18,6 @@ import {
   type GrahaKey,
 } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
-import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { formatRashiByNumber } from "@/lib/rashi-i18n";
 import { colorWithAlpha } from "@/lib/theme";
@@ -68,50 +73,63 @@ export function GrahaDetailsList({
   if (rows.length === 0) return null;
 
   const columns: Column[] = [
-    { key: "graha", ne: "ग्रह", en: "Graha", width: 84 },
-    { key: "rashi_lon", ne: "राशि / स्पष्ट", en: "Rashi / Long.", width: 128 },
-    { key: "bhava", ne: "भाव", en: "Bhava", width: 44 },
-    { key: "nak", ne: "नक्षत्र (पद)", en: "Nak (pada)", width: 108 },
-    { key: "lord_sub", ne: "नक्षत्रेश / उप", en: "Lord / Sub", width: 108 },
-    { key: "owner", ne: "स्वामी", en: "Owner", width: 88 },
-    { key: "rel", ne: "सम्बन्ध", en: "Relation", width: 72 },
-    { key: "dignity", ne: "स्थिति", en: "Dignity", width: 72 },
-    { key: "rules", ne: "स्वामित्व", en: "Rules", width: 68 },
+    { key: "graha", ne: "ग्रह", en: "Graha", width: 96 },
+    { key: "rashi_lon", ne: "राशि / स्पष्ट", en: "Rashi / Long.", width: 148 },
+    { key: "bhava", ne: "भाव", en: "Bhava", width: 48 },
+    { key: "nak", ne: "नक्षत्र (पद)", en: "Nak (pada)", width: 120 },
+    { key: "lord_sub", ne: "नक्षत्रेश / उप", en: "Lord / Sub", width: 132 },
+    { key: "owner", ne: "स्वामी", en: "Owner", width: 108 },
+    { key: "rel", ne: "सम्बन्ध", en: "Relation", width: 80 },
+    { key: "dignity", ne: "स्थिति", en: "Dignity", width: 80 },
+    { key: "rules", ne: "स्वामित्व", en: "Rules", width: 72 },
   ];
 
   return (
     <DataTable
       compact
+      stretch
       columns={columns}
       rows={rows.map((row) => {
-        const nakName =
-          lang === "en"
-            ? NAKSHATRA_ICONS[row.nakshatraIndex]?.en ?? "—"
-            : NAKSHATRA_ICONS[row.nakshatraIndex]?.ne ?? "—";
         const dmsLine = (
-          <Text key="dms" className="font-num text-[11px] text-foreground" numberOfLines={2} style={nepaliTextStyle(11)}>
-            <Text className="font-semibold">{digits(String(row.dms.deg).padStart(2, "0"))}°</Text>
-            <Text> {formatRashiByNumber(row.dms.rashiNum, lang)} </Text>
-            <Text>
+          <View key="dms" className="flex-row items-center gap-1">
+            <Text
+              className="font-num text-[11px] font-semibold text-foreground"
+              style={nepaliTextStyle(11)}
+              numberOfLines={1}
+            >
+              {digits(String(row.dms.deg).padStart(2, "0"))}°
+            </Text>
+            <RashiGlyphIcon number={row.dms.rashiNum} size={14} />
+            <Text className="text-[11px] text-foreground" style={nepaliTextStyle(11)} numberOfLines={1}>
+              {formatRashiByNumber(row.dms.rashiNum, lang)}
+            </Text>
+            <Text className="font-num text-[11px] text-foreground" style={nepaliTextStyle(11)} numberOfLines={1}>
               {digits(String(row.dms.min).padStart(2, "0"))}′{digits(String(row.dms.sec).padStart(2, "0"))}″
             </Text>
-          </Text>
+          </View>
         );
         const ownerCell =
-          row.ownerBhava != null
-            ? `${grahaLabel(row.ownerKey, lang)}${
-                lang === "en"
-                  ? ` (${digits(row.ownerBhava)})`
-                  : ` (${digits(row.ownerBhava)})`
-              }`
-            : grahaLabel(row.ownerKey, lang);
+          row.ownerBhava != null ? (
+            <GrahaInline
+              grahaKey={row.ownerKey}
+              label={`${grahaLabel(row.ownerKey, lang)} (${digits(row.ownerBhava)})`}
+              size={14}
+              textSize={11}
+            />
+          ) : (
+            <GrahaInline grahaKey={row.ownerKey} label={grahaLabel(row.ownerKey, lang)} size={14} textSize={11} />
+          );
 
         return {
           key: row.key,
           highlight: Boolean(row.retrograde),
           cells: [
-            <View key="g" className="flex-row flex-wrap items-center gap-0.5">
-              <Text className="text-[11px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
+            <GrahaInlineChildren key="g" grahaKey={row.key} size={18}>
+              <Text
+                className="text-[11px] font-semibold text-foreground"
+                style={nepaliTextStyle(11)}
+                numberOfLines={1}
+              >
                 {grahaLabel(row.key, lang)}
               </Text>
               {row.retrograde ? (
@@ -125,13 +143,34 @@ export function GrahaDetailsList({
                   </Text>
                 </View>
               ) : null}
-            </View>,
+            </GrahaInlineChildren>,
             dmsLine,
-            <Text key="b" className="text-center font-num text-[11px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
+            <Text
+              key="b"
+              className="text-center font-num text-[11px] font-semibold text-foreground"
+              style={nepaliTextStyle(11)}
+              numberOfLines={1}
+            >
               {digits(row.bhava)}
             </Text>,
-            `${nakName} (${digits(row.pada)})`,
-            `${grahaLabel(row.nakshatraLord, lang)}/${grahaLabel(row.subLord, lang)}`,
+            <NakshatraInline
+              key="nak"
+              index={row.nakshatraIndex}
+              lang={lang}
+              pada={row.pada}
+              digits={digits}
+              size={16}
+            />,
+            <View key="ls" className="flex-row items-center gap-0.5">
+              <GrahaInline
+                grahaKey={row.nakshatraLord}
+                label={grahaLabel(row.nakshatraLord, lang)}
+                size={14}
+                textSize={11}
+              />
+              <Text style={nepaliTextStyle(11)}>/</Text>
+              <GrahaInline grahaKey={row.subLord} label={grahaLabel(row.subLord, lang)} size={14} textSize={11} />
+            </View>,
             ownerCell,
             row.relation
               ? pick(RELATION_LABELS[row.relation].ne, RELATION_LABELS[row.relation].en)

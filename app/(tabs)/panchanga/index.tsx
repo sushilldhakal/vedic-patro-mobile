@@ -210,6 +210,9 @@ export default function PanchangaScreen() {
             onClockChange={handleClockChange}
             toolbar={headerToolbar}
             mobileToolbar={headerMobileToolbar}
+            hideNavLocation={!isCompact}
+            location={location}
+            onLocationChange={setLocation}
           />
           {ephemeris && data ? <EphemerisModeBanner p={data} clock={clock} /> : null}
           {wheelData || showWheelSkeleton ? (

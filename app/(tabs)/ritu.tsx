@@ -3,14 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/Card";
 import { ErrorState, LoadingState } from "@/components/ui/States";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
 import { fetchTropicalSeasons, seasonsKeys } from "@/lib/api";
+import { getCurrentBs } from "@/lib/bs-calendar";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import { useLocale } from "@/lib/i18n";
 
 export default function RituScreen() {
   const { pick, lang } = useLocale();
   const { location, setLocation } = usePanchangaLocation();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
 
   const query = useQuery({
     queryKey: seasonsKeys.tropical(location.params),
@@ -18,8 +21,16 @@ export default function RituScreen() {
   });
 
   return (
-    <AppShell title={pick("ऋतु", "Seasons")} subtitle={pick("सायन ऋतु तालिका", "Tropical season segments")}>
-      <LocationSelector location={location} onLocationChange={setLocation} />
+    <AppShell title={pick("ऋतु", "Seasons")} showHeader={false}>
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        onToday={() => setYear(getCurrentBs().year)}
+      />
       {query.isLoading ? (
         <LoadingState />
       ) : query.isError ? (

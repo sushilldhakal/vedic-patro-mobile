@@ -3,7 +3,9 @@ import { Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "@/components/ui/Text";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
 import type { ShadbalaResponse, VimshottariResponse } from "@/lib/api";
+import type { GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
@@ -11,6 +13,7 @@ import { NAVAGRAHA_SHANTI, getGrahaShanti } from "@/lib/shanti/navagraha-shanti"
 import {
   TableHeader,
   TableHeaderCell,
+  TableHeaderLabel,
   TableRow,
   TableScrollShell,
 } from "@/components/ui/DataTable";
@@ -107,12 +110,15 @@ function RecommendationCard({
       </Text>
       {graha ? (
         <>
-          <Text
-            className="mt-1 text-lg font-bold text-foreground"
-            style={nepaliTextStyle(18)}
-          >
-            {pick(graha.nameNe, graha.nameEn)}
-          </Text>
+          <View className="mt-1 flex-row flex-wrap items-center gap-2">
+            <GrahaPlanetIcon graha={graha.key as GrahaKey} size={28} />
+            <Text
+              className="text-lg font-bold text-foreground"
+              style={nepaliTextStyle(18)}
+            >
+              {pick(graha.nameNe, graha.nameEn)}
+            </Text>
+          </View>
           {detail ? (
             <Text className="mt-0.5 text-xs text-muted-foreground" style={nepaliTextStyle(12)}>
               {detail}
@@ -258,6 +264,7 @@ export function ShantiVidhiPanel({
               }}
               className="items-center gap-1 rounded-xl border p-3 active:opacity-80"
             >
+              <GrahaPlanetIcon graha={g.key as GrahaKey} size={28} />
               <Text
                 numberOfLines={1}
                 className={cn(
@@ -285,6 +292,7 @@ export function ShantiVidhiPanel({
               style={{ backgroundColor: graha.colorHex }}
               className="h-10 w-1.5 self-stretch rounded-full"
             />
+            <GrahaPlanetIcon graha={graha.key as GrahaKey} size={40} />
             <View className="min-w-0 flex-1">
               <Text className="text-lg font-bold text-foreground" style={nepaliTextStyle(18)}>
                 {pick(`${graha.nameNe} शान्ति`, `${graha.nameEn} Shanti`)}
@@ -404,9 +412,7 @@ export function ShantiVidhiPanel({
           <TableHeader>
             {SHANTI_COLUMNS.map((col) => (
               <TableHeaderCell key={col.key} width={col.width} compact>
-                <Text style={nepaliTextStyle(11)} className="text-xs font-semibold text-muted-foreground">
-                  {pick(col.ne, col.en)}
-                </Text>
+                <TableHeaderLabel compact>{pick(col.ne, col.en)}</TableHeaderLabel>
               </TableHeaderCell>
             ))}
           </TableHeader>
@@ -420,7 +426,12 @@ export function ShantiVidhiPanel({
                 onPress={() => setSelectedKey(g.key)}
               >
                     <Cell width={SHANTI_COLUMNS[0].width} bold>
-                      {pick(g.nameNe, g.nameEn)}
+                      <View className="flex-row items-center gap-1.5">
+                        <GrahaPlanetIcon graha={g.key as GrahaKey} size={22} />
+                        <Text className="text-xs font-semibold text-foreground" style={nepaliTextStyle(12)}>
+                          {pick(g.nameNe, g.nameEn)}
+                        </Text>
+                      </View>
                     </Cell>
                     <Cell width={SHANTI_COLUMNS[1].width}>{pick(g.vaaraNe, g.vaaraEn)}</Cell>
                     <Cell width={SHANTI_COLUMNS[2].width}>{g.beejMantra}</Cell>
@@ -466,16 +477,23 @@ function Cell({
   bold?: boolean;
   children: React.ReactNode;
 }) {
+  if (typeof children === "string" || typeof children === "number") {
+    return (
+      <Text
+        style={{ width, ...nepaliTextStyle(12) }}
+        className={cn(
+          "px-2.5 py-2 text-xs",
+          bold ? "font-semibold text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {children}
+      </Text>
+    );
+  }
   return (
-    <Text
-      style={{ width, ...nepaliTextStyle(12) }}
-      className={cn(
-        "px-2.5 py-2 text-xs",
-        bold ? "font-semibold text-foreground" : "text-muted-foreground",
-      )}
-    >
+    <View style={{ width }} className="justify-center px-2.5 py-2">
       {children}
-    </Text>
+    </View>
   );
 }
 

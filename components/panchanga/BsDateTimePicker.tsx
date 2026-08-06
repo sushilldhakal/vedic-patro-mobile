@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { BsNativeSelect } from "@/components/ui/BsNativeSelect";
 import { PatroYearEraToggle } from "@/components/patro-date/PatroYearEraToggle";
 import type { PatroBrowseEra } from "@/lib/patro-era";
-import { formatClockParts, parseClockParts } from "@/components/panchanga/use-panchanga-mode";
+import { formatClockParts, from12h, parseClockParts, to12h } from "@/components/panchanga/use-panchanga-mode";
 
 const WEEKDAYS_NE = ["आइत", "सोम", "मंगल", "बुध", "बिही", "शुक्र", "शनि"];
 const WEEKDAYS_EN = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -43,17 +43,6 @@ type Props = {
   browseEra?: PatroBrowseEra;
   onBrowseEraChange?: (era: PatroBrowseEra) => void;
 };
-
-function to12h(hour24: number): { hour12: number; meridiem: "AM" | "PM" } {
-  const meridiem = hour24 < 12 ? "AM" : "PM";
-  const base = hour24 % 12;
-  return { hour12: base === 0 ? 12 : base, meridiem };
-}
-
-function from12h(hour12: number, meridiem: "AM" | "PM"): number {
-  const base = hour12 % 12;
-  return meridiem === "AM" ? base : base + 12;
-}
 
 export function BsDateTimePicker({
   year,

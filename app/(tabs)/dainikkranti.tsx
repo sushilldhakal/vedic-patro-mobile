@@ -21,7 +21,6 @@ import {
   TableRow,
   TableScrollShell,
 } from "@/components/ui/DataTable";
-import { PanchangaShellLayout } from "@/components/panchanga/PanchangaShellLayout";
 import {
   apiKeys,
   fetchGochar,
@@ -483,7 +482,7 @@ export default function DainikKrantiScreen() {
   const refDay = days[0];
 
   return (
-    <PanchangaShellLayout>
+    <>
       <DainikKrantiHeader
         year={year}
         month={month}
@@ -857,7 +856,7 @@ export default function DainikKrantiScreen() {
           </View>
         </View>
       )}
-    </PanchangaShellLayout>
+    </>
   );
 }
 

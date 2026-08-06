@@ -9,16 +9,19 @@ export function AppShell({
   children,
   headerRight,
   scroll = true,
+  showHeader = true,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   headerRight?: React.ReactNode;
-  /** false when the screen manages its own scroll (e.g. nested lists). */
   scroll?: boolean;
+  showHeader?: boolean;
+  /** @deprecated Sidebar comes from `PanchangaTabsShell` for shell routes. */
+  panchangaSidebar?: boolean;
 }) {
   const { isTablet } = useBreakpoint();
-  const header = (
+  const header = showHeader ? (
     <View className="mb-4 flex-row items-start justify-between gap-3 py-1">
       <View className="min-w-0 flex-1">
         <Text
@@ -38,6 +41,13 @@ export function AppShell({
       </View>
       {headerRight}
     </View>
+  ) : null;
+
+  const body = (
+    <>
+      {header}
+      {children}
+    </>
   );
 
   if (!scroll) {

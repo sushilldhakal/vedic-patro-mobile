@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { defaultClockForTimezone } from "@/components/panchanga/use-panchanga-mode";
 import { Text } from "@/components/ui/Text";
@@ -52,14 +51,7 @@ export default function ShantiVidhiScreen() {
   });
 
   return (
-    <AppShell
-      title={pick("शान्ति विधि", "Shanti Vidhi")}
-      subtitle={pick(
-        "नवग्रह शान्ति — जन्म कुण्डलीबाट सिफारिस र पूर्ण सन्दर्भ तालिका",
-        "Navagraha shanti — recommendations from your chart plus the full reference table",
-      )}
-      headerRight={<Ionicons name="flame-outline" size={26} color={colors.secondary} />}
-    >
+    <AppShell title={pick("शान्ति विधि", "Shanti Vidhi")} showHeader={false}>
       <View className="overflow-hidden rounded-2xl border border-border">
         <View className="flex-row items-center gap-1.5 border-b border-border px-4 py-3">
           <Ionicons name="person-outline" size={16} color={colors.secondary} />
@@ -76,13 +68,15 @@ export default function ShantiVidhiScreen() {
         </View>
 
         <View className="gap-4 p-4">
-          <LocationSelector location={location} onLocationChange={setLocation} />
           <PanchangaDateNav
             date={date}
             onDateChange={setDate}
             todayAd={todayAd}
             clock={clock}
             onClockChange={setClock}
+            location={location}
+            onLocationChange={setLocation}
+            adDateStr={adDateStr}
           />
 
           <ShantiVidhiPanel

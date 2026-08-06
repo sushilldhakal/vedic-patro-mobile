@@ -5,15 +5,15 @@ import { Card } from "@/components/ui/Card";
 import { KundaliBirthPanchangaCard } from "@/components/kundali/KundaliBirthPanchangaCard";
 import { DashaSystemPanel } from "@/components/kundali/DashaSystemPanel";
 import { DivisionalChartCompare } from "@/components/kundali/DivisionalChartCompare";
+import { ShadbalaCard } from "@/components/kundali/ShadbalaCard";
+import { AshtakavargaCard } from "@/components/kundali/AshtakavargaCard";
+import { BhavaBalaCard } from "@/components/kundali/BhavaBalaCard";
+import { VimshopakaCard } from "@/components/kundali/VimshopakaCard";
 import { YogaReferenceCatalog } from "@/components/kundali/YogaReferenceCatalog";
 import {
-  AshtakavargaCard,
-  BhavaBalaCard,
   GrahaAstroTable,
   KundaliSection,
-  ShadbalaCard,
   UpagrahaTable,
-  VimshopakaCard,
   YogaList,
 } from "@/components/kundali/KundaliSections";
 import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
@@ -110,14 +110,19 @@ export function KundaliDetailView({ detail, section, ayanamshaMode, timeZone }: 
           subtitle={pick("ग्रह बल — रूपमा", "Planetary strength in rupas")}
           icon="barbell-outline"
         >
-          <ShadbalaCard shadbala={detail.shadbala} />
+          <ShadbalaCard
+            data={detail.shadbala}
+            yuddha={detail.yuddha}
+            bhavaBala={detail.bhavaBala}
+            compactHeader
+          />
         </KundaliSection>
       ) : null}
 
       {show("kundali-bhava-bala") ? (
         <KundaliSection title={pick("भाव बल", "Bhava bala")} icon="stats-chart-outline">
           {detail.bhavaBala ? (
-            <BhavaBalaCard data={detail.bhavaBala} />
+            <BhavaBalaCard data={detail.bhavaBala} compactHeader />
           ) : (
             <Text className="py-8 text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
               {pick("यो खण्ड उपलब्ध छैन।", "This section is not available.")}
@@ -129,7 +134,7 @@ export function KundaliDetailView({ detail, section, ayanamshaMode, timeZone }: 
       {show("kundali-ashtakavarga") ? (
         <KundaliSection title={pick("अष्टकवर्ग", "Ashtakavarga")} icon="apps-outline">
           {detail.ashtakavarga ? (
-            <AshtakavargaCard data={detail.ashtakavarga} />
+            <AshtakavargaCard data={detail.ashtakavarga} compactHeader />
           ) : (
             <Text className="py-8 text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
               {pick("यो खण्ड उपलब्ध छैन।", "This section is not available.")}
@@ -139,9 +144,13 @@ export function KundaliDetailView({ detail, section, ayanamshaMode, timeZone }: 
       ) : null}
 
       {show("kundali-vimshopaka") ? (
-        <KundaliSection title={pick("विंशोपक बल", "Vimshopaka")} icon="grid-outline">
+        <KundaliSection
+          title={pick("विंशोपक बल", "Vimshopaka Bala")}
+          icon="grid-outline"
+          edgeToEdgeContent
+        >
           {detail.vimshopaka && detail.vimshopaka.classifications.length > 0 ? (
-            <VimshopakaCard data={detail.vimshopaka} />
+            <VimshopakaCard data={detail.vimshopaka} compactHeader />
           ) : (
             <Text className="py-8 text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
               {pick("यो खण्ड उपलब्ध छैन।", "This section is not available.")}

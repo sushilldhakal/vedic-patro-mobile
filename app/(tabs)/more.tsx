@@ -2,10 +2,10 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { AppShell, LangToggle } from "@/components/AppShell";
+import { useBreakpoint } from "@/lib/responsive";
 import { Card } from "@/components/ui/Card";
 import { API_BASE } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
-import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import {
   SITEMAP_ELEMENT_IDS,
@@ -72,12 +72,15 @@ export default function MoreScreen() {
     };
   });
 
+  const { isCalendarWide } = useBreakpoint();
+
   return (
-    <AppShell
-      title={pick("थप", "More")}
-      subtitle={pick("सबै पृष्ठ · vedicpatro.com sitemap", "All pages · sitemap parity")}
-      headerRight={<LangToggle />}
-    >
+    <AppShell title={pick("थप", "More")} showHeader={false}>
+      {!isCalendarWide ? (
+        <View className="mb-3 flex-row justify-end">
+          <LangToggle />
+        </View>
+      ) : null}
       <View className={isTablet ? "flex-row flex-wrap gap-4" : "gap-4"}>
         <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
           <Text className="mb-2 text-base font-semibold text-foreground">

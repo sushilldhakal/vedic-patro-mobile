@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GocharIngressSection } from "@/components/gochar/GocharIngressSection";
 import { GocharPlanetDeepDive } from "@/components/gochar/GocharPlanetDeepDive";
 import { GocharSkySection } from "@/components/gochar/GocharSkySection";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
+import { GrahaBanner } from "@/components/graha/GrahaPageParts";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
+import { defaultClockForTimezone } from "@/components/panchanga/use-panchanga-mode";
 import { Text } from "@/components/ui/Text";
 import { fetchGochar, fetchGocharIngress, gocharKeys } from "@/lib/api";
 import { adToBS, bsToAD, BS_MONTH_NAMES, BS_MONTHS_NE, getBSMonthLength, shiftBsMonth } from "@/lib/bs-calendar";
@@ -35,6 +35,7 @@ export default function GocharScreen() {
   const tz = resolveTimeZone(undefined, location.params.timezone);
   const todayAd = todayAdStringInTimezone(new Date(), tz);
   const [date, setDate] = useState(() => new Date(`${todayAd}T12:00:00`));
+  const [clock, setClock] = useState(() => defaultClockForTimezone(tz));
   const [selectedPlanet, setSelectedPlanet] = useState<GrahaKey>("sun");
 
   const dateAd = useMemo(() => toAdStr(date), [date]);
@@ -73,16 +74,25 @@ export default function GocharScreen() {
   const gochar = gocharQ.data?.gochar;
 
   return (
-    <AppShell
-      title={pick("गोचर", "Gochar")}
-      subtitle={pick(
-        "प्रत्यक्ष ग्रह गोचर — स्थिति, आगामी प्रवेश र वक्री",
-        "Live planetary transits — positions, upcoming ingresses & retrogrades",
-      )}
-      headerRight={<Ionicons name="planet-outline" size={26} color={colors.secondary} />}
-    >
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <PanchangaDateNav date={date} onDateChange={setDate} todayAd={todayAd} />
+    <AppShell title={pick("गोचर", "Gochar")} showHeader={false}>
+      <GrahaBanner
+        icon="planet-outline"
+        title={pick("गोचर", "Gochar")}
+        blurb={pick(
+          "प्रत्यक्ष ग्रह गोचर — स्थिति, आगामी प्रवेश र वक्री",
+          "Live planetary transits — positions, upcoming ingresses & retrogrades",
+        )}
+      />
+
+      <PanchangaDateNav
+        date={date}
+        onDateChange={setDate}
+        todayAd={todayAd}
+        clock={clock}
+        onClockChange={setClock}
+        location={location}
+        onLocationChange={setLocation}
+      />
 
       {gochar ? (
         <View className="gap-6">

@@ -1,10 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { AppShell } from "@/components/AppShell";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import { BsYearPicker } from "@/components/pickers/BsYearMonthPicker";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
 import { SaitDayCard } from "@/components/sait/SaitDayCard";
 import { SaitRulesSection, type SaitRule } from "@/components/sait/SaitRulesSection";
 import { Text } from "@/components/ui/Text";
@@ -12,6 +11,7 @@ import type { SaitDetailDay, SaitPersonalizeDay, SaitSuitability } from "@/lib/a
 import { BS_MONTH_NAMES } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import type { PatroBrowseEra } from "@/lib/patro-era";
 import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import type { PanchangaLocation } from "@/lib/use-panchanga-location";
@@ -83,16 +83,20 @@ export function SaitCeremonyLayout({
         `${days.length} auspicious days in ${year}`,
       );
 
+  const [era, setEra] = useState<PatroBrowseEra>("bs");
+
   return (
-    <AppShell
-      title={title}
-      subtitle={subtitle}
-      headerRight={<Ionicons name="heart-outline" size={26} color={colors.secondary} />}
-    >
+    <AppShell title={title} showHeader={false}>
       <SaitRulesSection method={method} rules={rules} engineVersion={engineVersion} />
 
-      <LocationSelector location={location} onLocationChange={onLocationChange} />
-      <BsYearPicker year={year} onYearChange={onYearChange} />
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={onYearChange}
+        location={location}
+        onLocationChange={onLocationChange}
+      />
 
       {profileControl ? (
         <View

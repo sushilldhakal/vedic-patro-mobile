@@ -1,14 +1,27 @@
 import type { ReactNode } from "react";
-import { Platform, Pressable, ScrollView, View } from "react-native";
+import { createContext, useContext } from "react";
+import { Pressable, ScrollView, View } from "react-native";
 import { Text } from "@/components/ui/Text";
 import { useLocale } from "@/lib/i18n";
-import { nepaliLineHeight, nepaliTextStyle } from "@/lib/nepali-text";
+import {
+  tableHeaderCellPadding,
+  tableHeaderFontSize,
+  tableHeaderTextStyle,
+  nepaliTextStyle,
+} from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
 import { tableHeaderBackground, tableRowBackground } from "@/lib/theme";
 import { useTheme, useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 
-export type TableColumn = { key: string; ne: string; en: string; width: number };
+export type TableColumn = {
+  key: string;
+  ne: string;
+  en: string;
+  width: number;
+  /** Optional custom header (e.g. graha icon + label). */
+  header?: ReactNode;
+};
 
 /** @deprecated use TableColumn */
 export type Column = TableColumn;
@@ -21,10 +34,91 @@ function columnFlexStyle(
   return { flex: width, minWidth: Math.round(width * 0.72) };
 }
 
+/** Shared column sizing for composable tables (Shadbala matrix, etc.). */
+export function tableColumnLayout(
+  stretch: boolean,
+  width: number,
+): { width: number } | { flex: number; minWidth: number } {
+  return columnFlexStyle(stretch, width);
+}
+
+/** Stretch column with explicit minWidth — pair header `TableHeaderCell` and body `TableCell` with the same values. */
+export function tableFlexColumn(flex: number, minWidth: number) {
+  return { flex, minWidth };
+}
+
 function useTableLayout(stretch?: boolean) {
   const { width: windowWidth } = useBreakpoint();
-  const fill = stretch ?? windowWidth >= 640;
+  /** Explicit `stretch: true` always fills the wrapper; `false` fixed+scroll; default fills from sm breakpoint up. */
+  const fill = stretch === true ? true : stretch === false ? false : windowWidth >= 640;
   return { fill };
+}
+
+const TableLayoutContext = createContext({ fill: false });
+
+export function useTableFillLayout() {
+  return useContext(TableLayoutContext);
+}
+
+function resolveWidthLayout(
+  fill: boolean,
+  width: number | undefined,
+  flex: number | undefined,
+  minWidth: number | undefined,
+) {
+  if (width != null) return tableColumnLayout(fill, width);
+  if (flex != null) return { flex, minWidth: minWidth ?? 0 };
+  if (minWidth != null) return { minWidth };
+  return undefined;
+}
+
+/** Standard header label — use inside `TableHeaderCell` or DataTable default headers. */
+export function TableHeaderLabel({
+  children,
+  compact,
+  fontSize,
+  numberOfLines = 2,
+  uppercase = true,
+  className,
+}: {
+  children: ReactNode;
+  compact?: boolean;
+  /** Override default compact/normal header size. */
+  fontSize?: number;
+  numberOfLines?: number;
+  uppercase?: boolean;
+  className?: string;
+}) {
+  const size = fontSize ?? tableHeaderFontSize(compact);
+  return (
+    <Text
+      numberOfLines={numberOfLines}
+      style={tableHeaderTextStyle(size)}
+      className={cn(
+        "font-semibold text-muted-foreground",
+        uppercase ? "uppercase tracking-wide" : "tracking-normal",
+        className,
+      )}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function headerCellStyle(
+  layout: { width: number } | { flex: number; minWidth: number } | { minWidth: number } | undefined,
+  compact?: boolean,
+) {
+  const pad = tableHeaderCellPadding(compact);
+  return [
+    layout,
+    {
+      paddingHorizontal: pad.horizontal,
+      paddingTop: pad.top,
+      paddingBottom: pad.bottom,
+      justifyContent: "flex-start" as const,
+    },
+  ];
 }
 
 /* ── Declarative column/row table (kundali, ashtakavarga, etc.) ───────── */
@@ -38,6 +132,7 @@ export function DataTable({
   columns: TableColumn[];
   rows: { key: string; cells: React.ReactNode[]; highlight?: boolean }[];
   compact?: boolean;
+  /** When false, fixed column widths + horizontal scroll (no squashing). */
   stretch?: boolean;
 }) {
   const { pick } = useLocale();
@@ -46,42 +141,32 @@ export function DataTable({
   const { fill } = useTableLayout(stretch);
   const cellPx = compact ? 6 : 10;
   const cellPy = compact ? 5 : 8;
-  const headerPy = compact ? 9 : 10;
-  const headerSize = compact ? 10 : 11;
-  const bodySize = compact ? 11 : 12;
-  const headerLine = nepaliLineHeight(headerSize);
-  const headerMaxLines = compact ? 2 : 2;
-  const iosHeadroom = Platform.OS === "ios" ? 4 : 0;
-  const headerMinH = headerLine * headerMaxLines + headerPy * 2 + iosHeadroom;
+  const bodySize = compact ? 12 : 13;
+  const headerMaxLines = fill ? (compact ? 2 : 2) : 1;
+  const bodyMaxLines = fill ? (compact ? 3 : 2) : 1;
+  const tableMinWidth = fill
+    ? undefined
+    : columns.reduce((sum, c) => sum + c.width, 0) + cellPx * 2;
 
   const tableInner = (
-    <View className={fill ? "w-full" : undefined}>
+    <View className={fill ? "w-full" : undefined} style={tableMinWidth != null ? { minWidth: tableMinWidth } : undefined}>
       <View
-        className="flex-row border-b border-border"
-        style={{
-          backgroundColor: tableHeaderBackground(colors, isDark),
-          minHeight: headerMinH,
-          paddingTop: iosHeadroom > 0 ? 2 : 0,
-        }}
+        className="w-full flex-row border-b border-border"
+        style={{ backgroundColor: tableHeaderBackground(colors, isDark) }}
       >
         {columns.map((c) => (
           <View
             key={c.key}
-            style={{
-              ...columnFlexStyle(fill, c.width),
-              paddingHorizontal: cellPx,
-              paddingVertical: headerPy,
-              justifyContent: "center",
-              alignItems: "flex-start",
-            }}
+            style={[
+              ...headerCellStyle(columnFlexStyle(fill, c.width), compact),
+              { alignItems: "flex-start" as const },
+            ]}
           >
-            <Text
-              numberOfLines={headerMaxLines}
-              style={nepaliTextStyle(headerSize)}
-              className={`font-semibold text-muted-foreground ${compact ? "leading-snug tracking-normal" : "uppercase tracking-wide"}`}
-            >
-              {pick(c.ne, c.en)}
-            </Text>
+            {c.header ?? (
+              <TableHeaderLabel compact={compact} numberOfLines={headerMaxLines} uppercase={!compact}>
+                {pick(c.ne, c.en)}
+              </TableHeaderLabel>
+            )}
           </View>
         ))}
       </View>
@@ -101,7 +186,7 @@ export function DataTable({
                 <Text
                   className="text-foreground"
                   style={nepaliTextStyle(bodySize)}
-                  numberOfLines={compact ? 3 : 2}
+                  numberOfLines={bodyMaxLines}
                 >
                   {cell}
                 </Text>
@@ -143,16 +228,18 @@ export function TableScrollShell({
   const inner = <View className={fill ? "w-full" : undefined}>{children}</View>;
 
   return (
-    <View
-      className={cn(
-        "w-full overflow-hidden bg-card",
-        bordered && "border border-border",
-        rounded && "rounded-xl",
-        className,
-      )}
-    >
-      {fill || !scroll ? inner : <ScrollView horizontal showsHorizontalScrollIndicator>{inner}</ScrollView>}
-    </View>
+    <TableLayoutContext.Provider value={{ fill }}>
+      <View
+        className={cn(
+          "w-full bg-card",
+          bordered && "border border-border",
+          rounded && "overflow-hidden rounded-xl",
+          className,
+        )}
+      >
+        {fill || !scroll ? inner : <ScrollView horizontal showsHorizontalScrollIndicator>{inner}</ScrollView>}
+      </View>
+    </TableLayoutContext.Provider>
   );
 }
 
@@ -161,7 +248,7 @@ export function TableHeader({ children, className }: { children: ReactNode; clas
   const { isDark } = useTheme();
   return (
     <View
-      className={cn("flex-row border-b border-border", className)}
+      className={cn("w-full flex-row border-b border-border", className)}
       style={{ backgroundColor: tableHeaderBackground(colors, isDark) }}
     >
       {children}
@@ -179,18 +266,11 @@ export function TableColumnsHeader({
   className?: string;
 }) {
   const { pick } = useLocale();
-  const headerSize = compact ? 10 : 11;
   return (
     <TableHeader className={className}>
       {columns.map((c) => (
         <TableHeaderCell key={c.key} width={c.width} compact={compact}>
-          <Text
-            numberOfLines={compact ? 3 : 2}
-            style={nepaliTextStyle(headerSize)}
-            className="font-semibold uppercase tracking-wide text-muted-foreground"
-          >
-            {pick(c.ne, c.en)}
-          </Text>
+          <TableHeaderLabel compact={compact}>{pick(c.ne, c.en)}</TableHeaderLabel>
         </TableHeaderCell>
       ))}
     </TableHeader>
@@ -216,24 +296,18 @@ export function TableHeaderCell({
   className?: string;
   compact?: boolean;
 }) {
-  const px = compact ? 6 : 10;
-  const py = compact ? 8 : 10;
-  const layout =
-    width != null
-      ? { width }
-      : flex != null
-        ? { flex, minWidth: minWidth ?? 0 }
-        : minWidth != null
-          ? { minWidth }
-          : undefined;
+  const { fill } = useTableFillLayout();
+  const layout = resolveWidthLayout(fill, width, flex, minWidth);
+
+  const cellStyle = headerCellStyle(layout, compact);
 
   if (onPress) {
     return (
       <Pressable
         disabled={disabled}
         onPress={onPress}
-        style={[layout, { paddingHorizontal: px, paddingVertical: py }]}
-        className={cn("flex-row items-center gap-1 active:opacity-70", className)}
+        style={cellStyle}
+        className={cn("flex-row items-start gap-1 active:opacity-70", className)}
       >
         {children}
       </Pressable>
@@ -241,10 +315,7 @@ export function TableHeaderCell({
   }
 
   return (
-    <View
-      style={[layout, { paddingHorizontal: px, paddingVertical: py, justifyContent: "center" }]}
-      className={className}
-    >
+    <View style={cellStyle} className={cn("items-start", className)}>
       {children}
     </View>
   );
@@ -269,7 +340,7 @@ export function TableRow({
   const colors = useThemeColors();
   const { isDark } = useTheme();
   const style = { backgroundColor: tableRowBackground(colors, isDark, rowIndex, highlight) };
-  const rowClass = cn("flex-row", borderTop && "border-t border-border", className);
+  const rowClass = cn("w-full flex-row", borderTop && "border-t border-border", className);
 
   if (onPress) {
     return (
@@ -303,16 +374,10 @@ export function TableCell({
   compact?: boolean;
   align?: "left" | "center" | "right";
 }) {
+  const { fill } = useTableFillLayout();
   const px = compact ? 6 : 10;
   const py = compact ? 5 : 8;
-  const layout =
-    width != null
-      ? { width }
-      : flex != null
-        ? { flex, minWidth: minWidth ?? 0 }
-        : minWidth != null
-          ? { minWidth }
-          : undefined;
+  const layout = resolveWidthLayout(fill, width, flex, minWidth);
 
   const alignClass =
     align === "center" ? "items-center" : align === "right" ? "items-end" : "items-start";

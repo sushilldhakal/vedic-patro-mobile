@@ -1,8 +1,15 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/Text";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
 import { DashaTree } from "@/components/kundali/DashaTree";
 import type { DashaSystem, DashaTreeResponse } from "@/lib/api";
+import {
+  DASHA_LORD_EN,
+  DASHA_LORD_NE,
+  dashaMahadashaGrahaKey,
+  type DashaLord,
+} from "@/lib/dasha";
 import { useLocale } from "@/lib/i18n";
 import { kundaliLabel } from "@/lib/kundali/kundali-i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -96,9 +103,25 @@ export function DashaSystemPanel({ vimshottari, tribhagi, yogini, timeZone }: Pr
             >
               {kundaliLabel("mahadasha_at_birth", lang)}
             </Text>
-            <Text className="text-base font-bold leading-tight text-foreground" style={nepaliTextStyle(16)}>
-              {lang === "en" ? dasha.mahadasha_lord : dasha.mahadasha_lord_ne}
-            </Text>
+            {(() => {
+              const grahaKey = dashaMahadashaGrahaKey(current.id, dasha.mahadasha_lord);
+              const lordLabel =
+                current.id === "yogini"
+                  ? lang === "en"
+                    ? dasha.mahadasha_lord
+                    : dasha.mahadasha_lord_ne
+                  : lang === "en"
+                    ? DASHA_LORD_EN[dasha.mahadasha_lord as DashaLord] ?? dasha.mahadasha_lord
+                    : DASHA_LORD_NE[dasha.mahadasha_lord as DashaLord] ?? dasha.mahadasha_lord_ne;
+              return (
+                <View className="flex-row flex-wrap items-center gap-2">
+                  {grahaKey ? <GrahaPlanetIcon graha={grahaKey} size={28} /> : null}
+                  <Text className="text-base font-bold leading-tight text-foreground" style={nepaliTextStyle(16)}>
+                    {lordLabel}
+                  </Text>
+                </View>
+              );
+            })()}
             <Text className="mt-0.5 text-xs text-muted-foreground" style={nepaliTextStyle(12)}>
               {pick(
                 `${kundaliLabel("dasha_balance", lang)}: ${digits(dasha.balance_label)}`,

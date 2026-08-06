@@ -10,10 +10,12 @@ import {
   type DashaTreeNode,
 } from "@/lib/api";
 import { formatDashaMoment } from "@/lib/bs-calendar";
+import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
 import {
   DASHA_LORD_EN,
   DASHA_LORD_NE,
   breakdownDashaDuration,
+  dashaMahadashaGrahaKey,
   formatDashaDuration,
   formatDashaDurationParts,
   type DashaLord,
@@ -91,6 +93,20 @@ function displayLordName(span: SpanWithChildren, lang: "ne" | "en", system: Dash
   if (system === "yogini") return span.lordNe;
   const lord = span.lord as DashaLord;
   return lang === "en" ? DASHA_LORD_EN[lord] ?? span.lordNe : DASHA_LORD_NE[lord] ?? span.lordNe;
+}
+
+function DashaLordIcon({
+  lord,
+  system,
+  size = 18,
+}: {
+  lord: string;
+  system: DashaSystem;
+  size?: number;
+}) {
+  const grahaKey = dashaMahadashaGrahaKey(system, lord);
+  if (!grahaKey) return null;
+  return <GrahaPlanetIcon graha={grahaKey} size={size} />;
 }
 
 function MomentLine({ label, value }: { label: string; value: string }) {
@@ -295,6 +311,7 @@ function DashaNode({
             ) : (
               <View style={{ width: 14 }} />
             )}
+            <DashaLordIcon lord={span.lord} system={system} size={18} />
             <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(14)}>
               {displayLordName(span, lang, system)}
             </Text>
@@ -435,11 +452,14 @@ export function DashaTree({
             }}
           />
           <View className="flex-row flex-wrap items-center justify-between gap-2 pl-2">
-            <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(14)}>
-              {displayLordName(running, lang, system)}
-              <Text className="font-normal"> · </Text>
-              {kundaliLabel("dasha_maha", lang)}
-            </Text>
+            <View className="flex-row flex-wrap items-center gap-2">
+              <DashaLordIcon lord={running.lord} system={system} size={20} />
+              <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(14)}>
+                {displayLordName(running, lang, system)}
+                <Text className="font-normal"> · </Text>
+                {kundaliLabel("dasha_maha", lang)}
+              </Text>
+            </View>
             <View className="flex-row flex-wrap items-center gap-2">
               {yoginiCycle ? (
                 <View className="rounded-full border border-border/60 bg-card px-2 py-0.5">

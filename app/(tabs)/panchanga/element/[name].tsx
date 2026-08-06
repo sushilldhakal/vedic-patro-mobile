@@ -1,19 +1,24 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
+import {
+  AllElementsLink,
+  ElementDescription,
+  GrahaBanner,
+} from "@/components/graha/GrahaPageParts";
+import { PatroMonthYearNavBlock } from "@/components/patro-date/PatroMonthYearNavBlock";
+import {
+  ElementDayRowIcon,
+  ElementSpanIcon,
+  NakshatraGlyphIcon,
+  RashiGlyphIcon,
+} from "@/components/panchanga/element/ElementGlyphIcon";
 import { NavataraBalamCardGrid } from "@/components/panchanga/NavataraBalamCardGrid";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { defaultClockForTimezone } from "@/components/panchanga/use-panchanga-mode";
-import {
-  BsMonthPicker,
-  BsYearPicker,
-  useBsMonth,
-  useBsYear,
-} from "@/components/pickers/BsYearMonthPicker";
 import { Card } from "@/components/ui/Card";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { Text } from "@/components/ui/Text";
@@ -38,10 +43,6 @@ import {
 } from "@/lib/choghadiya-display";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import {
-  elementDescriptionBlocks,
-  ELEMENT_SECTION_LABELS,
-} from "@/lib/panchanga-element-descriptions";
 import { ELEMENT_BY_ID } from "@/lib/panchanga-elements";
 import {
   formatElementStampDisplay,
@@ -52,7 +53,9 @@ import { formatRashiDisplay } from "@/lib/rashi-i18n";
 import { useBreakpoint } from "@/lib/responsive";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
+import { formatPatroMonthCrossEraSubtitle } from "@/lib/patro-headline-subtitle";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { usePatroMonthBrowse } from "@/lib/use-patro-month-browse";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 
 function clockFromGhati(sunriseMin: number | null, g: number): string | null {
@@ -113,25 +116,30 @@ function SpanBoundary({
   );
 }
 
-function SpanList({ spans }: { spans: ElementSpan[] }) {
+function SpanList({ spans, elementId }: { spans: ElementSpan[]; elementId: string }) {
   const { lang, pick } = useLocale();
-  const width = useGridWidth(1, 2, 3);
+  const width = useGridWidth(1, 2, 4);
 
   return (
     <View className="flex-row flex-wrap gap-2.5">
       {spans.map((s, i) => (
         <Card key={`${s.name}-${i}`} style={{ width: width as never }} className="gap-2 p-3">
-          <View className="flex-row items-baseline justify-between gap-2">
-            <Text className="text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
-              {lang === "en" ? s.name : s.name_ne}
-            </Text>
-            {s.paksha ? (
-              <Text className="text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
-                {s.paksha === "shukla"
-                  ? pick("शुक्ल पक्ष", "Shukla paksha")
-                  : pick("कृष्ण पक्ष", "Krishna paksha")}
-              </Text>
-            ) : null}
+          <View className="flex-row items-center gap-2.5">
+            <ElementSpanIcon elementId={elementId} span={s} size={34} />
+            <View className="min-w-0 flex-1">
+              <View className="flex-row items-baseline justify-between gap-2">
+                <Text className="text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
+                  {lang === "en" ? s.name : s.name_ne}
+                </Text>
+                {s.paksha ? (
+                  <Text className="text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
+                    {s.paksha === "shukla"
+                      ? pick("शुक्ल पक्ष", "Shukla paksha")
+                      : pick("कृष्ण पक्ष", "Krishna paksha")}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
           </View>
           <View className="gap-1.5">
             <SpanBoundary label={pick("सुरु", "Begins")} stamp={s.begins} tone="begin" />
@@ -154,6 +162,7 @@ function ToneRow({
   bad,
   width,
   badge,
+  leading,
 }: {
   label: string;
   trailing?: string | null;
@@ -161,6 +170,7 @@ function ToneRow({
   bad: boolean;
   width: string;
   badge?: string;
+  leading?: ReactNode;
 }) {
   const colors = useThemeColors();
   const tone = bad
@@ -175,9 +185,10 @@ function ToneRow({
       className="flex-row items-center justify-between gap-2 rounded-lg px-3 py-2"
     >
       <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        {leading}
         <Text
           numberOfLines={2}
-          style={{ color: tone.fg, ...nepaliTextStyle(13) }}
+          style={{ color: tone.fg, ...nepaliTextStyle(14) }}
           className="shrink text-sm font-semibold"
         >
           {label}
@@ -204,6 +215,7 @@ function ToneRow({
 
 function ChoghadiyaTableView({ data, sunrise }: { data: AnyRow[]; sunrise?: string }) {
   const { lang, pick, digits } = useLocale();
+  const legendColWidth = useGridWidth(1, 2, 2);
   const width = useGridWidth(1, 2, 3);
   const sunriseMin = parseHHMM(sunrise);
 
@@ -217,12 +229,12 @@ function ChoghadiyaTableView({ data, sunrise }: { data: AnyRow[]; sunrise?: stri
 
   return (
     <>
-      <View className="mb-3 gap-1">
+      <View className="mb-3 flex-row flex-wrap gap-x-4 gap-y-1">
         {CHOGHADIYA_TYPE_KEYS.map((key) => (
           <Text
             key={key}
+            style={{ width: legendColWidth as never, ...nepaliTextStyle(14) }}
             className="text-sm leading-snug text-muted-foreground"
-            style={nepaliTextStyle(13)}
           >
             {choghadiyaLegendMarker(TONE_BY_KEY[key])} {choghadiyaLegendLabel(key, lang)}
           </Text>
@@ -290,8 +302,15 @@ function TableView({
           {rows.map((r, i) => {
             const good = r.tone === "good" || r.quality === "शुभ";
             const bad = r.tone === "bad" || r.quality === "अशुभ";
+            const rowNum = typeof r.number === "number" ? r.number : i + 1;
             const name = lang === "en" ? String(r.name_en ?? r.name ?? "") : String(r.name ?? "");
             const trailing = `${String(r.tara ?? "")}${r.quality ? ` · ${String(r.quality)}` : ""}`;
+            const glyph =
+              elementId === "tarabala" ? (
+                <NakshatraGlyphIcon name={String(r.name ?? "")} number={rowNum} size={24} />
+              ) : (
+                <RashiGlyphIcon name={String(r.name ?? "")} number={rowNum} size={24} />
+              );
             return (
               <ToneRow
                 key={i}
@@ -300,6 +319,7 @@ function TableView({
                 trailing={trailing.trim() || null}
                 good={good}
                 bad={bad}
+                leading={glyph}
               />
             );
           })}
@@ -349,6 +369,7 @@ function TableView({
               good={good}
               bad={bad}
               badge={hasPushkara ? pick("पुष्कर", "Pushkara") : undefined}
+              leading={<ElementDayRowIcon elementId={elementId} row={it} size={24} />}
             />
           );
         })}
@@ -412,39 +433,8 @@ function NavataraBalamElementView({
           {moonRef}
         </Text>
       ) : null}
-      <NavataraBalamCardGrid cards={cards} clock={clock} formatName={formatName} lang={lang} />
+      <NavataraBalamCardGrid cards={cards} clock={clock} formatName={formatName} lang={lang} variant={elementId} />
     </View>
-  );
-}
-
-function ElementDescription({ elementId }: { elementId: string }) {
-  const { lang, pick } = useLocale();
-  const colors = useThemeColors();
-  const blocks = elementDescriptionBlocks(elementId, lang);
-  if (!blocks.length) return null;
-
-  return (
-    <Card className="mt-6 gap-4 p-4">
-      <Text
-        style={{ color: colors.secondary, ...nepaliTextStyle(12) }}
-        className="text-xs font-bold uppercase tracking-wider"
-      >
-        {pick("परिचय", "About")}
-      </Text>
-      {blocks.map((b) => (
-        <View key={b.section} className="gap-1">
-          <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(14)}>
-            {pick(ELEMENT_SECTION_LABELS[b.section].ne, ELEMENT_SECTION_LABELS[b.section].en)}
-          </Text>
-          <Text
-            className="text-sm leading-relaxed text-muted-foreground"
-            style={nepaliTextStyle(14)}
-          >
-            {b.body}
-          </Text>
-        </View>
-      ))}
-    </Card>
   );
 }
 
@@ -452,10 +442,12 @@ function ElementDescription({ elementId }: { elementId: string }) {
 
 export default function ElementScreen() {
   const { name } = useLocalSearchParams<{ name: string }>();
-  const { pick } = useLocale();
+  const { pick, lang, digits } = useLocale();
   const router = useRouter();
   const colors = useThemeColors();
   const { location, setLocation } = usePanchangaLocation();
+  const monthBrowse = usePatroMonthBrowse();
+  const { era, setEra, year, setYear, month, setMonth, stepMonth, goToday } = monthBrowse;
   const meta = name ? ELEMENT_BY_ID[name] : undefined;
   const isSpan = meta?.kind === "span";
   const isNavataraBal = name === "chandrabala" || name === "tarabala";
@@ -463,8 +455,11 @@ export default function ElementScreen() {
   const timezone = resolveTimeZone(undefined, location.params.timezone);
   const todayAd = todayAdStringInTimezone(new Date(), timezone);
   const [date, setDate] = useState(() => new Date(`${todayAd}T12:00:00`));
-  const { year, setYear } = useBsYear();
-  const { month, setMonth } = useBsMonth();
+
+  const crossEraSubtitle = useMemo(
+    () => formatPatroMonthCrossEraSubtitle(era, year, month, lang, digits),
+    [era, year, month, lang, digits],
+  );
 
   const dateAd = useMemo(() => {
     const y = date.getFullYear();
@@ -517,7 +512,7 @@ export default function ElementScreen() {
     if (isSpan) {
       if (spanQuery.isLoading && !spanQuery.data) return <LoadingState />;
       if (!spanQuery.data) return <ErrorState />;
-      return <SpanList spans={spanQuery.data.spans} />;
+      return <SpanList spans={spanQuery.data.spans} elementId={name} />;
     }
     if (isNavataraBal) {
       if (panchangaQuery.isLoading && !panchangaQuery.data) return <LoadingState />;
@@ -542,35 +537,45 @@ export default function ElementScreen() {
   };
 
   return (
-    <AppShell
-      title={pick(meta.titleNe, meta.titleEn)}
-      subtitle={pick(meta.blurbNe, meta.blurbEn)}
-      headerRight={<Ionicons name="sparkles-outline" size={24} color={colors.secondary} />}
-    >
-      <LocationSelector location={location} onLocationChange={setLocation} />
+    <AppShell title={pick(meta.titleNe, meta.titleEn)} showHeader={false}>
+      <GrahaBanner
+        icon="sparkles-outline"
+        title={pick(meta.titleNe, meta.titleEn)}
+        blurb={pick(meta.blurbNe, meta.blurbEn)}
+      />
 
       {isSpan ? (
-        <View className="mb-4 gap-2">
-          <BsYearPicker year={year} onYearChange={setYear} />
-          <BsMonthPicker month={month} onMonthChange={setMonth} />
-        </View>
+        <PatroMonthYearNavBlock
+          era={era}
+          onEraChange={setEra}
+          year={year}
+          month={month}
+          onMonthChange={setMonth}
+          onYearChange={setYear}
+          location={location}
+          onLocationChange={setLocation}
+          crossEraSubtitle={crossEraSubtitle}
+          onToday={() => goToday(todayAd)}
+          onPrev={() => stepMonth(-1)}
+          onNext={() => stepMonth(1)}
+        />
       ) : (
-        <PanchangaDateNav date={date} onDateChange={setDate} todayAd={todayAd} />
+        <PanchangaDateNav
+          date={date}
+          onDateChange={setDate}
+          todayAd={todayAd}
+          adDateStr={dateAd}
+          location={location}
+          onLocationChange={setLocation}
+          wheelData={isNavataraBal ? panchangaQuery.data : undefined}
+        />
       )}
 
       {renderBody()}
 
       <ElementDescription elementId={meta.id} />
 
-      <Pressable
-        onPress={() => router.push("/panchanga/details" as never)}
-        className="mt-6 flex-row items-center gap-1.5"
-      >
-        <Ionicons name="grid-outline" size={14} color={colors.primary} />
-        <Text style={{ color: colors.primary }} className="text-sm underline">
-          {pick("सबै पञ्चाङ्ग तत्त्वहरू", "All panchanga elements")}
-        </Text>
-      </Pressable>
+      <AllElementsLink />
     </AppShell>
   );
 }

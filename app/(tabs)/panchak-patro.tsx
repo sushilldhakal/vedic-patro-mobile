@@ -2,8 +2,9 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppShell } from "@/components/AppShell";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
+import { getCurrentBs } from "@/lib/bs-calendar";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import { Text } from "@/components/ui/Text";
 import { fetchPanchakYear, panchakKeys } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
@@ -145,7 +146,7 @@ export default function PanchakPatroScreen() {
   const colors = useThemeColors();
   const { width } = useBreakpoint();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
   const en = lang === "en";
   const yearLabel = digits(year);
 
@@ -160,16 +161,16 @@ export default function PanchakPatroScreen() {
   const cardWidth = width >= 1024 ? "49%" : "100%";
 
   return (
-    <AppShell
-      title={pick(`पञ्चक पात्रो ${yearLabel}`, `Panchak Patro ${yearLabel}`)}
-      subtitle={pick(
-        "वैदिक ज्योतिष र सूर्य सिद्धान्तमा आधारित पञ्चक काल र मुहूर्त विवरण",
-        "Panchak periods and moment details based on Vedic jyotish and Surya Siddhanta",
-      )}
-      headerRight={<Ionicons name="calendar-outline" size={26} color={colors.secondary} />}
-    >
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <BsYearPicker year={year} onYearChange={setYear} />
+    <AppShell title={pick(`पञ्चक पात्रो ${yearLabel}`, `Panchak Patro ${yearLabel}`)} showHeader={false}>
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        onToday={() => setYear(getCurrentBs().year)}
+      />
 
       <View
         style={{ backgroundColor: colors.surfaceInset, borderColor: colors.border }}

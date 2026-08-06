@@ -8,6 +8,7 @@ import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import {
   descriptionBlocksFrom,
+  elementDescriptionBlocks,
   ELEMENT_SECTION_LABELS,
 } from "@/lib/panchanga-element-descriptions";
 import { colorWithAlpha } from "@/lib/theme";
@@ -26,8 +27,11 @@ export function GrahaBanner({
   const colors = useThemeColors();
   return (
     <View
-      style={{ backgroundColor: colors.card, borderColor: colors.border }}
-      className="mb-4 rounded-2xl border px-5 py-5"
+      style={{
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+      }}
+      className="mb-4 overflow-hidden rounded-2xl border px-5 py-5"
     >
       <View className="flex-row items-start gap-4">
         <View
@@ -60,6 +64,38 @@ export function GrahaDescription({ pageId }: { pageId: string }) {
   const { lang, pick } = useLocale();
   const colors = useThemeColors();
   const blocks = descriptionBlocksFrom(GRAHA_PAGE_DESCRIPTIONS, pageId, lang);
+  if (!blocks.length) return null;
+
+  return (
+    <Card className="mt-6 gap-4 p-4">
+      <Text
+        style={{ color: colors.secondary, ...nepaliTextStyle(12) }}
+        className="text-xs font-bold uppercase tracking-wider"
+      >
+        {pick("परिचय", "About")}
+      </Text>
+      {blocks.map((b) => (
+        <View key={b.section} className="gap-1">
+          <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(14)}>
+            {pick(ELEMENT_SECTION_LABELS[b.section].ne, ELEMENT_SECTION_LABELS[b.section].en)}
+          </Text>
+          <Text
+            className="text-sm leading-relaxed text-muted-foreground"
+            style={nepaliTextStyle(14)}
+          >
+            {b.body}
+          </Text>
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+/** Element page "About" block — same content as web `ElementDescription`. */
+export function ElementDescription({ elementId }: { elementId: string }) {
+  const { lang, pick } = useLocale();
+  const colors = useThemeColors();
+  const blocks = elementDescriptionBlocks(elementId, lang);
   if (!blocks.length) return null;
 
   return (

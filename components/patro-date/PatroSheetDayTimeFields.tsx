@@ -1,10 +1,16 @@
 import { useMemo } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/Text";
 import { BsNativeSelect } from "@/components/ui/BsNativeSelect";
 import { getBSMonthLength } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
-import { formatClockParts, parseClockParts } from "@/components/panchanga/use-panchanga-mode";
+import {
+  formatClockParts,
+  from12h,
+  parseClockParts,
+  to12h,
+} from "@/components/panchanga/use-panchanga-mode";
+import { cn } from "@/lib/utils";
 
 type Props = {
   year: number;
@@ -37,12 +43,13 @@ export function PatroSheetDayTimeFields({
   }, [year, month, digits]);
 
   const { hour, minute } = parseClockParts(clock || "00:00");
+  const { hour12, meridiem } = to12h(hour);
 
-  const hourOptions = useMemo(
+  const hour12Options = useMemo(
     () =>
-      Array.from({ length: 24 }, (_, i) => ({
-        value: i,
-        label: digits(String(i).padStart(2, "0")),
+      Array.from({ length: 12 }, (_, i) => ({
+        value: i + 1,
+        label: digits(String(i + 1).padStart(2, "0")),
       })),
     [digits],
   );
@@ -55,6 +62,10 @@ export function PatroSheetDayTimeFields({
       })),
     [digits],
   );
+
+  const setTime = (nextHour12: number, nextMinute: number, nextMeridiem: "AM" | "PM") => {
+    onClockChange(formatClockParts(from12h(nextHour12, nextMeridiem), nextMinute));
+  };
 
   return (
     <View className="gap-3 pt-1">
@@ -76,20 +87,41 @@ export function PatroSheetDayTimeFields({
           </Text>
           <View className="flex-row items-center justify-center gap-2">
             <BsNativeSelect
-              value={hour}
-              options={hourOptions}
+              value={hour12}
+              options={hour12Options}
               ariaLabel={pick("घण्टा", "Hour")}
-              onChange={(h) => onClockChange(formatClockParts(h, minute))}
-              minWidth={72}
+              onChange={(h) => setTime(h, minute, meridiem)}
+              minWidth={64}
             />
             <Text className="font-num text-base font-semibold text-muted-foreground">:</Text>
             <BsNativeSelect
               value={minute}
               options={minuteOptions}
               ariaLabel={pick("मिनेट", "Minute")}
-              onChange={(m) => onClockChange(formatClockParts(hour, m))}
-              minWidth={72}
+              onChange={(m) => setTime(hour12, m, meridiem)}
+              minWidth={64}
             />
+            <View className="flex-row overflow-hidden rounded-md border border-border">
+              {(["AM", "PM"] as const).map((mer) => (
+                <Pressable
+                  key={mer}
+                  onPress={() => setTime(hour12, minute, mer)}
+                  className={cn(
+                    "px-2.5 py-1.5",
+                    meridiem === mer ? "bg-secondary" : "bg-card active:bg-muted",
+                  )}
+                >
+                  <Text
+                    className={cn(
+                      "text-sm font-bold",
+                      meridiem === mer ? "text-secondary-foreground" : "text-foreground",
+                    )}
+                  >
+                    {mer}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         </View>
       ) : null}

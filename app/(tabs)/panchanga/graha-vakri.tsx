@@ -7,8 +7,9 @@ import {
   GrahaColumnCard,
   GrahaDescription,
 } from "@/components/graha/GrahaPageParts";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
-import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
+import { getCurrentBs } from "@/lib/bs-calendar";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import { Text } from "@/components/ui/Text";
 import { fetchGrahaVakriYear, grahaDetailKeys, type GrahaVakriEvent } from "@/lib/api";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
@@ -54,7 +55,7 @@ export default function GrahaVakriScreen() {
   const colors = useThemeColors();
   const { width } = useBreakpoint();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
 
   const query = useQuery({
     queryKey: grahaDetailKeys.vakri(year, location.params),
@@ -74,10 +75,7 @@ export default function GrahaVakriScreen() {
   }
 
   return (
-    <AppShell
-      title={pick("ग्रह वक्री", "Graha Vakri")}
-      subtitle={pick("वर्षभरका वक्री–मार्गी स्थितिहरू", "The year's retrograde & direct stations")}
-    >
+    <AppShell title={pick("ग्रह वक्री", "Graha Vakri")} showHeader={false}>
       <GrahaBanner
         icon="refresh-outline"
         title={pick("ग्रह वक्री", "Graha Vakri")}
@@ -87,8 +85,15 @@ export default function GrahaVakriScreen() {
         )}
       />
 
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <BsYearPicker year={year} onYearChange={setYear} />
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        onToday={() => setYear(getCurrentBs().year)}
+      />
 
       {query.isLoading && !query.data ? (
         <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>

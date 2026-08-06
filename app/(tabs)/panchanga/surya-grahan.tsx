@@ -1,17 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState, LoadingState } from "@/components/ui/States";
-import { BsYearPicker, useBsYear } from "@/components/pickers/BsYearMonthPicker";
+import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
 import { SimpleEventCard, EmptyHint } from "@/components/graha/GrahaEventCards";
-import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { fetchEclipseYear, grahaDetailKeys } from "@/lib/api";
+import { getCurrentBs } from "@/lib/bs-calendar";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 import { useLocale } from "@/lib/i18n";
 
 function EclipseYearScreen({ kind }: { kind: "solar" | "lunar" }) {
   const { pick, digits, lang } = useLocale();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
 
   const query = useQuery({
     queryKey: grahaDetailKeys.eclipse(kind, year, location.params),
@@ -24,9 +25,16 @@ function EclipseYearScreen({ kind }: { kind: "solar" | "lunar" }) {
       : pick("चन्द्र ग्रहण", "Lunar eclipse");
 
   return (
-    <AppShell title={title} subtitle={pick("वर्षवार ग्रहण सूची", "Eclipses this year")}>
-      <LocationSelector location={location} onLocationChange={setLocation} />
-      <BsYearPicker year={year} onYearChange={setYear} />
+    <AppShell title={title} showHeader={false}>
+      <PatroYearNavBlock
+        era={era}
+        onEraChange={setEra}
+        year={year}
+        onYearChange={setYear}
+        location={location}
+        onLocationChange={setLocation}
+        onToday={() => setYear(getCurrentBs().year)}
+      />
       {query.isLoading ? (
         <LoadingState />
       ) : query.isError ? (
