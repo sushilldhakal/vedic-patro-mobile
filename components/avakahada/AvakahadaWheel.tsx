@@ -26,6 +26,7 @@ import {
 } from "@/lib/avakahada-locale";
 import { useLocale } from "@/lib/i18n";
 import { nepaliSvgTextCenter, nepaliTextStyle } from "@/lib/nepali-text";
+import { NOTO_DEVANAGARI_CHART, NOTO_DEVANAGARI_REGULAR } from "@/lib/fonts";
 import { useBreakpoint } from "@/lib/responsive";
 
 /**
@@ -87,8 +88,8 @@ const ATTR_FILL_ALT = "#132e1f";
 const GANA_VALUE_INK = "#b8e8d8";
 const NADI_VALUE_INK = "#c4d4f0";
 
-const FONT = "Mukta_600SemiBold";
-const NUM_FONT = "FiraCode_400Regular";
+const FONT = NOTO_DEVANAGARI_CHART;
+const NUM_FONT = NOTO_DEVANAGARI_REGULAR;
 
 const GANA_FILL: Record<Gana, string> = {
   देव: "#183e23",

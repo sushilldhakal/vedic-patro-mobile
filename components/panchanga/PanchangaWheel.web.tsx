@@ -29,6 +29,7 @@ import {
   type WheelDetail,
 } from "@/lib/wheel-data";
 import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
+import type { YearWheelScrub } from "@/lib/wheel-year-scrub";
 import { WheelChart, type WheelHover, type WheelPick } from "./WheelChart";
 import { WheelPanel } from "./WheelPanel";
 import { useLocale } from "@/lib/i18n";
@@ -74,32 +75,7 @@ function bsMonthEnOf(ne: string): string {
 
 const wheelDockIcon = "h-3.5 w-3.5 max-[480px]:h-3 max-[480px]:w-3";
 
-export type YearWheelScrub = {
-  /** Global day index across the whole range (single year ⇒ 1..365). */
-  day: number;
-  /** Total days across the whole range. */
-  totalDays: number;
-  /** Autoplay direction: -1 backward, 0 paused, 1 forward. */
-  direction: -1 | 0 | 1;
-  /** Autoplay speed multiplier while playing: 1 | 2 | 4 | 8. */
-  speed: number;
-  /** Play/step forward — repeated presses ramp 1×→2×→4×→8×. */
-  onForward: () => void;
-  /** Play/step backward — repeated presses ramp 1×→2×→4×→8×. */
-  onBackward: () => void;
-  /** Stop playback (resets speed). */
-  onPause: () => void;
-  /** Receives the global day index; the page maps it back to (year, day). */
-  onDayChange: (day: number) => void;
-  /** Jump straight to a day-in-year (1-based) within the active year; pauses playback. */
-  onJumpDay: (dayInYear: number) => void;
-  onScrubStart: () => void;
-  onScrubEnd: () => void;
-  /** Multi-year range context — shows the active year + day-in-year label. */
-  yearLabel?: string;
-  dayInYear?: number;
-  daysInYear?: number;
-};
+export type { YearWheelScrub };
 
 /** Year-view playback controls (rewind / play-pause / fast-forward) for the dock. */
 function WheelYearPlayback({ scrub }: { scrub: YearWheelScrub }) {
@@ -587,125 +563,32 @@ function PanchangaWheelBody({
 
         <div className={wheelDock}>
           {yearScrub ? (
+            /* The range wheel's whole control set: playback, where you are in
+               the window, and — in fullscreen — the date-time picker. No time
+               slider, no reset, no zoom: the page's date chrome owns all that. */
             <>
               <WheelYearPlayback scrub={yearScrub} />
               <div className={wheelDockSep} />
               <div className={cn(wheelDockGrp, "min-w-0 justify-center")}>
-                {editingDay ? (
-                  <span className={cn(wheelDockVal, "inline-flex min-w-0 items-center gap-1")}>
-                    {yearScrub.yearLabel != null && (
-                      <span className="text-[var(--w-ink-dim)]">{yearScrub.yearLabel} · </span>
-                    )}
-                    <input
-                      type="number"
-                      autoFocus
-                      defaultValue={yearScrub.dayInYear ?? yearScrub.day}
-                      min={1}
-                      max={yearScrub.daysInYear ?? yearScrub.totalDays}
-                      aria-label={pick("दिन जानुहोस्", "Jump to day")}
-                      className={cn(wheelDockEditInput, "w-[54px] max-[720px]:w-[44px]")}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitDayEdit((e.target as HTMLInputElement).value);
-                        else if (e.key === "Escape") setEditingDay(false);
-                      }}
-                      onBlur={(e) => commitDayEdit(e.target.value)}
-                    />
-                    <span className="text-[var(--w-ink-dim)]">
-                      /{num(yearScrub.daysInYear ?? yearScrub.totalDays)}
-                    </span>
+                <span className={cn(wheelDockVal, "min-w-0 whitespace-nowrap")}>
+                  {num(yearScrub.dayInYear ?? yearScrub.day)}
+                  <span className="text-[var(--w-ink-dim)]">
+                    /{num(yearScrub.daysInYear ?? yearScrub.totalDays)}
                   </span>
-                ) : (
-                  <button
-                    type="button"
-                    className={cn(wheelDockVal, "min-w-0 cursor-pointer whitespace-nowrap")}
-                    title={pick("दिन जानुहोस्", "Jump to day")}
-                    onClick={() => {
-                      yearScrub.onPause();
-                      setEditingDay(true);
-                    }}
-                  >
-                    {yearScrub.yearLabel != null &&
-                    yearScrub.dayInYear != null &&
-                    yearScrub.daysInYear != null ? (
-                      <>
-                        <span className="text-[var(--w-ink-dim)]">{yearScrub.yearLabel} · </span>
-                        {num(yearScrub.dayInYear)}
-                        <span className="text-[var(--w-ink-dim)]">/{num(yearScrub.daysInYear)}</span>
-                      </>
-                    ) : (
-                      <>
-                        {num(yearScrub.day)}
-                        <span className="text-[var(--w-ink-dim)]">/{num(yearScrub.totalDays)}</span>
-                      </>
-                    )}
-                  </button>
-                )}
-                {editingTime ? (
-                  <input
-                    type="time"
-                    autoFocus
-                    defaultValue={scrubClock}
-                    aria-label={pick("समय", "Time")}
-                    className={cn(wheelDockEditInput, "w-[94px] max-[720px]:w-[80px]")}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitTimeEdit((e.target as HTMLInputElement).value);
-                      else if (e.key === "Escape") setEditingTime(false);
-                    }}
-                    onBlur={(e) => commitTimeEdit(e.target.value)}
-                  />
-                ) : showYearTime ? (
-                  <button
-                    type="button"
-                    className={cn(wheelDockVal, "cursor-pointer whitespace-nowrap")}
-                    title={pick("समय बदल्नुहोस्", "Edit time")}
-                    onClick={() => {
-                      yearScrub.onPause();
-                      setEditingTime(true);
-                    }}
-                  >
-                    {num(scrubClock)}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className={wheelIconBtn}
-                    title={pick("समय हेर्नुहोस्", "Show / edit time")}
-                    onClick={() => {
-                      yearScrub.onPause();
-                      setShowYearTime(true);
-                      setEditingTime(true);
-                    }}
-                  >
-                    <Clock className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                  </button>
-                )}
+                </span>
               </div>
               <div className={wheelDockSep} />
               <div className={cn(wheelDockGrp, "shrink-0")}>
-                <button
-                  type="button"
-                  className={wheelIconBtn}
-                  title={pick("रिलोड · जुम रिसेट · सूर्योदय", "Reload · reset zoom · sunrise")}
-                  onClick={resetToSunrise}
-                >
-                  <RotateCcw className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={wheelIconBtn}
-                  title={pick("जुम इन", "Zoom in")}
-                  onClick={() => handleZoom(zoom * 1.4)}
-                >
-                  <ZoomIn className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={wheelIconBtn}
-                  title={pick("जुम आउट", "Zoom out")}
-                  onClick={() => handleZoom(zoom / 1.4)}
-                >
-                  <ZoomOut className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                </button>
+                {expanded && onOpenDatePicker ? (
+                  <button
+                    type="button"
+                    className={wheelIconBtn}
+                    title={pick("मिति र समय", "Date and time")}
+                    onClick={onOpenDatePicker}
+                  >
+                    <CalendarDays className={wheelDockIcon} strokeWidth={2} aria-hidden />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={wheelIconBtn}

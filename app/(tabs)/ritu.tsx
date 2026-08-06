@@ -1,52 +1,41 @@
-import { Text } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { AppShell } from "@/components/AppShell";
-import { Card } from "@/components/ui/Card";
-import { ErrorState, LoadingState } from "@/components/ui/States";
-import { PatroYearNavBlock } from "@/components/patro-date/PatroYearNavBlock";
-import { fetchTropicalSeasons, seasonsKeys } from "@/lib/api";
-import { getCurrentBs } from "@/lib/bs-calendar";
-import { usePanchangaLocation } from "@/lib/use-panchanga-location";
-import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
+import { LocationSelector } from "@/components/panchanga/LocationSelector";
+import { PatroPageHeader } from "@/components/patro-date/PatroPageHeader";
+import { LearnMoreCard } from "@/components/learn/LearnMoreCard";
+import { RituSeasons } from "@/components/RituSeasons";
 import { useLocale } from "@/lib/i18n";
+import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { useThemeColors } from "@/lib/theme-context";
 
 export default function RituScreen() {
-  const { pick, lang } = useLocale();
+  const { pick } = useLocale();
+  const colors = useThemeColors();
   const { location, setLocation } = usePanchangaLocation();
-  const { era, setEra, year, setYear } = usePatroYearBrowse();
-
-  const query = useQuery({
-    queryKey: seasonsKeys.tropical(location.params),
-    queryFn: () => fetchTropicalSeasons(location.params),
-  });
+  const locationLabel = displayLocationLabel(location);
+  const subtitle = `${pick("सायन ऋतु · विषुव–अयनान्त", "Tropical seasons · equinox–solstice")}${
+    locationLabel ? ` · ${locationLabel}` : ""
+  }`;
 
   return (
-    <AppShell title={pick("ऋतु", "Seasons")} showHeader={false}>
-      <PatroYearNavBlock
-        era={era}
-        onEraChange={setEra}
-        year={year}
-        onYearChange={setYear}
-        location={location}
-        onLocationChange={setLocation}
-        onToday={() => setYear(getCurrentBs().year)}
-      />
-      {query.isLoading ? (
-        <LoadingState />
-      ) : query.isError ? (
-        <ErrorState />
-      ) : (
-        (query.data?.segments ?? []).map((seg, i) => (
-          <Card key={i} className="mb-2 p-3">
-            <Text className="text-base font-semibold text-foreground">
-              {lang === "ne" ? seg.name_ne : seg.name_en}
-            </Text>
-            <Text className="text-sm text-muted-foreground">
-              {seg.start_ad} — {seg.end_ad}
-            </Text>
-          </Card>
-        ))
-      )}
+    <AppShell title="" showHeader={false}>
+      <View className="mb-3 flex-row flex-wrap items-start justify-between gap-3">
+        <View className="min-w-0 flex-1">
+          <PatroPageHeader
+            icon={<Ionicons name="leaf-outline" size={28} color={colors.secondary} />}
+            title={pick("ऋतु", "Season")}
+            subtitle={subtitle}
+          />
+        </View>
+        <View className="shrink-0 self-start pt-1">
+          <LocationSelector location={location} onLocationChange={setLocation} />
+        </View>
+      </View>
+
+      <RituSeasons location={location} />
+
+      <LearnMoreCard className="mt-7" slugs={["ritu-drift"]} />
     </AppShell>
   );
 }

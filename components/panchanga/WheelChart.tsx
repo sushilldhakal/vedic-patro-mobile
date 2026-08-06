@@ -36,6 +36,7 @@ import {
 } from "@/lib/wheel-data";
 import { KARANA_SEQ, karanaColor, WHEEL_TITHIS, WHEEL_YOGAS } from "@/lib/tithi-wheel-data";
 import { nepaliSvgTextCenter } from "@/lib/nepali-text";
+import { NOTO_DEVANAGARI_CHART } from "@/lib/fonts";
 
 const DEG = Math.PI / 180;
 const CX = 500;
@@ -79,7 +80,8 @@ const W_RASHI_ALT = "#163821";
 const W_PADA = "#0d2024";
 /** var(--w-pada-alt) */
 const W_PADA_ALT = "#112a2f";
-const FONT = "Mukta_600SemiBold";
+
+const FONT = NOTO_DEVANAGARI_CHART;
 
 /**
  * react-native-svg types `onPress` as an unsatisfiable intersection; it works

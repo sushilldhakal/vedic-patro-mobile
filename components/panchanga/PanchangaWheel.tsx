@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Pressable, StatusBar, View,  } from "react-native"
 import { Text } from "@/components/ui/Text"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,10 +28,14 @@ import {
 } from "@/lib/wheel-layout";
 import { WheelChart, type WheelHover, type WheelPick } from "./WheelChart";
 import { WheelPanel } from "./WheelPanel";
+import { parseClockParts } from "./use-panchanga-mode";
 import {
   wheelLegendDot,
   wheelLegendRow,
 } from "@/lib/wheel-classes";
+import type { YearWheelScrub } from "@/lib/wheel-year-scrub";
+
+export type { YearWheelScrub };
 
 const W_BG = "#061f21";
 const W_ACCENT = "#c62828";
@@ -84,6 +88,19 @@ type Props = {
   isToday?: boolean;
   timezone?: string;
   locationLabel?: string;
+  /** When true, only fetch at-time state after the user moves the time slider. */
+  atTimeScrubOnly?: boolean;
+  /**
+   * Range view: playback across a window of days. Replaces the whole time dock —
+   * the day and the time both come from the page's own date chrome instead.
+   */
+  yearScrub?: YearWheelScrub;
+  /** "HH:MM" — where the needle sits when the wheel has no time slider of its own. */
+  clock?: string;
+  /** Fullscreen-only calendar button; opens whatever `fullscreenOverlay` renders. */
+  onOpenDatePicker?: () => void;
+  /** Rendered inside the fullscreen modal so a picker can sit above the wheel. */
+  fullscreenOverlay?: ReactNode;
 };
 
 
@@ -109,6 +126,128 @@ function GhatiScrubber({
       thumbTintColor={W_ACCENT}
       accessibilityLabel="Time scrubber"
     />
+  );
+}
+
+/**
+ * The range wheel's whole control set: step/play backward, play-pause, step/play
+ * forward, and — in fullscreen only — a calendar button for the date-time picker.
+ * Pressing the direction you are already playing ramps 1×→2×→4×→8×.
+ *
+ * Deliberately nothing else: the day and the time are the page's business here,
+ * so there is no time slider, no "now", no reload and no zoom buttons.
+ */
+function WheelRangeDock({
+  pick,
+  digits,
+  scrub,
+  fullscreen,
+  onToggleFullscreen,
+  onOpenDatePicker,
+  bottomInset,
+}: {
+  pick: (ne: string, en: string) => string;
+  digits: (n: number | string) => string | number;
+  scrub: YearWheelScrub;
+  fullscreen: boolean;
+  onToggleFullscreen: () => void;
+  onOpenDatePicker?: () => void;
+  bottomInset: number;
+}) {
+  const playing = scrub.direction !== 0;
+  const dayLabel = scrub.dayInYear ?? scrub.day;
+  const totalLabel = scrub.daysInYear ?? scrub.totalDays;
+
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{
+        position: "absolute",
+        left: 8,
+        right: 8,
+        bottom: 14 + bottomInset,
+        alignItems: "center",
+        zIndex: 22,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          maxWidth: "100%",
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: W_DOCK_BORDER,
+          backgroundColor: W_DOCK_BG,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          shadowColor: "#000",
+          shadowOpacity: 0.55,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 8,
+        }}
+      >
+        <Pressable
+          onPress={scrub.onBackward}
+          style={[
+            wheelDockIconStyle,
+            scrub.direction === -1 ? { backgroundColor: W_ACCENT } : null,
+          ]}
+          accessibilityLabel={pick("पछाडि चलाउनुहोस्", "Play backward")}
+        >
+          <Ionicons name="play-back" size={15} color={W_INK} />
+        </Pressable>
+        <Pressable
+          onPress={playing ? scrub.onPause : scrub.onForward}
+          style={wheelDockIconStyle}
+          accessibilityLabel={playing ? pick("रोक्नुहोस्", "Pause") : pick("चलाउनुहोस्", "Play")}
+        >
+          <Ionicons name={playing ? "pause" : "play"} size={15} color={W_INK} />
+        </Pressable>
+        <Pressable
+          onPress={scrub.onForward}
+          style={[
+            wheelDockIconStyle,
+            scrub.direction === 1 ? { backgroundColor: W_ACCENT } : null,
+          ]}
+          accessibilityLabel={pick("अगाडि चलाउनुहोस्", "Play forward")}
+        >
+          <Ionicons name="play-forward" size={15} color={W_INK} />
+        </Pressable>
+
+        <Text style={{ color: W_INK, fontSize: 13, fontWeight: "600", flexShrink: 0 }}>
+          {digits(dayLabel)}
+          <Text style={{ color: W_INK_DIM }}>
+            /{digits(totalLabel)}
+            {playing ? ` · ${digits(scrub.speed)}×` : ""}
+          </Text>
+        </Text>
+
+        {/* The page's date chrome is out of reach in fullscreen, so the picker
+            comes to the wheel — and opens without dropping out of fullscreen. */}
+        {fullscreen && onOpenDatePicker ? (
+          <Pressable
+            onPress={onOpenDatePicker}
+            style={wheelDockIconStyle}
+            accessibilityLabel={pick("मिति र समय", "Date and time")}
+          >
+            <Ionicons name="calendar-outline" size={16} color={W_INK} />
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={onToggleFullscreen}
+          style={wheelDockIconStyle}
+          accessibilityLabel={
+            fullscreen ? pick("सामान्य दृश्य", "Exit full screen") : pick("पूर्ण स्क्रिन", "Full screen")
+          }
+        >
+          <Ionicons name={fullscreen ? "contract-outline" : "expand-outline"} size={16} color={W_INK} />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -245,6 +384,11 @@ function WheelBody({
   isToday,
   timezone,
   locationLabel,
+  atTimeScrubOnly = false,
+  yearScrub,
+  clock,
+  onOpenDatePicker,
+  fullscreenOverlay,
 }: Omit<Props, "loading" | "p"> & { p: PanchangaDay }) {
   const { pick, digits } = useLocale();
   const { width: screenW, height: screenH, isTablet, isLandscape } = useBreakpoint();
@@ -277,8 +421,20 @@ function WheelBody({
     return Math.max(0, Math.min(60, g));
   }, [now, det.sunriseMin, tz]);
 
+  /* Range view: the wheel has no time slider, so the needle follows the clock
+     the page's date chrome is holding. */
+  const rangeMode = Boolean(yearScrub);
+  const clockG = useMemo(() => {
+    if (!clock) return null;
+    const { hour, minute } = parseClockParts(clock);
+    let g = (hour * 60 + minute - det.sunriseMin) / 24;
+    if (g < 0) g += 60;
+    return Math.max(0, Math.min(60, g));
+  }, [clock, det.sunriseMin]);
+
   const [scrubG, setScrubG] = useState(() => (isToday ? nowG : 0));
   const [debouncedScrubG, setDebouncedScrubG] = useState(scrubG);
+  const effectiveG = rangeMode ? (clockG ?? 0) : scrubG;
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedScrubG(scrubG), 400);
@@ -301,8 +457,15 @@ function WheelBody({
     [anchorAd, debouncedScrubG, det.sunriseMin],
   );
 
-  const scrubbing = scrubPinned || Math.abs(scrubG - (isToday && !scrubPinned ? nowG : 0)) > 0.05;
-  const needsAtTime = Boolean(anchorAd) && scrubbing;
+  /* In the year view the day itself is what moves, so at-time state is only
+     worth fetching once the user reaches for the time slider — otherwise every
+     playback tick would queue a request the wheel never gets to draw. */
+  const scrubbing = atTimeScrubOnly
+    ? scrubPinned
+    : scrubPinned || Math.abs(scrubG - (isToday && !scrubPinned ? nowG : 0)) > 0.05;
+  /* Playback would queue an at-time request per tick and draw none of them, so
+     the range view stays on the day's own state and moves the needle locally. */
+  const needsAtTime = Boolean(anchorAd) && scrubbing && !rangeMode;
 
   const scrubQ = useQuery({
     queryKey: panchangaKeys.atTime(scrubDatetime, locationParams),
@@ -314,8 +477,8 @@ function WheelBody({
 
   const atTimeData = needsAtTime && !scrubQ.isPlaceholderData ? scrubQ.data : undefined;
   const markers = useMemo(
-    () => (atTimeData ? buildWheelMarkersAtTime(atTimeData) : buildWheelMarkers(p, det, scrubG)),
-    [atTimeData, p, det, scrubG],
+    () => (atTimeData ? buildWheelMarkersAtTime(atTimeData) : buildWheelMarkers(p, det, effectiveG)),
+    [atTimeData, p, det, effectiveG],
   );
 
   const handleScrubChange = useCallback((g: number) => {
@@ -373,7 +536,7 @@ function WheelBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.date_ad, p.panchanga_date_ad]);
 
-  const scrubClock = gClock(scrubG, det.sunriseMin);
+  const scrubClock = gClock(effectiveG, det.sunriseMin);
   const scrubTithi = atTimeData
     ? ((getPanchangaDetail(atTimeData)?.tithi as { name_ne?: string; name?: string } | undefined) ??
       (atTimeData.tithi as { name_ne?: string; name?: string } | undefined))
@@ -468,7 +631,8 @@ function WheelBody({
         style={{
           position: "absolute",
           left: 16,
-          bottom: fullscreen ? 88 + insets.bottom : 72,
+          // The year row takes a band of its own above the time dock.
+          bottom: (fullscreen ? 88 + insets.bottom : 72) + (yearScrub ? 60 : 0),
           gap: 6,
           maxWidth: size === "fill" ? "45%" : "45%",
           zIndex: 20,
@@ -499,22 +663,34 @@ function WheelBody({
         ) : null}
       </View>
 
-      <WheelDock
-        pick={pick}
-        digits={digits}
-        scrubG={scrubG}
-        scrubClock={scrubClock}
-        isToday={isToday}
-        onScrubChange={handleScrubChange}
-        onSnapNow={snapToNow}
-        onReset={resetToSunrise}
-        onZoomIn={() => handleZoom(zoom * 1.4)}
-        onZoomOut={() => handleZoom(zoom / 1.4)}
-        onToggleFullscreen={toggleExpanded}
-        expanded={fullscreen}
-        scrubTrackWidth={scrubTrackWidth}
-        bottomInset={fullscreen ? insets.bottom : 0}
-      />
+      {yearScrub ? (
+        <WheelRangeDock
+          pick={pick}
+          digits={digits}
+          scrub={yearScrub}
+          fullscreen={fullscreen}
+          onToggleFullscreen={toggleExpanded}
+          onOpenDatePicker={onOpenDatePicker}
+          bottomInset={fullscreen ? insets.bottom : 0}
+        />
+      ) : (
+        <WheelDock
+          pick={pick}
+          digits={digits}
+          scrubG={scrubG}
+          scrubClock={scrubClock}
+          isToday={isToday}
+          onScrubChange={handleScrubChange}
+          onSnapNow={snapToNow}
+          onReset={resetToSunrise}
+          onZoomIn={() => handleZoom(zoom * 1.4)}
+          onZoomOut={() => handleZoom(zoom / 1.4)}
+          onToggleFullscreen={toggleExpanded}
+          expanded={fullscreen}
+          scrubTrackWidth={scrubTrackWidth}
+          bottomInset={fullscreen ? insets.bottom : 0}
+        />
+      )}
     </View>
   );
 
@@ -542,6 +718,10 @@ function WheelBody({
         <StatusBar barStyle="light-content" backgroundColor={W_BG} translucent />
         <View style={{ flex: 1, backgroundColor: W_BG }}>
           {renderStage("fill", true)}
+          {/* Inside the fullscreen modal on purpose: a sheet mounted by the page
+              would open behind it, and closing fullscreen to pick a date is
+              exactly what the calendar button exists to avoid. */}
+          {fullscreenOverlay}
         </View>
       </Modal>
     </>
@@ -573,6 +753,11 @@ function PanchangaWheelImpl({
   isToday,
   timezone,
   locationLabel,
+  atTimeScrubOnly,
+  yearScrub,
+  clock,
+  onOpenDatePicker,
+  fullscreenOverlay,
 }: Props) {
   if (loading || !p) {
     return <WheelSkeleton bsYear={bsYear} bsMonthNe={bsMonthNe} bsDay={bsDay} locationLabel={locationLabel} />;
@@ -586,6 +771,11 @@ function PanchangaWheelImpl({
       isToday={isToday}
       timezone={timezone}
       locationLabel={locationLabel}
+      atTimeScrubOnly={atTimeScrubOnly}
+      yearScrub={yearScrub}
+      clock={clock}
+      onOpenDatePicker={onOpenDatePicker}
+      fullscreenOverlay={fullscreenOverlay}
     />
   );
 }

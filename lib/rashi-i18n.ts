@@ -2,7 +2,7 @@ export type Lang = "ne" | "en";
 
 /** Mirrors `rashis.*` in the web app's ne.json / en.json. */
 const RASHI_NAMES: Record<Lang, string[]> = {
-  ne: ["मेष", "वृष", "मिथुन", "कर्क", "सिंह", "कन्या", "तुला", "वृश्चिक", "धनु", "मकर", "कुम्भ", "मीन"],
+  ne: ["मेष", "वृष", "मिथुन", "कर्कट", "सिंह", "कन्या", "तुला", "वृश्चिक", "धनु", "मकर", "कुम्भ", "मीन"],
   en: ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"],
 };
 

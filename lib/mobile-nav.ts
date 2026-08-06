@@ -19,7 +19,25 @@ export const DRAWER_NAV_EXTRA = [
   { href: "/more", ne: "थप", en: "More", icon: "ellipsis-horizontal-outline" as MobileNavIcon },
 ] as const;
 
-export const FLOATING_NAV_BOTTOM_PADDING = 104;
+export const FLOATING_NAV_BOTTOM_PADDING = 84;
+
+/** Scroll bottom inset on tablet — keep in sync with `floatingNavTabBarHeight`. */
+export const FLOATING_NAV_BOTTOM_PADDING_TABLET = 96;
+
+/**
+ * Total height of the tab bar slot (pill + bottom inset).
+ * Keep in sync with `FloatingNavBar` padding and pill size.
+ */
+export function floatingNavTabBarHeight(isTablet: boolean, safeBottom: number): number {
+  const pill = isTablet ? 56 : 50;
+  const minBottom = isTablet ? 10 : 6;
+  return pill + Math.max(safeBottom, minBottom);
+}
+
+/** Bottom inset for scroll content — scales slightly on tablet. */
+export function floatingNavBottomPadding(isTablet: boolean): number {
+  return isTablet ? FLOATING_NAV_BOTTOM_PADDING_TABLET : FLOATING_NAV_BOTTOM_PADDING;
+}
 
 /** Standard left/right inset for page scroll content and headers. */
 export const PAGE_HORIZONTAL_PADDING = 15;
@@ -34,11 +52,6 @@ export function homeContentInset(isPhone: boolean): number {
 /** Panchanga main + sidebar split — matches web `xl:grid-cols-[1fr_330px]` (1280px). */
 export const PANCHANGA_SIDEBAR_SPLIT = 1280;
 export const PANCHANGA_SIDEBAR_WIDTH = 330;
-
-/** Bottom inset for scroll content — scales slightly on tablet. */
-export function floatingNavBottomPadding(isTablet: boolean): number {
-  return isTablet ? 112 : FLOATING_NAV_BOTTOM_PADDING;
-}
 
 /** Panchanga / kundali left rail — matches web `min-[992px]` sidebar. */
 export const PANCHANGA_SIDEBAR_MIN_WIDTH = 992;

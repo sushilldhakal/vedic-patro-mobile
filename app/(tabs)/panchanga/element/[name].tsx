@@ -31,6 +31,7 @@ import {
   type ElementSpan,
   type ElementStamp,
   type PanchangaDay,
+  type PushkaraNavamshaHit,
 } from "@/lib/api";
 import { getChandraBalamCards, getTaraBalamCards } from "@/lib/balam-cards";
 import {
@@ -73,6 +74,37 @@ function parseHHMM(s?: string | null): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
+type AnyRow = Record<string, unknown>;
+
+function formatSegmentTimeTrailing(
+  it: AnyRow,
+  elementId: string | undefined,
+  sunriseMin: number | null,
+  digits: (value: number | string) => string,
+): string | null {
+  if (elementId === "pushkara") {
+    const hits = (it.pushkara_navamsha as PushkaraNavamshaHit[] | undefined) ?? [];
+    const pushkaraTimes = hits
+      .map((h) => {
+        const t = h.local_time_short ?? h.local_time ?? "";
+        return t ? digits(String(t)) : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+    if (pushkaraTimes) return pushkaraTimes;
+  }
+
+  if (it.start_local_time_short) {
+    return `${digits(String(it.start_local_time_short))}–${digits(String(it.end_local_time_short ?? ""))}`;
+  }
+  if (typeof it.start_g === "number") {
+    const a = clockFromGhati(sunriseMin, it.start_g as number);
+    const b = clockFromGhati(sunriseMin, it.end_g as number);
+    if (a && b) return `${digits(a)}–${digits(b)}`;
+  }
+  return null;
+}
+
 /** Item width matching the web grid column count at each breakpoint. */
 function useGridWidth(phone: number, tablet: number, desktop = tablet): string {
   const { width } = useBreakpoint();
@@ -104,7 +136,9 @@ function SpanBoundary({
         <Text style={{ color: accent, ...nepaliTextStyle(11) }} className="text-xs font-semibold">
           {label}
         </Text>
-        <Text className="font-num text-xs text-foreground">{digits(stamp.time_label)}</Text>
+        <Text className="font-num text-sm text-foreground" style={nepaliTextStyle(14)}>
+          {digits(stamp.time_label)}
+        </Text>
       </View>
       <Text
         className="text-sm font-semibold leading-snug text-foreground"
@@ -153,8 +187,6 @@ function SpanList({ spans, elementId }: { spans: ElementSpan[]; elementId: strin
 
 /* ── table (per-day) view ──────────────────────────────────────────────── */
 
-type AnyRow = Record<string, unknown>;
-
 function ToneRow({
   label,
   trailing,
@@ -198,14 +230,17 @@ function ToneRow({
             style={{ backgroundColor: colorWithAlpha("#0b565a", 0.2) }}
             className="rounded-full px-1.5 py-px"
           >
-            <Text style={{ color: colors.secondary }} className="text-[10px] font-bold">
+            <Text style={{ color: colors.secondary, ...nepaliTextStyle(12) }} className="text-sm font-bold">
               {badge}
             </Text>
           </View>
         ) : null}
       </View>
       {trailing ? (
-        <Text style={{ color: tone.fg }} className="font-num text-xs opacity-90">
+        <Text
+          style={{ color: tone.fg, ...nepaliTextStyle(14) }}
+          className="shrink-0 font-num text-sm opacity-90"
+        >
           {trailing}
         </Text>
       ) : null}
@@ -244,14 +279,7 @@ function ChoghadiyaTableView({ data, sunrise }: { data: AnyRow[]; sunrise?: stri
         {data.map((it, i) => {
           const nameNe = String(it.name_ne ?? it.name ?? "—");
           const tone = choghadiyaTone(nameNe, it.bad as boolean | undefined);
-          let time: string | null = null;
-          if (it.start_local_time_short) {
-            time = `${digits(String(it.start_local_time_short))}–${digits(String(it.end_local_time_short ?? ""))}`;
-          } else if (typeof it.start_g === "number") {
-            const a = clockFromGhati(sunriseMin, it.start_g);
-            const b = clockFromGhati(sunriseMin, it.end_g as number);
-            if (a && b) time = `${digits(a)}–${digits(b)}`;
-          }
+          const time = formatSegmentTimeTrailing(it, "choghadiya", sunriseMin, digits);
           return (
             <ToneRow
               key={i}
@@ -348,14 +376,7 @@ function TableView({
             lang === "en"
               ? String(it.name ?? it.planet_en ?? it.lagna ?? it.name_ne ?? "—")
               : String(it.name_ne ?? it.planet_ne ?? it.lagna_ne ?? it.name ?? it.lagna ?? "—");
-          let time: string | null = null;
-          if (it.start_local_time_short) {
-            time = `${digits(String(it.start_local_time_short))}–${digits(String(it.end_local_time_short ?? ""))}`;
-          } else if (typeof it.start_g === "number") {
-            const a = clockFromGhati(sunriseMin, it.start_g as number);
-            const b = clockFromGhati(sunriseMin, it.end_g as number);
-            if (a && b) time = `${digits(a)}–${digits(b)}`;
-          }
+          const time = formatSegmentTimeTrailing(it, elementId, sunriseMin, digits);
           const bad = it.bad === true || it.good === false;
           const good = it.good === true || it.tone === "good";
           const hasPushkara =

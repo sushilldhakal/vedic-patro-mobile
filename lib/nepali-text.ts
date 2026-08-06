@@ -1,4 +1,5 @@
 import { Platform, type TextStyle } from "react-native";
+import { NOTO_DEVANAGARI_BOLD, NOTO_DEVANAGARI_REGULAR } from "@/lib/fonts";
 
 /** Line-height ratio that keeps Devanagari upper matras visible on native Text. */
 export const NEPALI_LINE_HEIGHT_RATIO = 1.45;
@@ -18,6 +19,7 @@ export function nepaliTextStyle(fontSize: number): TextStyle {
   const lineHeight = nepaliLineHeight(fontSize);
   const matraPad = fontSize <= 11 ? 3 : 2;
   return {
+    fontFamily: NOTO_DEVANAGARI_REGULAR,
     fontSize,
     lineHeight,
     ...(Platform.OS === "android"
@@ -33,6 +35,7 @@ export function nepaliTextStyle(fontSize: number): TextStyle {
 export function tableHeaderTextStyle(fontSize: number): TextStyle {
   const lineHeight = tableHeaderLineHeight(fontSize);
   return {
+    fontFamily: NOTO_DEVANAGARI_REGULAR,
     fontSize,
     lineHeight,
     paddingTop: 5,
@@ -57,12 +60,11 @@ export function tableHeaderFontSize(compact?: boolean): number {
   return compact ? 11 : 12;
 }
 
-/** Large day numbers in Nepali — use Mukta, not Fira Code (Devanagari digits clip in mono). */
+/** Large day numbers in Nepali — Noto Sans Devanagari (matches web). */
 export function nepaliDayNumberStyle(fontSize: number): TextStyle {
   return {
-    fontFamily: "Mukta_700Bold",
-    fontSize,
     ...nepaliTextStyle(fontSize),
+    fontFamily: NOTO_DEVANAGARI_BOLD,
   };
 }
 

@@ -18,8 +18,8 @@ import {
 import { formatTimeShort, getSunrise, getSunset } from "@/lib/panchanga-format.web";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
-import { DayTimeline, type DayCycleMode } from "@/components/panchanga/DayTimeline";
-import { DayCycleToggle } from "@/components/panchanga/DayCycleToggle";
+import { DayTimeline } from "@/components/panchanga/DayTimeline";
+import { DayCycleToggle, type DayCycleMode } from "@/components/panchanga/DayCycleToggle";
 import { PanchangaWheel } from "@/components/panchanga/PanchangaWheel";
 import { PanchangaAsidePanels } from "@/components/panchanga/PanchangaAsidePanels";
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
@@ -158,6 +158,17 @@ export default function PanchangaScreen() {
     setClock,
   ]);
 
+  const headerToolbar = (
+    <View className="flex-row flex-wrap items-center justify-end gap-1.5">
+      <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} />
+      <LocationSelector location={location} onLocationChange={setLocation} className="max-w-[8rem]" />
+    </View>
+  );
+
+  const headerMobileToolbar = (
+    <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} />
+  );
+
   return (
     <ScrollView
       className="mx-auto w-full max-w-[1400px] flex-1 bg-background pb-16 pt-4"
@@ -180,15 +191,8 @@ export default function PanchangaScreen() {
             wheelData={wheelData}
             clock={clock}
             onClockChange={handleClockChange}
-            toolbar={
-              <div className="flex items-center gap-1.5">
-                <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
-                <LocationSelector location={location} onLocationChange={setLocation} />
-              </div>
-            }
-            mobileToolbar={
-              <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
-            }
+            toolbar={headerToolbar}
+            mobileToolbar={headerMobileToolbar}
             hideNavLocation={!isCompact}
             location={location}
             onLocationChange={setLocation}
@@ -205,6 +209,7 @@ export default function PanchangaScreen() {
               showNeedle={clockUserAdjusted || isToday}
               mode={dayCycleMode}
               onModeChange={setDayCycleMode}
+              showToggle={false}
               civil={civilQuery.data}
               civilLoading={civilQuery.isLoading}
             />

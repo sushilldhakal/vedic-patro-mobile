@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppShell } from "@/components/AppShell";
 import { AvakahadaWheel } from "@/components/avakahada/AvakahadaWheel";
@@ -30,8 +30,10 @@ import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
 import {
+  TableCell,
   TableHeader,
   TableHeaderCell,
+  TableHeaderLabel,
   TableRow,
   TableScrollShell,
 } from "@/components/ui/DataTable";
@@ -169,6 +171,8 @@ const COLUMNS: {
   { key: "nadi", ne: "नाडी", en: "Nadi", width: 84, sortable: true },
 ];
 
+const TABLE_MIN_WIDTH = COLUMNS.reduce((sum, c) => sum + c.width, 0);
+
 export default function AvakahadaScreen() {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
@@ -240,55 +244,55 @@ export default function AvakahadaScreen() {
         ) : null}
       </View>
 
-      <TableScrollShell>
-        <TableHeader>
-          {COLUMNS.map((col) => {
-            const active = col.sortable && sort.key === col.key;
-            return (
-              <TableHeaderCell
-                key={col.key}
-                width={col.width}
-                disabled={!col.sortable}
-                onPress={col.sortable ? () => toggleSort(col.key as SortKey) : undefined}
-              >
-                <Text
-                  numberOfLines={2}
-                  className="shrink text-xs font-semibold text-foreground"
-                  style={nepaliTextStyle(11)}
+      <TableScrollShell stretch={false}>
+        <View style={{ minWidth: TABLE_MIN_WIDTH }}>
+          <TableHeader>
+            {COLUMNS.map((col) => {
+              const active = col.sortable && sort.key === col.key;
+              return (
+                <TableHeaderCell
+                  key={col.key}
+                  width={col.width}
+                  disabled={!col.sortable}
+                  onPress={col.sortable ? () => toggleSort(col.key as SortKey) : undefined}
                 >
-                  {pick(col.ne, col.en)}
-                </Text>
-                {col.sortable ? (
-                  <Ionicons
-                    name={
-                      active ? (sort.dir === "asc" ? "chevron-up" : "chevron-down") : "swap-vertical"
-                    }
-                    size={11}
-                    color={active ? colors.foreground : colors.mutedForeground}
-                  />
-                ) : null}
-              </TableHeaderCell>
-            );
-          })}
-        </TableHeader>
+                  <TableHeaderLabel uppercase={false} numberOfLines={2} className="text-foreground">
+                    {pick(col.ne, col.en)}
+                  </TableHeaderLabel>
+                  {col.sortable ? (
+                    <Ionicons
+                      name={
+                        active ? (sort.dir === "asc" ? "chevron-up" : "chevron-down") : "swap-vertical"
+                      }
+                      size={11}
+                      color={active ? colors.foreground : colors.mutedForeground}
+                    />
+                  ) : null}
+                </TableHeaderCell>
+              );
+            })}
+          </TableHeader>
 
-            {rows.length === 0 ? (
-              <View className="px-4 py-8">
-                <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
-                  {pick("कुनै नतिजा भेटिएन।", "No results found.")}
-                </Text>
-              </View>
-            ) : (
-              rows.map((row, rowIndex) => (
-                <TableRow key={row.index} rowIndex={rowIndex}>
-                  <Cell width={COLUMNS[0].width} bold>
+          {rows.length === 0 ? (
+            <View className="px-4 py-8">
+              <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+                {pick("कुनै नतिजा भेटिएन।", "No results found.")}
+              </Text>
+            </View>
+          ) : (
+            rows.map((row, rowIndex) => (
+              <TableRow key={row.index} rowIndex={rowIndex}>
+                <TableCell width={COLUMNS[0].width}>
+                  <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(13)}>
                     {digits(row.index)}. {row.label}
-                  </Cell>
-                  <Cell width={COLUMNS[1].width}>{row.deity}</Cell>
-                  <Cell width={COLUMNS[2].width}>{row.jati}</Cell>
-                  <Cell width={COLUMNS[3].width}>{row.sanjna}</Cell>
-                  <Cell width={COLUMNS[4].width}>{row.mukha}</Cell>
-                  <View style={{ width: COLUMNS[5].width }} className="flex-row flex-wrap gap-1 p-2">
+                  </Text>
+                </TableCell>
+                <TableCell width={COLUMNS[1].width}>{row.deity}</TableCell>
+                <TableCell width={COLUMNS[2].width}>{row.jati}</TableCell>
+                <TableCell width={COLUMNS[3].width}>{row.sanjna}</TableCell>
+                <TableCell width={COLUMNS[4].width}>{row.mukha}</TableCell>
+                <TableCell width={COLUMNS[5].width}>
+                  <View className="flex-row flex-wrap gap-1">
                     {row.aksharas.map((a, i) => (
                       <View
                         key={`${row.index}-${i}`}
@@ -300,29 +304,31 @@ export default function AvakahadaScreen() {
                       </View>
                     ))}
                   </View>
-                  <Cell width={COLUMNS[6].width}>{row.rashiText}</Cell>
-                  <Cell width={COLUMNS[7].width}>{row.lord}</Cell>
-                  <Cell width={COLUMNS[8].width}>{row.varna}</Cell>
-                  <Cell width={COLUMNS[9].width}>{row.vashya}</Cell>
-                  <Cell width={COLUMNS[10].width}>{row.yoni}</Cell>
-                  <Cell width={COLUMNS[11].width}>{row.vairiYoni}</Cell>
-                  <View style={{ width: COLUMNS[12].width }} className="justify-center p-2">
-                    <View
-                      style={{ backgroundColor: ganaTone[row.gana].bg }}
-                      className="self-start rounded-full px-2 py-0.5"
+                </TableCell>
+                <TableCell width={COLUMNS[6].width}>{row.rashiText}</TableCell>
+                <TableCell width={COLUMNS[7].width}>{row.lord}</TableCell>
+                <TableCell width={COLUMNS[8].width}>{row.varna}</TableCell>
+                <TableCell width={COLUMNS[9].width}>{row.vashya}</TableCell>
+                <TableCell width={COLUMNS[10].width}>{row.yoni}</TableCell>
+                <TableCell width={COLUMNS[11].width}>{row.vairiYoni}</TableCell>
+                <TableCell width={COLUMNS[12].width}>
+                  <View
+                    style={{ backgroundColor: ganaTone[row.gana].bg }}
+                    className="self-start rounded-full px-2 py-0.5"
+                  >
+                    <Text
+                      style={{ color: ganaTone[row.gana].fg, ...nepaliTextStyle(12) }}
+                      className="text-sm font-semibold"
                     >
-                      <Text
-                        style={{ color: ganaTone[row.gana].fg, ...nepaliTextStyle(11) }}
-                        className="text-xs font-semibold"
-                      >
-                        {localizeGana(row.gana, lang)}
-                      </Text>
-                    </View>
+                      {localizeGana(row.gana, lang)}
+                    </Text>
                   </View>
-                  <Cell width={COLUMNS[13].width}>{row.nadi}</Cell>
-                </TableRow>
-              ))
-            )}
+                </TableCell>
+                <TableCell width={COLUMNS[13].width}>{row.nadi}</TableCell>
+              </TableRow>
+            ))
+          )}
+        </View>
       </TableScrollShell>
 
       <AvakahadaWheel highlighted={query.trim() ? rows : undefined} />
@@ -381,26 +387,5 @@ export default function AvakahadaScreen() {
         </Text>
       </View>
     </AppShell>
-  );
-}
-
-function Cell({
-  width,
-  bold,
-  children,
-}: {
-  width: number;
-  bold?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Text
-      style={{ width, ...nepaliTextStyle(12) }}
-      className={
-        bold ? "p-2 text-xs font-semibold text-foreground" : "p-2 text-xs text-muted-foreground"
-      }
-    >
-      {children}
-    </Text>
   );
 }

@@ -1,4 +1,5 @@
 import { ScrollView, Text, View } from "react-native";
+import { useInPanchangaTabsShell } from "@/components/panchanga/PanchangaTabsShell";
 import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
@@ -21,6 +22,9 @@ export function AppShell({
   panchangaSidebar?: boolean;
 }) {
   const { isTablet } = useBreakpoint();
+  const inShell = useInPanchangaTabsShell();
+  const pagePadH = inShell ? 0 : PAGE_HORIZONTAL_PADDING;
+  const pagePadTop = inShell ? 0 : 16;
   const header = showHeader ? (
     <View className="mb-4 flex-row items-start justify-between gap-3 py-1">
       <View className="min-w-0 flex-1">
@@ -53,10 +57,11 @@ export function AppShell({
   if (!scroll) {
     return (
       <View
-        className="mx-auto w-full max-w-[1400px] flex-1 bg-background pt-4"
+        className="mx-auto w-full max-w-[1400px] flex-1 bg-background"
         style={{
           paddingBottom: floatingNavBottomPadding(isTablet),
-          paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+          paddingHorizontal: pagePadH,
+          paddingTop: pagePadTop,
         }}
       >
         {header}
@@ -68,10 +73,11 @@ export function AppShell({
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="mx-auto w-full max-w-[1400px] pt-4"
+      contentContainerClassName="mx-auto w-full max-w-[1400px]"
       contentContainerStyle={{
         paddingBottom: floatingNavBottomPadding(isTablet),
-        paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+        paddingHorizontal: pagePadH,
+        paddingTop: pagePadTop,
       }}
       keyboardShouldPersistTaps="handled"
     >

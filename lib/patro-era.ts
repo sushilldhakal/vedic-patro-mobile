@@ -61,3 +61,10 @@ export function toggleBrowseEraForLang(era: PatroBrowseEra, lang: "ne" | "en"): 
 export function browseEraPairForLang(lang: "ne" | "en"): [PatroBrowseEra, PatroBrowseEra] {
   return lang === "en" ? ["ad", "bc"] : ["bs", "bbs"];
 }
+
+/** Map UI browse era to API `era` query (web year endpoints). */
+export function browseEraToApi(era: PatroBrowseEra): "bs" | "ad" | "bbs" {
+  if (era === "ad" || era === "bc") return "ad";
+  if (era === "bbs") return "bbs";
+  return "bs";
+}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { Animated, type StyleProp, type ViewStyle } from "react-native";
+import { Animated, View, type StyleProp, type ViewStyle } from "react-native";
 
 type Props = {
   className?: string;

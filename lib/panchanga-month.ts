@@ -1,4 +1,5 @@
 import type { CalendarDay } from "@/lib/api";
+import { nakshatraShortLabel } from "@/lib/nakshatra-short";
 
 type Lang = "ne" | "en";
 
@@ -33,6 +34,23 @@ export function getMonthDayNakshatra(day: CalendarDay, lang: Lang): string | und
     day.nakshatra_ne ??
     day.panchanga?.nakshatra?.name_ne;
   return (lang === "en" ? en : ne) ?? en ?? ne;
+}
+
+function nakshatraLookupName(day: CalendarDay): string | undefined {
+  return (
+    day.nakshatra ??
+    day.nakshatra_ne ??
+    day.panchanga?.nakshatra?.name ??
+    day.panchanga?.nakshatra?.name_ne ??
+    undefined
+  );
+}
+
+/** Abbreviated nakshatra for narrow month cells; falls back to full name. */
+export function getMonthDayNakshatraShort(day: CalendarDay, lang: Lang): string | undefined {
+  const full = getMonthDayNakshatra(day, lang);
+  const short = nakshatraShortLabel(nakshatraLookupName(day), lang);
+  return short ?? full;
 }
 
 export function getMonthDayYoga(day: CalendarDay, lang: Lang): string {

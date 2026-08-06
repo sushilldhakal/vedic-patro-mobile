@@ -19,8 +19,16 @@ import { type Profile } from "@/lib/auth/client";
 import { useLocale } from "@/lib/i18n";
 import { PROFILES_QUERY_KEY, useProfilesQuery } from "@/lib/kundali/profiles-query";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { BREAKPOINTS, useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
+
+const PROFILE_GRID_GUTTER = 6;
+
+function profileGridColumns(width: number): number {
+  if (width >= BREAKPOINTS.md) return 3;
+  return 1;
+}
 
 export interface KundaliProfilePickerHandle {
   openAdd: () => void;
@@ -33,9 +41,11 @@ export const KundaliProfilePicker = forwardRef<
   { selectedId?: string | null; onSelect: (profile: Profile) => void }
 >(function KundaliProfilePicker({ selectedId, onSelect }, ref) {
   const { pick } = useLocale();
+  const { width } = useBreakpoint();
   const queryClient = useQueryClient();
   const { data: profiles, isLoading, isError } = useProfilesQuery();
   const [dialog, setDialog] = useState<DialogState>(null);
+  const profileCols = profileGridColumns(width);
 
   useImperativeHandle(ref, () => ({ openAdd: () => setDialog({ mode: "add" }) }), []);
 
@@ -81,15 +91,26 @@ export const KundaliProfilePicker = forwardRef<
           </View>
         </View>
       ) : (
-        <View className="flex-row flex-wrap gap-3">
+        <View
+          className="flex-row flex-wrap"
+          style={{ marginHorizontal: -PROFILE_GRID_GUTTER }}
+        >
           {list.map((p) => (
-            <ProfileCard
+            <View
               key={p.id}
-              profile={p}
-              active={p.id === selectedId}
-              onView={() => onSelect(p)}
-              onEdit={() => setDialog({ mode: "edit", profile: p })}
-            />
+              style={{
+                width: `${100 / profileCols}%`,
+                paddingHorizontal: PROFILE_GRID_GUTTER,
+                marginBottom: 12,
+              }}
+            >
+              <ProfileCard
+                profile={p}
+                active={p.id === selectedId}
+                onView={() => onSelect(p)}
+                onEdit={() => setDialog({ mode: "edit", profile: p })}
+              />
+            </View>
           ))}
         </View>
       )}
@@ -156,10 +177,7 @@ function ProfileCard({
 
   return (
     <Card
-      className={cn(
-        "min-w-[280px] flex-1 gap-3",
-        active ? "border-secondary bg-secondary/5" : undefined,
-      )}
+      className={cn("w-full gap-2.5 p-3", active ? "border-secondary bg-secondary/5" : undefined)}
     >
       <View className="flex-row items-start justify-between gap-2">
         <View className="min-w-0 flex-1">

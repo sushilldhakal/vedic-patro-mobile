@@ -85,6 +85,7 @@ export function BsMonthHeaderTitle({
         nextDisabled={nextDisabled}
         crossEraSubtitle={crossEraSubtitle}
         toolbar={viewToggle}
+        mobileToolbar={viewToggle}
       />
     </View>
   );

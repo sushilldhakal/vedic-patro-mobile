@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import { View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { PatroMonthYearNavBlock } from "@/components/patro-date/PatroMonthYearNavBlock";
+import { SunriseSunsetIcon } from "@/components/panchanga/SunriseSunsetIcon";
 import { Text } from "@/components/ui/Text";
 import { BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { apiKeys, fetchMonthCalendar, type CalendarDay } from "@/lib/api";
@@ -53,28 +55,28 @@ function AbhijitDayCard({
     <View
       style={{
         width: width as never,
-        minHeight: 132,
+        minHeight: 148,
         borderColor: isToday ? colorWithAlpha("#0b565a", 0.5) : colors.border,
         backgroundColor: isToday ? colorWithAlpha("#0b565a", 0.1) : colors.card,
       }}
-      className="rounded-xl border p-2.5"
+      className="rounded-xl border p-3"
     >
-      <View className="mb-1 flex-row items-center justify-between gap-1">
+      <View className="mb-1.5 flex-row items-center justify-between gap-1">
         <Text
           numberOfLines={1}
-          className="shrink text-xs font-semibold text-muted-foreground"
-          style={nepaliTextStyle(12)}
+          className="shrink text-sm font-semibold text-muted-foreground"
+          style={nepaliTextStyle(14)}
         >
           {weekday}
         </Text>
         {isToday ? (
           <View
             style={{ backgroundColor: colorWithAlpha("#0b565a", 0.2) }}
-            className="shrink-0 rounded-full px-1.5 py-px"
+            className="shrink-0 rounded-full px-2 py-0.5"
           >
             <Text
-              style={{ color: colors.secondary, ...nepaliTextStyle(10) }}
-              className="text-[10px] font-bold uppercase"
+              style={{ color: colors.secondary, ...nepaliTextStyle(12) }}
+              className="text-xs font-bold uppercase"
             >
               {pick("आज", "Today")}
             </Text>
@@ -83,24 +85,46 @@ function AbhijitDayCard({
       </View>
 
       <View className="mb-2 flex-row items-baseline justify-center gap-1.5">
-        <Text className="font-num text-lg font-bold text-foreground">{digits(day.day)}</Text>
-        <Text className="font-num text-xs text-muted-foreground">/{digits(adDay)}</Text>
+        <Text className="font-num text-2xl font-bold text-foreground" style={nepaliTextStyle(22)}>
+          {digits(day.day)}
+        </Text>
+        <Text className="font-num text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+          /{digits(adDay)}
+        </Text>
       </View>
 
-      <View className="mt-auto gap-1.5">
+      <View className="mt-auto gap-2">
         <Text
-          style={{ color: colors.secondary }}
-          className="text-center font-num text-xs font-bold"
+          style={{ color: colors.secondary, ...nepaliTextStyle(15) }}
+          className="text-center font-num text-base font-bold leading-snug"
         >
           {abhijit.rangeDisplay}
         </Text>
-        <Text className="text-center text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
+        <Text className="text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
           {pick("मध्यान्ह", "Solar noon")}{" "}
-          <Text className="font-num text-foreground">{abhijit.noonDisplay ?? "—"}</Text>
+          <Text className="font-num text-base font-semibold text-foreground" style={nepaliTextStyle(16)}>
+            {abhijit.noonDisplay ?? "—"}
+          </Text>
         </Text>
-        <Text numberOfLines={1} className="text-center font-num text-[10px] text-muted-foreground">
-          ↑{sunrise} · ↓{sunset}
-        </Text>
+        <View className="flex-row items-center justify-center gap-1.5">
+          <SunriseSunsetIcon variant="rise" size={14} color={colors.mutedForeground} />
+          <Text
+            numberOfLines={1}
+            className="font-num text-sm text-muted-foreground"
+            style={nepaliTextStyle(13)}
+          >
+            {sunrise}
+          </Text>
+          <Text className="text-muted-foreground">·</Text>
+          <SunriseSunsetIcon variant="set" size={14} color={colors.mutedForeground} />
+          <Text
+            numberOfLines={1}
+            className="font-num text-sm text-muted-foreground"
+            style={nepaliTextStyle(13)}
+          >
+            {sunset}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -135,8 +159,9 @@ export default function AbhijitMuhurtaScreen() {
 
   const monthLabel = pick(BS_MONTHS_NE[month - 1], BS_MONTH_NAMES[month - 1]);
 
-  // Web: grid-cols-3 / sm:4 / md:6 / lg:7 / xl:8
-  const cols = width >= 1280 ? 8 : width >= 1024 ? 7 : width >= 768 ? 6 : width >= 640 ? 4 : 3;
+  // Fewer columns on phone → wider cards and larger type.
+  const cols =
+    width >= 1280 ? 8 : width >= 1024 ? 7 : width >= 768 ? 6 : width >= 640 ? 4 : width < 420 ? 2 : 3;
   const cardWidth = `${(100 / cols - 1.5).toFixed(2)}%`;
 
   return (
@@ -166,24 +191,24 @@ export default function AbhijitMuhurtaScreen() {
         >
           <View>
             <Text
-              style={{ color: colors.secondary, letterSpacing: 0.8, ...nepaliTextStyle(11) }}
-              className="mb-1 text-xs font-bold uppercase"
+              style={{ color: colors.secondary, letterSpacing: 0.8, ...nepaliTextStyle(13) }}
+              className="mb-1 text-sm font-bold uppercase"
             >
               {pick("आजको अभिजित् मुहूर्त", "Today's Abhijit Moment")}
             </Text>
-            <Text className="mb-2 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            <Text className="mb-2 text-base text-muted-foreground" style={nepaliTextStyle(16)}>
               {digits(todayRow.day.day)} ·{" "}
               {lang === "en"
                 ? (todayRow.day.weekday_en ?? todayRow.day.weekday)
                 : (todayRow.day.weekday_ne ?? todayRow.day.weekday)}{" "}
               · <Text className="font-num">{todayRow.day.date_ad}</Text>
             </Text>
-            <Text className="font-num text-2xl font-bold text-foreground">
+            <Text className="font-num text-3xl font-bold text-foreground" style={nepaliTextStyle(28)}>
               {todayRow.abhijit.rangeDisplay}
             </Text>
-            <Text className="mt-2 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            <Text className="mt-2 text-base text-muted-foreground" style={nepaliTextStyle(16)}>
               {pick("मध्यान्ह", "Solar noon")}:{" "}
-              <Text className="font-num font-semibold text-foreground">
+              <Text className="font-num text-lg font-semibold text-foreground" style={nepaliTextStyle(18)}>
                 {todayRow.abhijit.noonDisplay ?? "—"}
               </Text>
             </Text>
@@ -192,14 +217,23 @@ export default function AbhijitMuhurtaScreen() {
             style={{ borderColor: colors.border, backgroundColor: colors.background }}
             className="gap-2 rounded-xl border px-4 py-3"
           >
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="sunny" size={15} color={colors.primary} />
-              <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
-                🌅 {formatClockNepali(todayRow.day.sunrise) ?? todayRow.day.sunrise ?? "—"} · 🌇{" "}
-                {formatClockNepali(todayRow.day.sunset) ?? todayRow.day.sunset ?? "—"}
-              </Text>
+            <View className="flex-row flex-wrap items-center gap-x-3 gap-y-2">
+              <View className="flex-row items-center gap-2">
+                <SunriseSunsetIcon variant="rise" size={20} color={colors.primary} />
+                <Text className="font-num text-base text-foreground" style={nepaliTextStyle(16)}>
+                  {formatClockNepali(todayRow.day.sunrise) ?? todayRow.day.sunrise ?? "—"}
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <SunriseSunsetIcon variant="set" size={20} color={colors.secondary} />
+                <Text className="font-num text-base text-foreground" style={nepaliTextStyle(16)}>
+                  {formatClockNepali(todayRow.day.sunset) ?? todayRow.day.sunset ?? "—"}
+                </Text>
+              </View>
             </View>
-            <Text className="font-num text-xs text-muted-foreground">{todayRow.day.date_ad}</Text>
+            <Text className="font-num text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+              {todayRow.day.date_ad}
+            </Text>
           </View>
         </View>
       ) : null}
@@ -208,10 +242,10 @@ export default function AbhijitMuhurtaScreen() {
         style={{ backgroundColor: colors.surfaceInset, borderColor: colors.border }}
         className="mt-4 flex-row gap-2.5 rounded-xl border px-4 py-3.5"
       >
-        <Ionicons name="sparkles-outline" size={15} color={colors.secondary} style={{ marginTop: 2 }} />
+        <Ionicons name="sparkles-outline" size={18} color={colors.secondary} style={{ marginTop: 2 }} />
         <Text
-          className="flex-1 text-sm leading-relaxed text-muted-foreground"
-          style={nepaliTextStyle(14)}
+          className="flex-1 text-base leading-relaxed text-muted-foreground"
+          style={nepaliTextStyle(16)}
         >
           {pick(
             "अभिजित् दिनको आठौँ मुहूर्त हो — सूर्योदय र सूर्यास्त बीचको सर्वश्रेष्ठ शुभ समय, स्थानीय मध्यान्हमा केन्द्रित।",
@@ -221,12 +255,12 @@ export default function AbhijitMuhurtaScreen() {
       </View>
 
       <View className="mt-4 flex-row flex-wrap items-center justify-between gap-2">
-        <Text className="text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
+        <Text className="text-lg font-bold text-foreground" style={nepaliTextStyle(18)}>
           {pick("मासिक सूची", "Month at a glance")} — {monthLabel} {digits(year)}
         </Text>
         {!monthQ.isLoading && rows.length > 0 ? (
-          <View className="rounded-full border border-border bg-card px-2.5 py-0.5">
-            <Text className="text-xs font-semibold text-muted-foreground" style={nepaliTextStyle(11)}>
+          <View className="rounded-full border border-border bg-card px-3 py-1">
+            <Text className="text-sm font-semibold text-muted-foreground" style={nepaliTextStyle(14)}>
               {pick(`${digits(rows.length)} दिन`, `${rows.length} days`)}
             </Text>
           </View>
@@ -236,7 +270,7 @@ export default function AbhijitMuhurtaScreen() {
       {monthQ.isError ? (
         <Text
           style={{ color: colors.destructive, ...nepaliTextStyle(14) }}
-          className="mt-3 text-sm"
+          className="mt-3 text-base"
         >
           {pick(
             "पात्रो लोड गर्न सकिएन। केही बेरपछि पुनः प्रयास गर्नुहोस्।",
@@ -244,11 +278,11 @@ export default function AbhijitMuhurtaScreen() {
           )}
         </Text>
       ) : monthQ.isLoading ? (
-        <Text className="mt-3 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+        <Text className="mt-3 text-base text-muted-foreground" style={nepaliTextStyle(16)}>
           {pick("लोड हुँदै…", "Loading…")}
         </Text>
       ) : rows.length === 0 ? (
-        <Text className="mt-3 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+        <Text className="mt-3 text-base text-muted-foreground" style={nepaliTextStyle(16)}>
           {pick(
             "यस महिनाका लागि अभिजित् समय उपलब्ध छैन।",
             "No Abhijit timings for this month.",

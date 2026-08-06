@@ -173,7 +173,8 @@ export type ScreenLabel = {
     | "polestar"
     | "obliquity"
     | "axis"
-    | "asterism";
+    | "asterism"
+    | "observer";
   /**
    * 1–12 for rashi, 1–27 for nakshatra; for a pole star, 1 marks the one the
    * pole is nearest at the moment on screen.
@@ -195,6 +196,9 @@ export type SkySample = {
   labels: ScreenLabel[];
   /** Sun altitude, deg — negative is night. Drives the daylight wash. */
   sunAltitude: number;
+  /** The camera's current `view.distance` — lets the overlay grow rashi and
+      nakshatra text as the belt shrinks on screen while zooming out. */
+  zoomDistance: number;
 };
 
 export type SceneToggles = {
@@ -1275,6 +1279,21 @@ export function AakashGocharScene({
           project({ id: `tr-${t.id}`, kind: "tropic", text: t.id }, world);
         }
       }
+      {
+        // Same treatment as a tropic label: the marker sits on the spinning
+        // globe, so its world position needs the same spin quaternion applied.
+        const at = geoToVec3(observer.lat, observer.lon, GLOBE_R * 1.09);
+        scratch.current.set(at[0], at[1], at[2]);
+        if (globeSpinRef.current) scratch.current.applyQuaternion(globeSpinRef.current.quaternion);
+        const world: [number, number, number] = [
+          scratch.current.x,
+          scratch.current.y,
+          scratch.current.z,
+        ];
+        if (labelVisible(world)) {
+          project({ id: "observer-loc", kind: "observer" }, world);
+        }
+      }
     }
 
     /* ── frame-level scenery ────────────────────────────────────────── */
@@ -1453,7 +1472,7 @@ export function AakashGocharScene({
 
     if (state.clock.elapsedTime - lastSample.current > 0.2) {
       lastSample.current = state.clock.elapsedTime;
-      onSample({ timeMs: s.timeMs, sky, labels: labels.current, sunAltitude });
+      onSample({ timeMs: s.timeMs, sky, labels: labels.current, sunAltitude, zoomDistance: view.current.distance });
     }
   }
 
@@ -1538,11 +1557,25 @@ export function AakashGocharScene({
           {globeLines.tropics.map(({ object, id }) => (
             <primitive key={`trop-${id}`} object={object} />
           ))}
-          {/* Where you are watching from. */}
-          <mesh position={geoToVec3(observer.lat, observer.lon, GLOBE_R * 1.005)}>
-            <sphereGeometry args={[GLOBE_R * 0.022, 12, 12]} />
-            <meshBasicMaterial color="#ff6b6b" />
-          </mesh>
+          {/* Where you are watching from — a bright marker plus a soft glow around
+              it, so it reads at a glance instead of disappearing as a single dot
+              against the grid. */}
+          <group position={geoToVec3(observer.lat, observer.lon, GLOBE_R * 1.006)}>
+            <mesh>
+              <sphereGeometry args={[GLOBE_R * 0.045, 16, 16]} />
+              <meshBasicMaterial color="#ff6b6b" />
+            </mesh>
+            <mesh>
+              <sphereGeometry args={[GLOBE_R * 0.09, 16, 16]} />
+              <meshBasicMaterial
+                color="#ff6b6b"
+                transparent
+                opacity={0.28}
+                depthWrite={false}
+                blending={THREE.AdditiveBlending}
+              />
+            </mesh>
+          </group>
         </group>
 
         {/* The Sun's ray and the subsolar point it plants between the tropics. */}

@@ -40,6 +40,7 @@ import {
   usePanchangaClock,
 } from "@/components/panchanga/use-panchanga-mode";
 import { LoadingState } from "@/components/ui/States";
+import { useInPanchangaTabsShell } from "@/components/panchanga/PanchangaTabsShell";
 import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { useLocale } from "@/lib/i18n";
 import {
@@ -65,6 +66,8 @@ function parseAdStr(s: string): Date {
 export default function PanchangaScreen() {
   const { pick } = useLocale();
   const { width, isTablet, isCompact } = useBreakpoint();
+  const inShell = useInPanchangaTabsShell();
+  const pagePadH = inShell ? 0 : PAGE_HORIZONTAL_PADDING;
   const splitSidebar = width >= PANCHANGA_SIDEBAR_SPLIT;
   const params = useLocalSearchParams<{ date?: string }>();
   const { location, setLocation, ready } = usePanchangaLocation();
@@ -118,16 +121,20 @@ export default function PanchangaScreen() {
 
   const headerToolbar = useMemo(
     () => (
-      <View className="flex-row items-center gap-1.5">
-        <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />
-        <LocationSelector location={location} onLocationChange={setLocation} />
+      <View className="flex-row flex-wrap items-center justify-end gap-1.5">
+        <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} />
+        <LocationSelector
+          location={location}
+          onLocationChange={setLocation}
+          className="max-w-[8rem]"
+        />
       </View>
     ),
     [dayCycleMode, location, setLocation],
   );
 
   const headerMobileToolbar = useMemo(
-    () => <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} size="md" />,
+    () => <DayCycleToggle mode={dayCycleMode} onModeChange={setDayCycleMode} />,
     [dayCycleMode],
   );
 
@@ -176,7 +183,7 @@ export default function PanchangaScreen() {
         className="flex-1 bg-background"
         contentContainerStyle={{
           paddingBottom: floatingNavBottomPadding(isTablet),
-          paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+          paddingHorizontal: pagePadH,
           paddingTop: isCompact ? 12 : 16,
         }}
       >
@@ -191,7 +198,7 @@ export default function PanchangaScreen() {
       contentContainerStyle={{
         paddingBottom: floatingNavBottomPadding(isTablet),
         paddingTop: isCompact ? 12 : 16,
-        paddingHorizontal: PAGE_HORIZONTAL_PADDING,
+        paddingHorizontal: pagePadH,
       }}
       showsVerticalScrollIndicator={false}
     >

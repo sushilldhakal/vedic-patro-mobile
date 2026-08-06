@@ -1,3 +1,5 @@
+import type { TextStyle, ViewStyle } from "react-native";
+import { NOTO_DEVANAGARI_REGULAR } from "./fonts";
 import { cn } from "./utils";
 
 /** Tabular monospace numerals (replaces legacy `.mono`). */
@@ -75,10 +77,50 @@ export const patroMonthChipButton =
   "cursor-pointer transition-[filter,transform,box-shadow] hover:brightness-[1.03] hover:shadow-md active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 export const patroMonthChipHead =
-  "truncate bg-secondary px-0.5 py-1.5 text-center text-sm font-bold leading-none tracking-wide text-secondary-foreground max-[512px]:text-xs sm:px-1 sm:py-1.5";
+  "min-w-0 w-full shrink bg-secondary px-0.5 sm:px-1";
+
+/** Era / month band — fixed 26px (web `h-[26px]`). */
+export const patroMonthChipHeadBoxStyle: ViewStyle = {
+  height: 26,
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+/** Year / day band — 32px default; month span `१-३१` uses 26px below sm (640px). */
+export function patroMonthChipBodyBoxStyle(opts?: {
+  narrow?: boolean;
+  monthSpan?: boolean;
+}): ViewStyle {
+  const narrowSpan = opts?.narrow && opts?.monthSpan;
+  return {
+    height: narrowSpan ? 26 : 32,
+    alignItems: "center",
+    justifyContent: "center",
+  };
+}
+
+export function patroMonthChipHeadLabelStyle(
+  useNepaliFont: boolean,
+  narrow?: boolean,
+): TextStyle {
+  return {
+    fontSize: narrow ? 12 : 14,
+    lineHeight: narrow ? 16 : 20,
+    textAlign: "center",
+    ...(useNepaliFont
+      ? { fontFamily: NOTO_DEVANAGARI_REGULAR, includeFontPadding: false }
+      : { includeFontPadding: false }),
+  };
+}
 
 export const patroMonthChipDay =
-  "flex min-h-md items-center justify-center bg-card pb-1 pt-1 text-sm font-bold leading-none text-foreground sm:min-h-[2rem] sm:pb-1 sm:text-base";
+  "flex items-center justify-center bg-card text-sm font-bold leading-none text-foreground sm:text-base";
+
+/**
+ * Month-span body (१-३१) — same 32px box as day chip.
+ */
+export const patroMonthChipSpan =
+  "flex items-center justify-center bg-card px-0.5 font-num text-xs font-bold leading-snug tracking-tight tabular-nums text-foreground sm:text-sm";
 
 /** Decorative calendar "body" line — month chip without a day numeral. */
 export const patroMonthChipLine =

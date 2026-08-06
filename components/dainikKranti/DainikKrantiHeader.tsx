@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { patroSegBtn } from "@/lib/patro-classes";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
+import type { SamvatsaraPayload } from "@/lib/samvatsara";
 import { type PanchangaLocation } from "@/lib/use-panchanga-location";
 
 export type PakshaFilter = "all" | "krishna" | "shukla";
@@ -29,6 +30,7 @@ type Props = {
   nextDisabled?: boolean;
   location: PanchangaLocation;
   onLocationChange: (location: PanchangaLocation) => void;
+  samvatsara?: SamvatsaraPayload | null;
 };
 
 function PakshaSegToggle({
@@ -93,6 +95,7 @@ export function DainikKrantiHeader({
   nextDisabled,
   location,
   onLocationChange,
+  samvatsara,
 }: Props) {
   const { pick, digits, lang } = useLocale();
   const { isCompact } = useBreakpoint();
@@ -122,8 +125,8 @@ export function DainikKrantiHeader({
       value={mobilePakshaDisplay}
       onChange={onPakshaChange}
       options={pakshaOptionsMobile}
-      className="w-full max-w-[10rem]"
-      buttonClassName="min-w-0 flex-1 px-2"
+      className="shrink-0"
+      buttonClassName="px-2.5"
     />
   );
 
@@ -157,6 +160,7 @@ export function DainikKrantiHeader({
         prevDisabled={prevDisabled}
         nextDisabled={nextDisabled}
         crossEraSubtitle={crossEraSubtitle}
+        samvatsara={samvatsara}
         location={location}
         onLocationChange={onLocationChange}
         mobileToolbar={isCompact ? pakshaToggleMobile : undefined}

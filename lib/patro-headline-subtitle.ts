@@ -114,6 +114,31 @@ export function patroHeadlineDigits(lang: string): (n: number | string) => strin
   return lang.slice(0, 2) === "en" ? String : toNepaliDigits;
 }
 
+const PATRO_PBBS_ABBR_NE = "पू.वि.सं.";
+const PATRO_PBBS_ABBR_EN = "PBBS";
+
+/** Positive browse-year label for URL era (web `formatBrowsePatroYear`). */
+export function formatBrowsePatroYear(
+  era: PatroBrowseEra,
+  year: number,
+  lang: string,
+  digits: (n: number | string) => string = String,
+): string {
+  if (!Number.isFinite(year) || year < 1) {
+    return digits("—");
+  }
+  const isEn = lang.slice(0, 2) === "en";
+  if (era === "ad") return digits(year);
+  if (era === "bc") {
+    return isEn ? `${digits(year)} BC` : `${digits(year)} ई.पू.`;
+  }
+  if (era === "bbs") {
+    const abbr = isEn ? PATRO_PBBS_ABBR_EN : PATRO_PBBS_ABBR_NE;
+    return `${abbr} ${digits(year)}`;
+  }
+  return isEn ? `BS ${digits(year)}` : `वि.सं. ${digits(year)}`;
+}
+
 /** Vikram year headline AD span (web `formatPatroYearGregorianRange`). */
 export function formatPatroYearGregorianRange(
   startIso: string,

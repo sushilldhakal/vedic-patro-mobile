@@ -17,6 +17,12 @@ export interface PanchakPeriod {
   durationEn: string;
 }
 
+function panchakMomentAd(moment: PanchakPeriodResponse["start"]): string {
+  if (moment.iso) return moment.iso.slice(0, 10);
+  if (moment.date_ad) return moment.date_ad.slice(0, 10);
+  return `${moment.bs_year}-${moment.bs_month}-${moment.bs_day}`;
+}
+
 export function mapPanchakPeriod(row: PanchakPeriodResponse): PanchakPeriod {
   return {
     start: {
@@ -25,7 +31,7 @@ export function mapPanchakPeriod(row: PanchakPeriodResponse): PanchakPeriod {
       bsDay: row.start.bs_day,
       timeNe: row.start.time_ne,
       timeEn: row.start.time_en,
-      ad: row.start.date_ad,
+      ad: panchakMomentAd(row.start),
     },
     end: {
       bsYear: row.end.bs_year,
@@ -33,7 +39,7 @@ export function mapPanchakPeriod(row: PanchakPeriodResponse): PanchakPeriod {
       bsDay: row.end.bs_day,
       timeNe: row.end.time_ne,
       timeEn: row.end.time_en,
-      ad: row.end.date_ad,
+      ad: panchakMomentAd(row.end),
     },
     durationNe: row.duration_ne,
     durationEn: row.duration_en,

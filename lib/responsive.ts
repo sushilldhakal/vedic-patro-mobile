@@ -28,6 +28,7 @@ export function useBreakpoint() {
     isPhone: bp === "phone" || bp === "largePhone",
     isTablet: bp === "tablet" || bp === "desktop",
     isCompact: width < BREAKPOINTS.md,
+    isNarrow: width < BREAKPOINTS.sm,
     isCalendarWide: width >= BREAKPOINTS.calendarWide,
     columns: width >= BREAKPOINTS.lg ? 2 : 1,
     calendarCellSize:

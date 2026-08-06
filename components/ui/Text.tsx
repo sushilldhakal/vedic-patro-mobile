@@ -35,7 +35,7 @@ export function Text({ className, style, ...props }: Props) {
   return (
     <RNText
       {...props}
-      className={cn(className)}
+      className={cn("font-sans", className)}
       style={[color ? { color } : undefined, style]}
     />
   );

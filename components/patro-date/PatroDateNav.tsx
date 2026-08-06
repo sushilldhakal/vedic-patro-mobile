@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
-import { BsMonthYearNav, BsNativeSelect } from "@/components/ui/BsNativeSelect";
 import {
   BS_MONTH_NAMES,
   BS_MONTHS_NE,
@@ -17,12 +16,20 @@ import {
   bsMonthLabel,
 } from "@/lib/patro-month-labels";
 import { isGregorianBrowseEra, type PatroBrowseEra } from "@/lib/patro-era";
-import { browseYearSelectOptions } from "@/lib/patro-browse-years";
 import { resolveSamvatsaraForPatroYear, type SamvatsaraPayload } from "@/lib/samvatsara";
 import { displayLocationLabel, DEFAULT_PANCHANGA_LOCATION, type PanchangaLocation } from "@/lib/use-panchanga-location";
 import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
+import {
+  patroMonthChipDay,
+  patroMonthChipHead,
+  patroMonthChipHeadBoxStyle,
+  patroMonthChipBodyBoxStyle,
+  patroMonthChipHeadLabelStyle,
+  patroMonthChipShell,
+  patroMonthChipSpan,
+} from "@/lib/patro-classes";
 import { parseClockParts } from "@/components/panchanga/use-panchanga-mode";
 import { PatroBsHeadline } from "./PatroBsHeadline";
 import { PatroDateSheet } from "./PatroDateSheet";
@@ -30,7 +37,6 @@ import type { PatroDateSheetDraft } from "./PatroDateSheetDatePanel";
 import { patroEraShortLabel } from "./patro-era-labels";
 import type { PatroDateNavProps } from "./types";
 import { usePatroDateSheet } from "./use-patro-date-sheet";
-import { stepPatroBrowseYear } from "@/lib/patro-year-browse-step";
 
 function chipMonthLabel(month: number, lang: string, era: PatroBrowseEra): string {
   if (isGregorianBrowseEra(era)) {
@@ -148,7 +154,7 @@ export function PatroDateNav(props: PatroDateNavProps) {
 
   const colors = useThemeColors();
   const { pick, digits, lang } = useLocale();
-  const { isCompact, isPhone } = useBreakpoint();
+  const { isCompact, isPhone, isNarrow } = useBreakpoint();
   const sheet = usePatroDateSheet();
 
   const safeLocation = location ?? DEFAULT_PANCHANGA_LOCATION;
@@ -160,10 +166,6 @@ export function PatroDateNav(props: PatroDateNavProps) {
   const todayAd = mode === "year-month-time" ? props.todayAd : undefined;
 
   const monthOptions = useMemo(() => buildMonthOptions(era, lang), [era, lang]);
-  const yearSelectOptions = useMemo(
-    () => browseYearSelectOptions(era, year, digits),
-    [era, year, digits],
-  );
 
   const eraShort = patroEraShortLabel(era, pick);
   const headlineEra = vikramEra ?? era;
@@ -206,7 +208,7 @@ export function PatroDateNav(props: PatroDateNavProps) {
       : null;
 
   const dateChipLabel = (() => {
-    if (mode === "year") return `${digits(year)} ${eraShort}`;
+    if (mode === "year") return digits(year);
     if (mode === "year-month") {
       return monthTitleShort ?? monthTitle ?? "";
     }
@@ -236,61 +238,67 @@ export function PatroDateNav(props: PatroDateNavProps) {
     }
   };
 
-  const stepYearInline = (dir: "prev" | "next") => {
-    onYearChange(stepPatroBrowseYear(era, year, dir));
-  };
-
   const todayChip = (
     <Pressable
       onPress={onToday}
       accessibilityLabel={pick("आज", "Today")}
       className={cn(
-        "shrink-0 overflow-hidden rounded-[8px] border border-border bg-card shadow-sm active:opacity-90 sm:rounded-[10px]",
-        mode === "year"
-          ? isPhone
-            ? "w-10"
-            : "w-[3.25rem]"
-          : "min-w-[3.25rem] w-[3.25rem] sm:w-[3.75rem]",
+        patroMonthChipShell,
+        "shrink-0 overflow-hidden active:opacity-90",
+        mode === "year" && "w-[2.85rem] sm:w-[3.75rem]",
       )}
     >
       {mode === "year" ? (
         <>
-          <View className="bg-secondary px-0.5 py-1.5 sm:px-1">
+          <View className={patroMonthChipHead} style={patroMonthChipHeadBoxStyle}>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.65}
-              className="text-center text-[11px] font-bold leading-none tracking-wide text-secondary-foreground sm:text-sm"
-              style={nepaliTextStyle(isPhone ? 11 : 14)}
+              className="w-full text-center font-bold tracking-wide text-secondary-foreground"
+              style={patroMonthChipHeadLabelStyle(lang !== "en", isNarrow)}
             >
               {eraShort}
             </Text>
           </View>
-          <View className="min-h-[2rem] items-center justify-center bg-card px-1 py-1">
-            <Text className="font-num text-xs font-bold leading-none text-foreground sm:text-sm">
+          <View className={patroMonthChipDay} style={patroMonthChipBodyBoxStyle({ narrow: isNarrow })}>
+            <Text className="font-num text-sm font-bold leading-none text-foreground sm:text-base">
               {digits(year)}
             </Text>
           </View>
         </>
       ) : (
         <>
-          <View className="bg-secondary px-1 py-1">
+          <View className={patroMonthChipHead} style={patroMonthChipHeadBoxStyle}>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.55}
-              className="text-center text-[10px] font-bold leading-tight tracking-wide text-secondary-foreground sm:text-[11px]"
-              style={nepaliTextStyle(10)}
+              minimumFontScale={0.6}
+              className="w-full text-center font-bold tracking-wide text-secondary-foreground"
+              style={patroMonthChipHeadLabelStyle(lang !== "en", isNarrow)}
             >
               {chipMonthLabel(month, lang, era)}
             </Text>
           </View>
-          <View className="min-h-[2rem] min-w-full items-center justify-center bg-card px-1 py-1.5">
+          <View
+            className={
+              mode === "year-month-time" ? patroMonthChipDay : patroMonthChipSpan
+            }
+            style={patroMonthChipBodyBoxStyle({
+              narrow: isNarrow,
+              monthSpan: mode === "year-month",
+            })}
+          >
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
-              className="font-num text-[11px] font-bold leading-snug text-foreground sm:text-sm"
+              className={cn(
+                "font-num font-bold text-foreground",
+                mode === "year-month-time"
+                  ? "text-sm leading-none sm:text-base"
+                  : "text-xs leading-snug tracking-tight sm:text-sm",
+              )}
             >
               {mode === "year-month-time" ? digits(day) : monthChipSpan(year, month, era, digits)}
             </Text>
@@ -301,14 +309,26 @@ export function PatroDateNav(props: PatroDateNavProps) {
   );
 
   /** Year + era + samvatsara + AD range — one baseline row (web `BsHeadline`). */
-  const headlineMeta = (compact: boolean) => (
-    <PatroBsHeadline
-      compact={compact}
-      bs={`${digits(year)} ${patroEraShortLabel(headlineEra, pick)}`}
-      samvatsara={samvatsaraLabel}
-      gregorian={crossEraSubtitle}
-    />
-  );
+  const headlineMeta = (compact: boolean) => {
+    const size = compact ? 14 : 20;
+    const secondary = { color: colors.secondary };
+    const bsPart = (
+      <Text className="font-semibold text-secondary" style={[nepaliTextStyle(size), secondary]}>
+        <Text className="font-num" style={secondary}>
+          {digits(year)}
+        </Text>
+        {` ${patroEraShortLabel(headlineEra, pick)}`}
+      </Text>
+    );
+    return (
+      <PatroBsHeadline
+        compact={compact}
+        bs={bsPart}
+        samvatsara={samvatsaraLabel}
+        gregorian={crossEraSubtitle}
+      />
+    );
+  };
 
   const headlineCompact = headlineMeta(true);
   const headlineTablet = headlineMeta(false);
@@ -336,7 +356,10 @@ export function PatroDateNav(props: PatroDateNavProps) {
     mobileToolbarLower ?? (!hideNavLocation ? locationChip : null);
 
   const navControlsPhone = (
-    <View className="-mt-1 min-w-0 flex-1 flex-row items-center gap-1">
+    <View
+      className="min-w-0 flex-1 flex-row items-center gap-1"
+      style={isNarrow ? { marginTop: -8 } : undefined}
+    >
       {onPrev ? <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" compact={isPhone} /> : null}
       {dateChip}
       {onNext ? <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" compact={isPhone} /> : null}
@@ -344,48 +367,41 @@ export function PatroDateNav(props: PatroDateNavProps) {
   );
 
   const navRowPhone = resolvedToolbarLower ? (
-    <View className="-mt-1 flex-row items-start gap-2">
+    <View className="flex-row items-start gap-2">
       {navControlsPhone}
       <View className="shrink-0 items-end justify-end self-start">{resolvedToolbarLower}</View>
     </View>
   ) : (
-    <View className="-mt-1 flex-row items-center justify-between gap-2">
+    <View className="flex-row items-center justify-between gap-2">
       {navControlsPhone}
       {!hideNavLocation ? locationChip : null}
     </View>
   );
 
+  const usesSheetPicker = mode === "year" || mode === "year-month";
+
   const navRowTablet = (
-    <View className="-mt-1 flex-row items-center justify-between gap-2">
+    <View className="mt-1.5 flex-row items-center justify-between gap-2">
       <View className="min-w-0 flex-1 flex-row items-center gap-1">
-        {onPrev ? <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" /> : null}
-        {mode === "year" ? (
+        {onPrev && !usesSheetPicker ? (
+          <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" />
+        ) : null}
+        {usesSheetPicker ? (
           <View className="flex-row items-center gap-1">
-            <StepBtn disabled={false} onPress={() => stepYearInline("prev")} icon="chevron-back" />
-            <BsNativeSelect
-              value={year}
-              options={yearSelectOptions}
-              onChange={onYearChange}
-              ariaLabel={pick("वर्ष", "Year")}
-              minWidth={72}
-            />
-            <StepBtn disabled={false} onPress={() => stepYearInline("next")} icon="chevron-forward" />
+            {onPrev ? (
+              <StepBtn disabled={prevDisabled} onPress={onPrev} icon="chevron-back" />
+            ) : null}
+            {dateChip}
+            {onNext ? (
+              <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" />
+            ) : null}
           </View>
-        ) : mode === "year-month" ? (
-          <BsMonthYearNav
-            month={month}
-            year={year}
-            monthOptions={monthOptions}
-            yearOptions={yearSelectOptions}
-            onMonthChange={props.onMonthChange}
-            onYearChange={onYearChange}
-            monthMinWidth={lang === "en" ? 76 : 88}
-            yearMinWidth={72}
-          />
         ) : (
           dateChip
         )}
-        {onNext ? <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" /> : null}
+        {onNext && !usesSheetPicker ? (
+          <StepBtn disabled={nextDisabled} onPress={onNext} icon="chevron-forward" />
+        ) : null}
       </View>
       {!hideNavLocation ? locationChip : null}
     </View>
@@ -397,27 +413,28 @@ export function PatroDateNav(props: PatroDateNavProps) {
         {onToday ? <View className="self-center">{todayChip}</View> : null}
         <View className="min-w-0 flex-1">
           {isCompact ? (
-            <View className="gap-0.5">
-              <View className="flex-row items-center justify-between gap-2">
-                <View className="min-w-0 flex-1 self-center">{headlineCompact}</View>
+            <View className="gap-1.5">
+              <View className="flex-row items-start gap-2">
+                <View className="min-w-0 flex-1 shrink">{headlineCompact}</View>
                 {mobileToolbar ? (
-                  <View className="h-[30px] shrink-0 flex-row items-center justify-end self-start [&>*]:h-full">
+                  <View className="h-[30px] shrink-0 items-center justify-end self-start">
                     {mobileToolbar}
-                  </View>
-                ) : toolbar ? (
-                  <View className="h-[30px] shrink-0 flex-row items-center justify-end gap-1.5">
-                    {toolbar}
                   </View>
                 ) : null}
               </View>
+              {!mobileToolbar && toolbar ? (
+                <View className="flex-row justify-end">{toolbar}</View>
+              ) : null}
               {navRowPhone}
             </View>
           ) : (
             <>
-              <View className="flex-row items-start justify-between gap-2">
-                <View className="min-w-0 flex-1">{headlineTablet}</View>
+              <View className="relative z-10 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                <View className="min-w-0 flex-1 shrink">{headlineTablet}</View>
                 {toolbar ? (
-                  <View className="shrink-0 flex-row items-center gap-1.5">{toolbar}</View>
+                  <View className="shrink-0 flex-row flex-wrap items-center justify-end gap-1.5">
+                    {toolbar}
+                  </View>
                 ) : null}
               </View>
               {navRowTablet}

@@ -328,6 +328,8 @@ export function TableRow({
   children,
   className,
   borderTop = true,
+  accessibilityLabel,
+  accessibilityState,
 }: {
   rowIndex: number;
   highlight?: boolean;
@@ -336,6 +338,8 @@ export function TableRow({
   className?: string;
   /** @default true — first body row still uses border-t to separate from header */
   borderTop?: boolean;
+  accessibilityLabel?: string;
+  accessibilityState?: { expanded?: boolean; selected?: boolean; disabled?: boolean };
 }) {
   const colors = useThemeColors();
   const { isDark } = useTheme();
@@ -344,7 +348,14 @@ export function TableRow({
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={style} className={cn(rowClass, "active:opacity-80")}>
+      <Pressable
+        onPress={onPress}
+        style={style}
+        className={cn(rowClass, "active:opacity-80")}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={accessibilityState}
+      >
         {children}
       </Pressable>
     );

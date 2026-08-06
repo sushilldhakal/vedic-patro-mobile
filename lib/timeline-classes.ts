@@ -4,16 +4,16 @@ export const pgxNightwash =
   "fill-[color-mix(in_srgb,var(--brand-teal)_7%,transparent)] dark:fill-[color-mix(in_srgb,var(--foreground)_8%,transparent)]";
 
 export const pgxScaleLabel =
-  "fill-muted-foreground text-sm font-semibold [font-family:Mukta,sans-serif]";
+  "fill-muted-foreground text-sm font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export function pgxScaleLabelDim(dim?: boolean) {
   return cn(pgxScaleLabel, dim && "opacity-75");
 }
 
-export const pgxHour = "fill-foreground text-xs font-semibold [font-family:Mukta,sans-serif]";
+export const pgxHour = "fill-foreground text-xs font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgxGhati =
-  "fill-muted-foreground text-xs [font-family:Mukta,sans-serif]";
+  "fill-muted-foreground text-xs [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgxSunline = "stroke-border [stroke-width:1]";
 
@@ -63,10 +63,10 @@ export function pgxSeg(
 }
 
 export const pgxSegname =
-  "fill-foreground text-sm font-semibold [font-family:Mukta,sans-serif]";
+  "fill-foreground text-sm font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgxSegnameSm =
-  "fill-foreground text-sm font-semibold tracking-tight [font-family:Mukta,sans-serif]";
+  "fill-foreground text-sm font-semibold tracking-tight [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export function pgxSegnameCho(bad?: boolean) {
   return cn(pgxSegname, "text-xs", bad && "fill-[var(--color-danger)]");
@@ -74,14 +74,14 @@ export function pgxSegnameCho(bad?: boolean) {
 
 /** Inauspicious (अशुभ) band label — danger-tinted, slightly smaller. */
 export const pgxSegnameBad =
-  "fill-[var(--color-danger)] text-sm font-semibold [font-family:Mukta,sans-serif]";
+  "fill-[var(--color-danger)] text-sm font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 /** Auspicious (शुभ) band label — success-tinted. */
 export const pgxSegnameGood =
-  "fill-[var(--color-success)] text-sm font-semibold [font-family:Mukta,sans-serif]";
+  "fill-[var(--color-success)] text-sm font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgxPaksha =
-  "fill-muted-foreground text-sm text-base [font-family:Mukta,sans-serif]";
+  "fill-muted-foreground text-sm text-base [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgxArrow =
   "[&_line]:stroke-[var(--brand-teal)] [&_line]:[stroke-width:1.6] [&_line]:stroke-round [&_path]:fill-[var(--brand-teal)] dark:[&_line]:stroke-[var(--brand-yellow)] dark:[&_path]:fill-[var(--brand-yellow)]";
@@ -89,7 +89,7 @@ export const pgxArrow =
 export const pgxArrowBound =
   "stroke-[var(--brand-teal)] [stroke-width:1.3] opacity-100 dark:stroke-[var(--brand-yellow)]";
 
-export const pgxTime = "fill-foreground text-xs [font-family:Mukta,sans-serif]";
+export const pgxTime = "fill-foreground text-xs [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export function pgxTimeLagna(lagna?: boolean) {
   return cn(pgxTime, lagna && "opacity-90");
@@ -100,7 +100,7 @@ export const pgxNowLine = "stroke-[var(--color-danger)] [stroke-width:1.4]";
 export const pgxNowPill = "fill-[var(--color-danger)]";
 
 export const pgxNowText =
-  "fill-white text-xs font-semibold [font-family:Mukta,sans-serif]";
+  "fill-white text-xs font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgTlVgridMajor =
   "pointer-events-none stroke-[color-mix(in_srgb,#0000007a_28%,#d1d1d157)] dark:stroke-[color-mix(in_srgb,#ffffff55_28%,#04253e50)] [stroke-width:1] [stroke-dasharray:3_4]";
@@ -120,17 +120,17 @@ export const pgTlSunHorizon =
 export const pgTlMoonEmoji = "text-base";
 
 export const pgTlEventTime =
-  "fill-[var(--color-warning)] text-xs font-semibold [font-family:Mukta,sans-serif]";
+  "fill-[var(--color-warning)] text-xs font-semibold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export function pgTlEventTimeMoon(moon?: boolean) {
   return cn(pgTlEventTime, moon && "fill-muted-foreground");
 }
 
 export const pgTlRowlabel =
-  "fill-foreground text-xs font-bold [font-family:Mukta,sans-serif]";
+  "fill-foreground text-xs font-bold [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 export const pgTlRowlabelEn =
-  "fill-muted-foreground text-sm font-semibold uppercase tracking-wide [font-family:Mukta,sans-serif]";
+  "fill-muted-foreground text-sm font-semibold uppercase tracking-wide [font-family:Noto_Sans_Devanagari,sans-serif]";
 
 const ROW_LINES = [
   "stroke-[color-mix(in_srgb,var(--brand-teal)_22%,transparent)]",

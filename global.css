@@ -74,12 +74,12 @@
   --brand-green: #2e7d32;
   --brand-teal: #0b565a;
   --brand-yellow: var(--brand-gold);
-  --pn-num: "Fira Code", monospace;
+  --pn-num: "Noto Sans Devanagari", sans-serif;
 }
 
 .pn-wheel {
   --pn-font: var(--font-sans);
-  --pn-num: "Fira Code", monospace;
+  --pn-num: "Noto Sans Devanagari", sans-serif;
   --pn-ring-soft: color-mix(in srgb, #8fbfc1 18%, transparent);
   --w-sky-0: #112c2a;
   --w-sky-1: #0a1a1b;

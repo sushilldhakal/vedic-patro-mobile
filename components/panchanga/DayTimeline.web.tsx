@@ -17,13 +17,14 @@ import {
 import { useLocale } from "@/lib/i18n";
 import { patroCard, patroMdRail, patroMono, patroSecBand, patroSkel } from "@/lib/patro-classes";
 import { cn } from "@/lib/utils";
+import { DayCycleToggle, type DayCycleMode } from "@/components/panchanga/DayCycleToggle";
+import { SUNRISE_ICON_PATH, SUNRISE_ICON_VIEWBOX } from "@/lib/sunrise-icon-art";
 import {
   pgTlAxis,
   pgTlEventTimeMoon,
   pgTlMoonEmoji,
   pgTlRowline,
   pgTlSunDisc,
-  pgTlSunHorizon,
   pgTlTick,
   pgTlVgridMajor,
   pgxArrow,
@@ -169,51 +170,18 @@ interface Props {
   /** Civil (midnight→midnight) timeline — only used in Calendar Day mode. */
   civil?: CivilTimeline;
   civilLoading?: boolean;
-}
-
-export type DayCycleMode = "Day-Night" | "Calendar Day";
-
-function DayCycleToggle({
-  mode,
-  onModeChange,
-}: {
-  mode: DayCycleMode;
-  onModeChange?: (mode: DayCycleMode) => void;
-}) {
-  const { pick } = useLocale();
-  const options: Array<{ value: DayCycleMode; ne: string; en: string }> = [
-    { value: "Day-Night", ne: "अहोरात्र", en: "Day-Night" },
-    { value: "Calendar Day", ne: "दिन-रात", en: "Calendar Day" },
-  ];
-  return (
-    <div className="inline-flex overflow-hidden rounded-md border border-border" role="radiogroup" aria-label={pick("दिन सीमा", "Day boundary")}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={mode === o.value}
-          onClick={() => onModeChange?.(o.value)}
-          className={cn(
-            "px-2 py-0.5 text-sm font-semibold transition-colors",
-            mode === o.value
-              ? "bg-primary text-primary-foreground"
-              : "bg-card hover:bg-surface-hover",
-          )}
-        >
-          {pick(o.ne, o.en)}
-        </button>
-      ))}
-    </div>
-  );
+  /** Hide in-chart toggle when the page header already has one. */
+  showToggle?: boolean;
 }
 
 function DayTimelineBand({
   mode,
   onModeChange,
+  showToggle = true,
 }: {
   mode: DayCycleMode;
   onModeChange?: (mode: DayCycleMode) => void;
+  showToggle?: boolean;
 }) {
   const { pick } = useLocale();
   const subtitle =
@@ -235,7 +203,7 @@ function DayTimelineBand({
           <i className="inline-block h-2.5 w-2.5 rounded-[3px] bg-secondary/22 not-italic" />
           {pick("रात", "Night")}
         </span>
-        <DayCycleToggle mode={mode} onModeChange={onModeChange} />
+        {showToggle ? <DayCycleToggle mode={mode} onModeChange={onModeChange} /> : null}
       </span>
     </div>
   );
@@ -274,6 +242,7 @@ export function DayTimeline({
   onModeChange,
   civil,
   civilLoading = false,
+  showToggle = true,
 }: Props) {
   const { pick, digits, lang } = useLocale();
   const isCivil = mode === "Calendar Day";
@@ -300,7 +269,7 @@ export function DayTimeline({
   if (busy) {
     return (
       <div className={cn(patroCard, patroMdRail)} aria-busy={busy}>
-        <DayTimelineBand mode={mode} onModeChange={onModeChange} />
+        <DayTimelineBand mode={mode} onModeChange={onModeChange} showToggle={showToggle} />
         <div className={cn("w-full", "max-w-full", "overflow-hidden", "pl-1", "pr-2", "pt-3", "pb-1")}>
           <div className={cn(patroSkel, "w-full")} style={{ minHeight: 320 }} />
         </div>
@@ -412,7 +381,7 @@ export function DayTimeline({
 
   return (
     <div className={cn(patroCard, patroMdRail)}>
-      <DayTimelineBand mode={mode} onModeChange={onModeChange} />
+      <DayTimelineBand mode={mode} onModeChange={onModeChange} showToggle={showToggle} />
 
       <div className="relative">
         <div className={cn("w-full", "max-w-full", "overflow-x-auto", "overscroll-x-contain", "pl-1", "pr-2", "pt-3", "pb-1")}>
@@ -690,7 +659,7 @@ export function DayTimeline({
           {tracks.map((tr, ti) => (
             <span
               key={tr.key}
-              className="absolute right-1.5 -translate-y-1/2 whitespace-nowrap text-sm font-bold leading-none text-foreground [font-family:Mukta,sans-serif] sm:text-sm"
+              className="absolute right-1.5 -translate-y-1/2 whitespace-nowrap text-sm font-bold leading-none text-foreground [font-family:Noto Sans Devanagari,sans-serif] sm:text-sm"
               style={{ top: `${((trackY(ti) + BAND / 2) / H) * 100}%` }}
             >
               {tr.ne}
@@ -878,11 +847,11 @@ function PeriodCards({
               >
                 {it.n}
               </span>
-              <span className="min-w-0 text-sm font-semibold leading-snug [font-family:Mukta,sans-serif]">
+              <span className="min-w-0 text-sm font-semibold leading-snug [font-family:Noto Sans Devanagari,sans-serif]">
                 {it.label}
               </span>
             </div>
-            <span className="mt-auto text-sm font-semibold tabular-nums [font-family:Mukta,sans-serif]">
+            <span className="mt-auto text-sm font-semibold tabular-nums [font-family:Noto Sans Devanagari,sans-serif]">
               {it.time}
             </span>
           </li>
@@ -908,15 +877,27 @@ function TransitionArrow({ x2, y }: { x2: number; y: number }) {
 }
 
 function SunHalfIcon({ x, y, variant }: { x: number; y: number; variant: "rise" | "set" }) {
-  const arc =
-    variant === "rise"
-      ? `M ${x - SUN_R} ${y} A ${SUN_R} ${SUN_R} 0 0 1 ${x + SUN_R} ${y} Z`
-      : `M ${x - SUN_R} ${y} A ${SUN_R} ${SUN_R} 0 0 0 ${x + SUN_R} ${y} Z`;
+  const { w: vbW, h: vbH } = SUNRISE_ICON_VIEWBOX;
+  const width = SUN_R * 2 + 10;
+  const scale = width / vbW;
+  const h = vbH * scale;
+  const left = x - width / 2;
+  const top = variant === "rise" ? y - h : y;
+  const cx = vbW / 2;
+  const cy = vbH / 2;
+  const inner =
+    variant === "set"
+      ? `rotate(180 ${cx} ${cy})`
+      : undefined;
 
   return (
-    <g aria-hidden>
-      <line x1={x - SUN_R - 3} y1={y} x2={x + SUN_R + 3} y2={y} className={pgTlSunHorizon} />
-      <path d={arc} className={pgTlSunDisc} />
+    <g
+      aria-hidden
+      transform={`translate(${left}, ${top}) scale(${scale})`}
+    >
+      <g transform={inner}>
+        <path d={SUNRISE_ICON_PATH} className={pgTlSunDisc} />
+      </g>
     </g>
   );
 }

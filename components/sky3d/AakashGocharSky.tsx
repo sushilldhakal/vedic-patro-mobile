@@ -73,6 +73,7 @@ const LABEL_COLOR = {
   poleStar: "#cfe0ff",
   asterism: "#e6efff",
   tropic: "#e2d264",
+  observer: "#ff6b6b",
   hud: "#ffffff",
   hudDim: "rgba(255,255,255,0.72)",
   overlayText: "rgba(236,242,244,0.88)",
@@ -295,6 +296,12 @@ export function AakashGocharSky({
   const sunLongitude = sample?.sky.sun.longitude;
   const sunSpeed = sample?.sky.sun.speedDegPerDay;
 
+  /* Rashi/nakshatra text grows past its base size once the camera pulls back
+     beyond the mode's own default framing — capped so it never swamps the
+     screen at the very widest zoom. */
+  const modeBaseline = mode === "space" ? SYSTEM_DISTANCE : mode === "globe" ? GLOBE_VIEW : HORIZON_WIDE;
+  const labelScale = sample ? Math.min(2.4, Math.max(1, sample.zoomDistance / modeBaseline)) : 1;
+
   /**
    * The place's offset from UT, taken once at the date the page is on.
    *
@@ -473,27 +480,6 @@ export function AakashGocharSky({
         compact={fullscreen}
       />
       <Chip
-        active={toggles.poleStars}
-        label={pick("ध्रुव तारा", "Pole stars")}
-        onPress={() => setToggles((t) => ({ ...t, poleStars: !t.poleStars }))}
-        overlay={fullscreen}
-        compact={fullscreen}
-      />
-      <Chip
-        active={toggles.tilt}
-        label={pick("अक्ष झुकाव", "Axial tilt")}
-        onPress={() => setToggles((t) => ({ ...t, tilt: !t.tilt }))}
-        overlay={fullscreen}
-        compact={fullscreen}
-      />
-      <Chip
-        active={toggles.grid}
-        label={pick("दिक् ग्रिड", "Alt-az grid")}
-        onPress={() => setToggles((t) => ({ ...t, grid: !t.grid }))}
-        overlay={fullscreen}
-        compact={fullscreen}
-      />
-      <Chip
         active={toggles.lockStars}
         label={pick("तारा स्थिर", "Lock to stars")}
         onPress={() => setToggles((t) => ({ ...t, lockStars: !t.lockStars }))}
@@ -530,7 +516,7 @@ export function AakashGocharSky({
 
         {/* Labels ride over the canvas rather than in it — real Devanagari type,
             positioned from the scene's own projection of each anchor. */}
-        {toggles.labels && sample ? <SkyLabels labels={sample.labels} /> : null}
+        {toggles.labels && sample ? <SkyLabels labels={sample.labels} scale={labelScale} /> : null}
 
         {/* HUD — the simulated instant, which drifts away from the nav once it runs. */}
         <View
@@ -657,75 +643,64 @@ export function AakashGocharSky({
           </>
         )}
       </View>
+
+      {/* An in-tree overlay, not its own Modal: a second RN-Web Modal stacked on
+          top of the fullscreen one let taps punch through to whatever sat at the
+          same screen position underneath (Done landing on the ✕ button or a view
+          chip beneath it). Living inside `body` instead, it shares the
+          fullscreen modal's own theme context, so nothing needs re-applying. */}
+      {datePickerOpen ? (
+        <View
+          className="absolute inset-0 items-center justify-center bg-black/60 px-4"
+          style={{ zIndex: 50 }}
+        >
+          <Pressable
+            className="absolute inset-0"
+            onPress={() => setDatePickerOpen(false)}
+            accessibilityLabel={pick("बन्द गर्नुहोस्", "Close")}
+          />
+          <View className="w-full max-w-sm rounded-2xl border border-border bg-card p-4">
+            <BsDateTimePicker
+              year={dateBs.year}
+              month={dateBs.month}
+              day={dateBs.day}
+              yearOptions={windowedBrowseYears("bs", dateBs.year)}
+              todayAd={todayAd}
+              onSelectDate={(y, m, d) => onDateChange?.(bsToAD(y, m, d))}
+              monthAriaLabel={pick("महिना", "Month")}
+              yearAriaLabel={pick("वर्ष", "Year")}
+              clock={clock}
+              onClockChange={onClockChange}
+              hourAriaLabel={pick("घण्टा", "Hour")}
+              minuteAriaLabel={pick("मिनेट", "Minute")}
+              showTime={Boolean(onClockChange)}
+              onDone={() => setDatePickerOpen(false)}
+            />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
-  /* Its own modal, not the outer PatroDateNav's sheet — that sheet lives above
-     the canvas and is unreachable once the sky is fullscreen. Like the
-     fullscreen modal below, this one renders outside the provider tree, so the
-     theme tokens are re-applied here too. */
-  const datePicker = datePickerOpen ? (
-    <Modal visible transparent animationType="fade" onRequestClose={() => setDatePickerOpen(false)}>
-      <View
-        className={cn("flex-1 items-center justify-center bg-black/60 px-4", isDark && "dark")}
-        style={nativeWindThemeVars(isDark ? "dark" : "light")}
-      >
-        <Pressable
-          className="absolute inset-0"
-          onPress={() => setDatePickerOpen(false)}
-          accessibilityLabel={pick("बन्द गर्नुहोस्", "Close")}
-        />
-        <View className="w-full max-w-sm rounded-2xl border border-border bg-card p-4">
-          <BsDateTimePicker
-            year={dateBs.year}
-            month={dateBs.month}
-            day={dateBs.day}
-            yearOptions={windowedBrowseYears("bs", dateBs.year)}
-            todayAd={todayAd}
-            onSelectDate={(y, m, d) => onDateChange?.(bsToAD(y, m, d))}
-            monthAriaLabel={pick("महिना", "Month")}
-            yearAriaLabel={pick("वर्ष", "Year")}
-            clock={clock}
-            onClockChange={onClockChange}
-            hourAriaLabel={pick("घण्टा", "Hour")}
-            minuteAriaLabel={pick("मिनेट", "Minute")}
-            showTime={Boolean(onClockChange)}
-            onDone={() => setDatePickerOpen(false)}
-          />
-        </View>
-      </View>
-    </Modal>
-  ) : null;
-
-  if (!fullscreen) {
-    return (
-      <>
-        {body}
-        {datePicker}
-      </>
-    );
-  }
+  if (!fullscreen) return body;
 
   return (
-    <>
-      <Modal
-        visible
-        animationType="fade"
-        supportedOrientations={["portrait", "landscape"]}
-        onRequestClose={() => setFullscreen(false)}
+    <Modal
+      visible
+      animationType="fade"
+      supportedOrientations={["portrait", "landscape"]}
+      onRequestClose={() => setFullscreen(false)}
+    >
+      {/* A modal renders outside the provider tree, so the theme tokens have to
+          be re-applied here or every chip loses its colours. The scene is
+          remounted too, but its textures come back out of the loader cache. */}
+      <View
+        className={cn("flex-1 bg-background", isDark && "dark")}
+        style={nativeWindThemeVars(isDark ? "dark" : "light")}
       >
-        {/* A modal renders outside the provider tree, so the theme tokens have to
-            be re-applied here or every chip loses its colours. The scene is
-            remounted too, but its textures come back out of the loader cache. */}
-        <View
-          className={cn("flex-1 bg-background", isDark && "dark")}
-          style={nativeWindThemeVars(isDark ? "dark" : "light")}
-        >
-          {body}
-        </View>
-      </Modal>
-      {datePicker}
-    </>
+        {body}
+      </View>
+    </Modal>
   );
 }
 
@@ -753,7 +728,16 @@ function formatPoleYear(
   return bs < 0 ? `${abs} बि.सं. पूर्व` : `${abs} बि.सं.`;
 }
 
-const SkyLabels = memo(function SkyLabels({ labels }: { labels: ScreenLabel[] }) {
+const SkyLabels = memo(function SkyLabels({
+  labels,
+  scale = 1,
+}: {
+  labels: ScreenLabel[];
+  /** Grows the rashi/nakshatra belt text as the camera pulls back — a fixed
+      pixel size reads fine close up but disappears against the wider view
+      once the belt has shrunk to a small ring in the middle of the screen. */
+  scale?: number;
+}) {
   const { lang, pick, digits } = useLocale();
 
   return (
@@ -761,16 +745,19 @@ const SkyLabels = memo(function SkyLabels({ labels }: { labels: ScreenLabel[] })
       {labels.map((label) => {
         if (label.kind === "rashi" && label.index) {
           const Icon = RASHI_ICONS[label.index - 1];
+          const iconSize = 22 * scale;
+          const boxWidth = 76 * scale;
+          const fontSize = 14 * scale;
           return (
             <View
               key={label.id}
-              style={{ position: "absolute", left: label.x - 34, top: label.y - 12, width: 68 }}
+              style={{ position: "absolute", left: label.x - boxWidth / 2, top: label.y - 12 * scale, width: boxWidth }}
               className="items-center"
             >
-              <Icon width={16} height={16} color="#f4c542" />
+              <Icon width={iconSize} height={iconSize} color="#f4c542" />
               <Text
-                className="text-[10px] font-bold"
-                style={[nepaliTextStyle(10), { color: LABEL_COLOR.rashi }]}
+                className="font-bold"
+                style={[nepaliTextStyle(fontSize), { color: LABEL_COLOR.rashi }]}
                 numberOfLines={1}
               >
                 {formatRashiByNumber(label.index, lang)}
@@ -780,14 +767,15 @@ const SkyLabels = memo(function SkyLabels({ labels }: { labels: ScreenLabel[] })
         }
         if (label.kind === "nakshatra" && label.index) {
           const nak = NAKSHATRA_ICONS[label.index - 1];
+          const boxWidth = 90 * scale;
+          const fontSize = 12 * scale;
           return (
             <Text
               key={label.id}
               style={[
-                { position: "absolute", left: label.x - 40, top: label.y - 6, width: 80, textAlign: "center", color: LABEL_COLOR.nakshatra },
-                nepaliTextStyle(9),
+                { position: "absolute", left: label.x - boxWidth / 2, top: label.y - 6 * scale, width: boxWidth, textAlign: "center", color: LABEL_COLOR.nakshatra },
+                nepaliTextStyle(fontSize),
               ]}
-              className="text-[9px]"
               numberOfLines={1}
             >
               {nak ? (lang === "en" ? nak.en : nak.ne) : ""}
@@ -917,6 +905,24 @@ const SkyLabels = memo(function SkyLabels({ labels }: { labels: ScreenLabel[] })
                 ? pick("कर्कट रेखा · २३.४४°उ", "Tropic of Cancer · 23.44°N")
                 : pick("मकर रेखा · २३.४४°द", "Tropic of Capricorn · 23.44°S")}
             </Text>
+          );
+        }
+        if (label.kind === "observer") {
+          return (
+            <View
+              key={label.id}
+              style={{ position: "absolute", left: label.x - 55, top: label.y - 8, width: 110 }}
+              className="items-center"
+            >
+              <Ionicons name="location" size={14 * scale} color={LABEL_COLOR.observer} />
+              <Text
+                className="font-bold"
+                style={[nepaliTextStyle(10 * scale), { color: LABEL_COLOR.observer }]}
+                numberOfLines={1}
+              >
+                {pick("तपाईं यहाँ", "You are here")}
+              </Text>
+            </View>
           );
         }
         if (label.kind === "azimuth") {

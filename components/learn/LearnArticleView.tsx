@@ -8,6 +8,7 @@ import {
   adjacentTopicMetas,
   type LearnTopicMeta,
 } from "@/lib/learn/learn-topics-meta";
+import { hrefForLearnSlug } from "@/lib/learn/learn-href";
 import { getLearnArticleContent } from "@/lib/learn/learn-topics";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -91,7 +92,7 @@ export function LearnArticleView({ slug }: { slug: string }) {
           <TopicNavCard
             topic={prev}
             direction="prev"
-            onPress={() => router.push({ pathname: "/learn/[slug]", params: { slug: prev.slug } })}
+            onPress={() => router.push(hrefForLearnSlug(prev.slug))}
           />
         ) : (
           <View className="flex-1" />
@@ -100,7 +101,7 @@ export function LearnArticleView({ slug }: { slug: string }) {
           <TopicNavCard
             topic={next}
             direction="next"
-            onPress={() => router.push({ pathname: "/learn/[slug]", params: { slug: next.slug } })}
+            onPress={() => router.push(hrefForLearnSlug(next.slug))}
           />
         ) : (
           <View className="flex-1" />

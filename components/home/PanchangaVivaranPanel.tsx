@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { CalendarDay, PanchangaDay } from "@/lib/api";
@@ -9,10 +10,31 @@ import {
   getSolarCorrections,
   type PanchangaDetailCell,
 } from "@/lib/panchanga-format";
+import { GrahaStatusBadges } from "@/components/graha/GrahaStatusBadges";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+
+const VIVARAN_WRAP_GAP = 8;
+const VIVARAN_MIN_TILE = 112;
+const GOCHAR_WRAP_GAP = 6;
+const GOCHAR_MIN_TILE = 148;
+
+function wrapTileWidth(
+  containerWidth: number,
+  gap: number,
+  minTile: number,
+  minCols: number,
+  maxCols: number,
+): number | `${number}%` {
+  if (containerWidth <= 0) return minCols <= 1 ? "100%" : "48%";
+  const cols = Math.min(
+    maxCols,
+    Math.max(minCols, Math.floor((containerWidth + gap) / (minTile + gap))),
+  );
+  return (containerWidth - gap * (cols - 1)) / cols;
+}
 
 type Props = {
   p?: PanchangaDay;
@@ -51,52 +73,88 @@ function VivaranCell({
   );
 }
 
-function GocharAsideCard({
-  label,
-  rashi,
-  degree,
+function GocharSolarCard({
+  title,
+  value,
   insetBg,
+  tileWidth,
 }: {
-  label: string;
-  rashi?: string;
-  degree: string;
+  title: string;
+  value: string;
   insetBg: string;
+  tileWidth: number | `${number}%`;
 }) {
   return (
     <View
-      className="min-w-[46%] flex-1 gap-0.5 rounded-[5px] p-2.5"
-      style={{ backgroundColor: insetBg, maxWidth: "33%" }}
+      className="min-w-0 gap-0.5 rounded-[5px] p-2.5"
+      style={{
+        backgroundColor: insetBg,
+        width: tileWidth,
+        flexGrow: 0,
+        flexShrink: 0,
+      }}
     >
       <Text className="text-sm font-semibold leading-tight text-foreground" style={nepaliTextStyle(14)}>
-        {label}
-        {rashi ? (
-          <>
-            {" "}
-            <Text aria-hidden>→</Text> {rashi}
-          </>
-        ) : null}
+        {title}
       </Text>
       <Text className="font-num text-sm font-semibold leading-tight text-foreground" style={nepaliTextStyle(14)}>
-        {degree}
+        {value}
       </Text>
     </View>
   );
 }
 
-function SolarCorrectionAsideCard({
+function GocharPlanetCard({
+  planetKey,
   label,
-  value,
+  rashi,
+  degree,
+  isRetrograde,
+  isCombust,
   insetBg,
+  tileWidth,
 }: {
+  planetKey: string;
   label: string;
-  value: string;
+  rashi?: string;
+  degree: string;
+  isRetrograde?: boolean;
+  isCombust?: boolean;
   insetBg: string;
+  tileWidth: number | `${number}%`;
 }) {
   return (
-    <View className="min-w-0 flex-1 gap-0.5 rounded-[5px] p-2.5" style={{ backgroundColor: insetBg }}>
-      <Text className="text-sm font-semibold leading-tight text-foreground">{label}</Text>
+    <View
+      className="min-w-0 gap-0.5 rounded-[5px] p-2.5"
+      style={{
+        backgroundColor: insetBg,
+        width: tileWidth,
+        flexGrow: 0,
+        flexShrink: 0,
+      }}
+    >
+      <View className="min-w-0 flex-row flex-wrap items-center gap-x-1 gap-y-0.5">
+        <Text
+          className="min-w-0 shrink text-sm font-semibold leading-tight text-foreground"
+          style={nepaliTextStyle(14)}
+        >
+          {label}
+          {rashi ? (
+            <>
+              {" "}
+              <Text>→</Text> {rashi}
+            </>
+          ) : null}
+        </Text>
+        <GrahaStatusBadges
+          planetKey={planetKey}
+          isRetrograde={isRetrograde}
+          isCombust={isCombust}
+          size={12}
+        />
+      </View>
       <Text className="font-num text-sm font-semibold leading-tight text-foreground" style={nepaliTextStyle(14)}>
-        {value}
+        {degree}
       </Text>
     </View>
   );
@@ -144,16 +202,26 @@ function AsideFooter({ p, selectedAd }: { p: PanchangaDay; selectedAd?: string }
 export function PanchangaVivaranPanel({ p, selectedDay, selectedAd, loading }: Props) {
   const { pick, lang } = useLocale();
   const colors = useThemeColors();
+  const [vivaranWrapWidth, setVivaranWrapWidth] = useState(0);
+  const [gocharWrapWidth, setGocharWrapWidth] = useState(0);
+  const vivaranTileW = useMemo(
+    () => wrapTileWidth(vivaranWrapWidth, VIVARAN_WRAP_GAP, VIVARAN_MIN_TILE, 1, 3),
+    [vivaranWrapWidth],
+  );
+  const gocharTileW = useMemo(
+    () => wrapTileWidth(gocharWrapWidth, GOCHAR_WRAP_GAP, GOCHAR_MIN_TILE, 2, 4),
+    [gocharWrapWidth],
+  );
 
   if (loading || !p) {
     return (
       <View>
-        <View className="mb-2.5 flex-row flex-wrap gap-2">
+        <View className="mb-2.5 flex-row flex-wrap" style={{ gap: VIVARAN_WRAP_GAP }}>
           {Array.from({ length: 6 }).map((_, i) => (
             <View
               key={i}
-              className="h-16 min-w-[46%] flex-1 rounded-lg p-2.5"
-              style={{ backgroundColor: colors.surfaceInset }}
+              className="h-16 rounded-lg p-2.5"
+              style={{ backgroundColor: colors.surfaceInset, width: "48%", flexGrow: 0, flexShrink: 0 }}
             >
               <View className="h-3 w-16 rounded bg-muted-foreground/20" />
               <View className="mt-2 h-4 w-24 rounded bg-muted-foreground/20" />
@@ -195,47 +263,62 @@ export function PanchangaVivaranPanel({ p, selectedDay, selectedAd, loading }: P
 
   return (
     <View>
-      <View className="mb-2.5 flex-row flex-wrap gap-2">
+      <View
+        className="mb-2.5 flex-row flex-wrap"
+        style={{ gap: VIVARAN_WRAP_GAP }}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          setVivaranWrapWidth((prev) => (prev === w ? prev : w));
+        }}
+      >
         {cells.map((cell) => (
-          <View key={cell.label} className="min-w-[46%] flex-1">
+          <View
+            key={cell.label}
+            style={{
+              width: cell.wide ? "100%" : vivaranTileW,
+              flexGrow: 0,
+              flexShrink: 0,
+            }}
+            className="min-w-0"
+          >
             <VivaranCell {...cell} insetBg={colors.surfaceInset} />
           </View>
         ))}
       </View>
 
-      {planets.length > 0 ? (
+      {planets.length > 0 || solarCards.length > 0 ? (
         <View className="mt-2.5 border-t border-border/60 pt-2.5">
           <Text className="mb-1.5 text-sm font-bold text-foreground">
             {pick("ग्रह गोचर", "Planet positions")}
           </Text>
-          <View className="flex-row flex-wrap gap-1.5">
-            {planets.map(({ key, label, rashi, degree }) => (
-              <GocharAsideCard
+          <View
+            className="flex-row flex-wrap"
+            style={{ gap: GOCHAR_WRAP_GAP }}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              setGocharWrapWidth((prev) => (prev === w ? prev : w));
+            }}
+          >
+            {planets.map(({ key, label, rashi, degree, isRetrograde, isCombust }) => (
+              <GocharPlanetCard
                 key={key}
+                planetKey={key}
                 label={label}
                 rashi={rashi}
                 degree={degree}
+                isRetrograde={isRetrograde}
+                isCombust={isCombust}
                 insetBg={colors.surfaceInset}
+                tileWidth={gocharTileW}
               />
             ))}
-          </View>
-        </View>
-      ) : null}
-
-      {solarCards.length > 0 ? (
-        <View
-          className={cn(
-            "border-t border-border/60 pt-2",
-            planets.length > 0 ? "mt-1.5" : "mt-2.5",
-          )}
-        >
-          <View className="flex-row gap-1.5">
             {solarCards.map(({ label, value }) => (
-              <SolarCorrectionAsideCard
+              <GocharSolarCard
                 key={label}
-                label={label}
+                title={label}
                 value={value}
                 insetBg={colors.surfaceInset}
+                tileWidth={gocharTileW}
               />
             ))}
           </View>

@@ -3,7 +3,13 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform, StyleSheet, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useFonts, Mukta_400Regular, Mukta_500Medium, Mukta_600SemiBold, Mukta_700Bold } from "@expo-google-fonts/mukta";
+import {
+  useFonts,
+  NotoSansDevanagari_400Regular,
+  NotoSansDevanagari_500Medium,
+  NotoSansDevanagari_600SemiBold,
+  NotoSansDevanagari_700Bold,
+} from "@expo-google-fonts/noto-sans-devanagari";
 import { FiraCode_400Regular, FiraCode_700Bold } from "@expo-google-fonts/fira-code";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
@@ -34,10 +40,10 @@ function ThemedStatusBar() {
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    Mukta_400Regular,
-    Mukta_500Medium,
-    Mukta_600SemiBold,
-    Mukta_700Bold,
+    NotoSansDevanagari_400Regular,
+    NotoSansDevanagari_500Medium,
+    NotoSansDevanagari_600SemiBold,
+    NotoSansDevanagari_700Bold,
     FiraCode_400Regular,
     FiraCode_700Bold,
   });

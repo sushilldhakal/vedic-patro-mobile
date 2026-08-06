@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import type { LocationParams } from "@/lib/api";
+import { searchCities, type LocationParams } from "@/lib/api";
 import { NEPAL_CITIES, nepalCityEnglishLabel } from "@/lib/cities/nepal-cities";
+import { KATHMANDU } from "@/lib/sky3d/horizon";
 
 const STORAGE_KEY = "vedicPatroLocation";
 
@@ -10,9 +11,19 @@ export interface PanchangaLocation {
   params: LocationParams;
 }
 
+const DEFAULT_CITY_ID = 1283240;
+
 export const DEFAULT_PANCHANGA_LOCATION: PanchangaLocation = {
   label: "Kathmandu, NP",
-  params: { city_id: 1283240, timezone: "Asia/Kathmandu" },
+  /* Coordinates ride along with the city_id: client-side geometry (the 3D sky's
+     observer frame and its "you are here" pin) has no way to turn an id into a
+     place, and without them it silently falls back to a fixed point. */
+  params: {
+    city_id: DEFAULT_CITY_ID,
+    lat: KATHMANDU.lat,
+    lon: KATHMANDU.lon,
+    timezone: "Asia/Kathmandu",
+  },
 };
 
 export function resolveLocationTimezone(location: PanchangaLocation): string {
@@ -23,8 +34,21 @@ function hasDevanagari(value: string): boolean {
   return /[\u0900-\u097F]/.test(value);
 }
 
+/** True once the location can drive client-side geometry, not just an API call. */
+export function hasCoords(loc: PanchangaLocation): boolean {
+  return loc.params.lat != null && loc.params.lon != null;
+}
+
 function healStoredLocation(loc: PanchangaLocation): PanchangaLocation {
   const { params } = loc;
+
+  /* Entries written before cityToLocation started attaching coordinates hold a
+     bare city_id. The default one we can fill in from here; anything else needs
+     the lookup in backfillCoords below. */
+  if (!hasCoords(loc) && params.city_id === DEFAULT_CITY_ID) {
+    return { ...loc, params: { ...params, lat: KATHMANDU.lat, lon: KATHMANDU.lon } };
+  }
+
   if (!params.city || !hasDevanagari(params.city)) return loc;
 
   if (params.lat != null && params.lon != null) {
@@ -57,13 +81,50 @@ function healStoredLocation(loc: PanchangaLocation): PanchangaLocation {
   };
 }
 
+/**
+ * Last resort for a stored city_id with no coordinates: there is no look-up-by-id
+ * endpoint, but the label still carries the city's name, so search for it and take
+ * the coordinates off the row whose id matches. Failure just leaves the location
+ * as-is — the API side of it works either way.
+ */
+async function backfillCoords(loc: PanchangaLocation): Promise<PanchangaLocation> {
+  const id = loc.params.city_id;
+  if (hasCoords(loc) || id == null) return loc;
+
+  const name = loc.label.split(",")[0]?.trim();
+  if (!name || name.length < 2) return loc;
+
+  try {
+    const { cities } = await searchCities(name, 15);
+    const match = cities.find((c) => c.id === id);
+    if (!match) return loc;
+    return {
+      ...loc,
+      params: {
+        ...loc.params,
+        lat: match.lat,
+        lon: match.lon,
+        timezone: loc.params.timezone ?? match.timezone,
+      },
+    };
+  } catch {
+    return loc;
+  }
+}
+
 async function readStoredLocation(): Promise<PanchangaLocation> {
   try {
     const raw = await SecureStore.getItemAsync(STORAGE_KEY);
     if (!raw) return DEFAULT_PANCHANGA_LOCATION;
     const parsed = JSON.parse(raw) as PanchangaLocation;
     if (!parsed?.label || !parsed?.params) return DEFAULT_PANCHANGA_LOCATION;
-    return healStoredLocation(parsed);
+
+    const healed = await backfillCoords(healStoredLocation(parsed));
+    /* Write the repair back so the lookup above happens once, not every launch. */
+    if (JSON.stringify(healed) !== raw) {
+      SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(healed)).catch(() => {});
+    }
+    return healed;
   } catch {
     return DEFAULT_PANCHANGA_LOCATION;
   }
@@ -117,6 +178,13 @@ export function cityToLocation(city: {
     label,
     params: {
       city_id: city.id,
+      // Both, not just city_id: the id is the backend's own for this city (not
+      // the curated NEPAL_CITIES namespace above, which isn't valid here), so
+      // its coordinates are consistent with it — and client-side geometry that
+      // needs real lat/lon (the 3D sky's observer marker) has nowhere else to
+      // get them, since there's no "look up a city by id" endpoint to call
+      // later from just a city_id.
+      ...(city.lat != null && city.lon != null ? { lat: city.lat, lon: city.lon } : {}),
       ...(city.timezone ? { timezone: city.timezone } : {}),
     },
   };

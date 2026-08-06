@@ -60,6 +60,12 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
               </Text>
             </View>
           ))}
+          <View className={cn(th, patroStickyHeadCell, "min-w-[4rem] items-center")}>
+            <Text className="text-center text-sm font-semibold">{pick("देशान्तर", "Deshaantar")}</Text>
+          </View>
+          <View className={cn(th, patroStickyHeadCell, "min-w-[4rem] items-center")}>
+            <Text className="text-center text-sm font-semibold">{pick("अक्षांश", "Latitude")}</Text>
+          </View>
           <View className={cn(th, patroStickyHeadCell, "min-w-[4.5rem] items-center")}>
             <Text className="text-center text-sm font-semibold">
               {pick("बेलान्तर", "Belaantar")}
@@ -76,6 +82,16 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
               </Text>
             </View>
           ))}
+          <View className={cn(th, patroStickySubHeadCell, "min-w-[4rem] items-center")}>
+            <Text className="text-center text-xs font-normal text-muted-foreground">
+              {pick("देशान्तर", "Long.")}
+            </Text>
+          </View>
+          <View className={cn(th, patroStickySubHeadCell, "min-w-[4rem] items-center")}>
+            <Text className="text-center text-xs font-normal text-muted-foreground">
+              {pick("अक्षांश", "Lat.")}
+            </Text>
+          </View>
           <View className={cn(th, patroStickySubHeadCell, "min-w-[4.5rem] items-center")}>
             <Text className="text-center text-xs font-normal text-muted-foreground">
               {pick("समय सुधार", "Time corr.")}
@@ -120,6 +136,12 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
                     </Text>
                   </View>
                 ))}
+                <View className={cn(td, "min-w-[4rem] items-center")}>
+                  <Text className="font-num text-center tabular-nums">{row.deshaantar ?? "—"}</Text>
+                </View>
+                <View className={cn(td, "min-w-[4rem] items-center")}>
+                  <Text className="font-num text-center tabular-nums">{row.akshamsha ?? "—"}</Text>
+                </View>
                 <View className={cn(td, "min-w-[4.5rem] items-center")}>
                   <Text className="font-num text-center tabular-nums">
                     {row.belaantar ?? (hasPlanets ? "—" : "—")}
@@ -154,8 +176,8 @@ export function MonthGrahaSpashta({ rows, todayKey, loading, empty, embedded }: 
     <PatroTableShell
       titleNe="उदयकालिक सूर्यादिग्रहस्पष्ट"
       titleEn="Sunrise Planetary Positions (Graha Spashta)"
-      subtitle="सूर्योदयको क्षणमा ग्रहहरूको राश्यादि स्थिति (राशि, अंश|कला|विकला) र दैनिक बेलान्तर।"
-      subtitleEn="The planets' rashi positions (sign, deg|kala|vikala) at the moment of sunrise, and the daily belaantar."
+      subtitle="सूर्योदयको क्षणमा ग्रहहरूको राश्यादि स्थिति (राशि, अंश|कला|विकला), देशान्तर, अक्षांश र दैनिक बेलान्तर।"
+      subtitleEn="Planetary rashi at sunrise (sign, deg|kala|vikala), plus deshaantar, akshamsha, and daily belaantar."
     >
       {table}
       {footnote}

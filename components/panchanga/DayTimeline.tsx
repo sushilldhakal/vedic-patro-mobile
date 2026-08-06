@@ -7,6 +7,7 @@ import type { PanchangaDay } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
 import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { SunTimelineMarker } from "@/components/panchanga/SunriseSunsetIcon";
 import { GrahaStatusBadges } from "@/components/graha/GrahaStatusBadges";
 import type { GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/day-timeline-data";
 import { minutesSinceMidnightInTimezone, resolveTimeZone } from "@/lib/zoned-time";
 import { nepaliSvgTextCenter, nepaliTextStyle } from "@/lib/nepali-text";
+import { NOTO_DEVANAGARI_CHART, NOTO_DEVANAGARI_CHART_SM } from "@/lib/fonts";
 import { useTheme } from "@/lib/theme-context";
 
 const W = 1000;
@@ -47,8 +49,9 @@ const SUNLINE_Y = RULER_H + MOON_BAND_H + 8;
 const MARKER_TIME_Y = SUNLINE_Y + 13;
 const SUN_R = 6;
 const GHATI_TICKS = Array.from({ length: 16 }, (_, i) => i * 4);
-const FONT = "Mukta_600SemiBold";
-const FONT_SM = "Mukta_500Medium";
+
+const FONT = NOTO_DEVANAGARI_CHART;
+const FONT_SM = NOTO_DEVANAGARI_CHART_SM;
 
 function isGrahaKey(key: string): key is GrahaKey {
   return (
@@ -234,17 +237,18 @@ function minutesOnVedicChart(
   return null;
 }
 
-function SunHalfIcon({ x, y, variant, C }: { x: number; y: number; variant: "rise" | "set"; C: ReturnType<typeof useTimelineColors> }) {
-  const arc =
-    variant === "rise"
-      ? `M ${x - SUN_R} ${y} A ${SUN_R} ${SUN_R} 0 0 1 ${x + SUN_R} ${y} Z`
-      : `M ${x - SUN_R} ${y} A ${SUN_R} ${SUN_R} 0 0 0 ${x + SUN_R} ${y} Z`;
-  return (
-    <G>
-      <Line x1={x - SUN_R - 3} y1={y} x2={x + SUN_R + 3} y2={y} stroke={C.sun} strokeWidth={1} />
-      <Path d={arc} fill={C.sun} stroke="#c9a000" strokeWidth={0.75} />
-    </G>
-  );
+function SunHalfIcon({
+  x,
+  y,
+  variant,
+  C,
+}: {
+  x: number;
+  y: number;
+  variant: "rise" | "set";
+  C: ReturnType<typeof useTimelineColors>;
+}) {
+  return <SunTimelineMarker x={x} y={y} variant={variant} fill={C.sun} width={SUN_R * 2 + 10} />;
 }
 
 function EventMarker({

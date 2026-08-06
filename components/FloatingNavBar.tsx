@@ -23,7 +23,7 @@ export function FloatingNavBar() {
   return (
     <View
       pointerEvents="box-none"
-      style={{ paddingBottom: Math.max(insets.bottom, isTablet ? 14 : 10) }}
+      style={{ paddingBottom: Math.max(insets.bottom, isTablet ? 10 : 6) }}
       className={cn("absolute bottom-0 left-0 right-0", isTablet ? "px-5" : "px-3")}
     >
       <View
@@ -32,14 +32,14 @@ export function FloatingNavBar() {
           alignSelf: "center",
           width: "100%",
           shadowColor: "#1a1410",
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.14,
-          shadowRadius: 20,
-          elevation: 14,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 16,
+          elevation: 12,
         }}
         className={cn(
-          "flex-row items-stretch rounded-[28px] border border-border/80 bg-card/95",
-          isTablet ? "px-2 py-2" : "px-1 py-1.5",
+          "flex-row items-stretch rounded-[24px] border border-border/80 bg-card/95",
+          isTablet ? "px-1.5 py-1.5" : "px-1 py-1",
         )}
       >
         {FLOATING_NAV.map((item) => {
@@ -49,8 +49,8 @@ export function FloatingNavBar() {
               key={item.href}
               onPress={() => router.push(item.href as never)}
               className={cn(
-                "min-w-0 flex-1 items-center justify-center rounded-[22px]",
-                isTablet ? "px-1 py-2.5" : "px-0.5 py-2",
+                "min-w-0 flex-1 items-center justify-center rounded-[20px]",
+                isTablet ? "px-1 py-2" : "px-0.5 py-1.5",
                 active && "bg-tab-active",
               )}
               accessibilityRole="button"
@@ -62,13 +62,13 @@ export function FloatingNavBar() {
                 color={active ? colors.primary : colors.mutedForeground}
               />
               <Text
-                numberOfLines={2}
+                numberOfLines={1}
                 className={cn(
-                  "mt-1 min-h-[28px] text-center font-medium",
+                  "mt-0.5 text-center font-medium",
                   isTablet ? "text-[11px]" : "text-[10px]",
                   active ? "font-bold text-primary" : "text-muted-foreground",
                 )}
-                style={[nepaliTextStyle(isTablet ? 11 : 10), { paddingTop: 1 }]}
+                style={[nepaliTextStyle(isTablet ? 11 : 10), { paddingTop: 0 }]}
               >
                 {pick(item.ne, item.en)}
               </Text>

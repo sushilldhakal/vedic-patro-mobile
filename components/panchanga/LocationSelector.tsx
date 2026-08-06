@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Keyboard, Modal, Platform, Pressable, TextInput, View,  } from "react-native"
+import {
+  ActivityIndicator,
+  FlatList,
+  Keyboard,
+  Modal,
+  Platform,
+  Pressable,
+  TextInput,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { Text } from "@/components/ui/Text"
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -24,12 +35,15 @@ import {
   type PanchangaLocation,
 } from "@/lib/use-panchanga-location";
 import { useThemeColors } from "@/lib/theme-context";
+import { dayCycleToggleMetrics } from "@/lib/day-cycle-toggle-metrics";
+import { useBreakpoint } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
 
 type Props = {
   location: PanchangaLocation;
   onLocationChange: (location: PanchangaLocation) => void;
   className?: string;
+  style?: StyleProp<ViewStyle>;
 };
 
 function cityLabel(city: City): string {
@@ -110,9 +124,11 @@ function LocationResultsList({
   );
 }
 
-export function LocationSelector({ location, onLocationChange, className }: Props) {
+export function LocationSelector({ location, onLocationChange, className, style }: Props) {
   const colors = useThemeColors();
   const { pick, lang } = useLocale();
+  const { isCompact } = useBreakpoint();
+  const chipH = dayCycleToggleMetrics(isCompact).height;
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const [open, setOpen] = useState(false);
@@ -205,12 +221,13 @@ export function LocationSelector({ location, onLocationChange, className }: Prop
         onPress={() => setOpen(true)}
         accessibilityLabel={pick("स्थान बदल्नुहोस्", "Change location")}
         className={cn(
-          "h-[30px] max-w-[7.5rem] shrink flex-row items-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted",
+          "max-w-[7.5rem] shrink flex-row items-center gap-1 rounded-md border border-border bg-card px-2 active:bg-muted",
           className,
         )}
+        style={[{ height: chipH, maxHeight: chipH }, style]}
       >
         <Ionicons name="location-outline" size={13} color={colors.secondary} />
-        <Text numberOfLines={1} className="text-sm font-medium text-foreground">
+        <Text numberOfLines={1} className="text-xs font-medium text-foreground">
           {label}
         </Text>
       </Pressable>

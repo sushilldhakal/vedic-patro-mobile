@@ -789,6 +789,48 @@ function normalizeMonthDay(day: CalendarDay): CalendarDay {
   };
 }
 
+/** One BS month's metadata in the year-wheel payload (no per-day grid). */
+export interface YearWheelMonth {
+  year_bs: number;
+  month_bs: number;
+  month_name?: string;
+  month_name_ne?: string;
+  month_start_ad?: string;
+  month_length: number;
+}
+
+/** One day of the year-wheel payload — the trimmed wheel state, nothing else. */
+export interface YearWheelCalendarDay {
+  day: number;
+  date_ad: string;
+  sunrise?: string;
+  sunset?: string;
+  panchanga?: PanchangaDay;
+}
+
+/**
+ * A whole BS year of wheel state in one response. `wheel=true` trims each day to
+ * what the wheel actually draws (angas, planets, lagna, rashi spans) and drops
+ * the duplicated per-day month grids — the difference between ~2 MB and ~20 MB.
+ */
+export interface YearWheelCalendar {
+  year_bs: number;
+  year_length: number;
+  location?: PanchangaDay["location"];
+  months: YearWheelMonth[];
+  calendar: YearWheelCalendarDay[];
+}
+
+export const yearWheelKeys = {
+  year: (year: number, loc?: LocationParams) =>
+    ["panchanga", "year-wheel", PANCHANGA_CACHE_VERSION, year, locationKey(loc)] as const,
+};
+
+export const fetchYearWheelCalendar = (year: number, location?: LocationParams) =>
+  get<YearWheelCalendar>(
+    appendLocation(withCache(`/panchanga/year/${year}?wheel=true&era=bs`), location),
+  );
+
 export const fetchPanchanga = (date: string, era: "bs" | "ad" = "bs", location?: LocationParams) =>
   get<PanchangaDay>(
     appendLocation(
@@ -865,7 +907,13 @@ export interface GocharIngressEvent {
   entry_time_local_short?: string;
   entry_time_utc?: string;
   entry_date_ad?: string;
+  /** Vedic day (sunrise–sunrise) civil date — patro गते row key. */
   entry_vedic_date_ad?: string;
+  /** BS patro date key when the civil AD fields are omitted (BCE / JD path). */
+  entry_jd_date?: string;
+  entry_vedic_jd_date?: string;
+  entry_jd?: number;
+  entry_vedic_jd?: number;
   event?: "udaya" | "asta";
   hemisphere?: "east" | "west";
   motion_ne?: string;
@@ -1096,7 +1144,10 @@ export interface EclipseYearResponse {
 }
 
 export interface PanchakMomentResponse {
-  date_ad: string;
+  /** Full AD instant with the Nepal offset, e.g. "2026-04-13T04:03:00+05:45". */
+  iso: string;
+  /** Legacy; prefer `iso`. */
+  date_ad?: string;
   bs_year: number;
   bs_month: number;
   bs_day: number;
@@ -1190,6 +1241,16 @@ export interface SunYearResponse {
   months: SunYearMonth[];
 }
 
+export interface TropicalSeasonBoundary {
+  slot: number;
+  angle: number;
+  start_instant_utc: string;
+  start_ad: string;
+  start_bs: string;
+  is_current: boolean;
+}
+
+/** @deprecated Legacy shape; API returns {@link TropicalSeasonsResponse.boundaries}. */
 export interface TropicalSeasonSegment {
   name_ne?: string;
   name_en?: string;
@@ -1198,7 +1259,12 @@ export interface TropicalSeasonSegment {
 }
 
 export interface TropicalSeasonsResponse {
-  segments: TropicalSeasonSegment[];
+  timezone?: string;
+  latitude?: number;
+  southern_hemisphere: boolean;
+  boundaries: TropicalSeasonBoundary[];
+  /** @deprecated */
+  segments?: TropicalSeasonSegment[];
 }
 
 export interface SaitDetailDay {
@@ -1434,7 +1500,11 @@ export const fetchEclipseYear = (
     ),
   );
 
-export const fetchPanchakYear = (year: number, location?: LocationParams, era: "bs" | "ad" = "bs") =>
+export const fetchPanchakYear = (
+  year: number,
+  location?: LocationParams,
+  era: "bs" | "ad" | "bbs" = "bs",
+) =>
   get<PanchakYearResponse>(
     appendLocation(`/nepal/panchak/year/${year}?${buildEraQuery(era, year)}`, location),
   );

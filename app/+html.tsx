@@ -6,6 +6,7 @@ const BOOT_SPLASH_CSS = `
     background: linear-gradient(135deg, #0e6a6f 0%, #073f43 100%);
     margin: 0;
     min-height: 100%;
+    font-family: "Noto Sans Devanagari", sans-serif;
   }
   #vp-boot-splash {
     position: fixed;
@@ -46,7 +47,10 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <style dangerouslySetInnerHTML={{ __html: BOOT_SPLASH_CSS }} />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wdth,wght@87.5,100..900&family=Fira+Code:wght@400;600&display=swap"
+        />
         <script dangerouslySetInnerHTML={{ __html: BOOT_SPLASH_SCRIPT }} />
       </head>
       <body>

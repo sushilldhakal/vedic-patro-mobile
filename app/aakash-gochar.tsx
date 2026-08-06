@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { AakashGocharSky } from "@/components/sky3d/AakashGocharSky";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
@@ -10,7 +10,6 @@ import { Text } from "@/components/ui/Text";
 import { fetchGochar, gocharKeys } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { NEPAL_CITIES } from "@/lib/cities/nepal-cities";
 import { KATHMANDU, type Observer } from "@/lib/sky3d/horizon";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
@@ -46,18 +45,24 @@ export default function AakashGocharScreen() {
     return d;
   }, [date, clock]);
 
-  /* The horizon view needs real coordinates. Backend city ids carry none, so
-     fall back through the local city table and finally to Kathmandu. */
+  /* The horizon/globe view is drawn from these coordinates — the observer frame
+     and the "you are here" pin both. Every location now carries them (picked
+     cities via cityToLocation, the default and older stored ones via the heal in
+     usePanchangaLocation), so the constant below is a type-level backstop rather
+     than a place the app actually lands on. */
   const observer: Observer = useMemo(() => {
-    const { lat, lon, city_id: cityId } = location.params;
-    if (lat != null && lon != null) return { lat, lon };
-    const city = cityId != null ? NEPAL_CITIES.find((c) => c.id === cityId) : undefined;
-    return city ? { lat: city.lat, lon: city.lon } : KATHMANDU;
+    const { lat, lon } = location.params;
+    return lat != null && lon != null ? { lat, lon } : KATHMANDU;
   }, [location.params]);
 
   const query = useQuery({
     queryKey: gocharKeys.day(dateAd, "ad", location.params),
     queryFn: () => fetchGochar(dateAd, "ad", location.params),
+    /* Without this, `isLoading` goes true on every date change (no data yet
+       under the new key), which swaps AakashGocharSky out for the spinner —
+       unmounting it and wiping its fullscreen/mode/camera state. Keeping the
+       previous day's data on screen during the refetch keeps it mounted. */
+    placeholderData: keepPreviousData,
   });
 
   return (

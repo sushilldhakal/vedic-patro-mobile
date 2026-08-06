@@ -14,9 +14,10 @@ import {
   rashiNeFromNumber,
   toNepaliDigits,
 } from "@/lib/panchanga-format";
+import { formatRashiByNumber, resolveRashiDisplay, rashiNumberFromName } from "@/lib/rashi-i18n";
 
 export const RASHI_COLUMNS_NE = [
-  "मेष", "वृष", "मिथुन", "कर्क", "सिंह", "कन्या",
+  "मेष", "वृष", "मिथुन", "कर्कट", "सिंह", "कन्या",
   "तुला", "वृश्चिक", "धनु", "मकर", "कुम्भ", "मीन",
 ] as const;
 
@@ -61,8 +62,10 @@ export type GrahaSpashtaRow = {
   weekdayNe?: string;
   weekdayEn?: string;
   planets: Partial<
-    Record<(typeof PATRO_PLANET_KEYS)[number], { rashiNe: string; rashiEn?: string; coords: string }>
+    Record<(typeof PATRO_PLANET_KEYS)[number], { rashiNe: string; rashiEn?: string; coords: string; isRetrograde?: boolean; isCombust?: boolean }>
   >;
+  deshaantar?: string;
+  akshamsha?: string;
   belaantar?: string;
 };
 
@@ -163,22 +166,33 @@ export function buildGrahaSpashtaMatrix(days: CalendarDay[]): GrahaSpashtaRow[] 
       for (const key of PATRO_PLANET_KEYS) {
         const info = rawPlanets[key];
         if (!info || typeof info === "string") continue;
-        const rashiNe = planetRashiNe(info);
-        if (!rashiNe) continue;
+        const rashiNeRaw = planetRashiNe(info);
+        if (!rashiNeRaw) continue;
+        const rashiNe = resolveRashiDisplay(rashiNeRaw, info.rashi as string | undefined, "ne") ?? rashiNeRaw;
         planets[key] = {
           rashiNe,
-          rashiEn: RASHI_COLUMNS_EN[RASHI_COLUMNS_NE.indexOf(rashiNe as (typeof RASHI_COLUMNS_NE)[number])] ?? rashiNe,
+          rashiEn:
+            resolveRashiDisplay(rashiNeRaw, info.rashi as string | undefined, "en") ??
+            formatRashiByNumber(rashiNumberFromName(rashiNeRaw), "en") ??
+            rashiNe,
           coords: planetDegreeCells(info),
+          isRetrograde: info.is_retrograde ?? info.retrograde ?? false,
+          isCombust: info.is_combust ?? false,
         };
       }
     }
-    const belaantar = formatSolarCorrectionDisplay(p?.solar_corrections?.belaantar);
+    const sc = p?.solar_corrections;
+    const deshaantar = formatSolarCorrectionDisplay(sc?.deshaantar);
+    const akshamsha = formatSolarCorrectionDisplay(sc?.akshamsha);
+    const belaantar = formatSolarCorrectionDisplay(sc?.belaantar);
     return {
       day: day.day,
       dateAd: day.date_ad,
       weekdayNe: day.weekday_ne ?? day.weekday,
       weekdayEn: day.weekday_en ?? day.weekday,
       planets,
+      deshaantar,
+      akshamsha,
       belaantar,
     };
   });

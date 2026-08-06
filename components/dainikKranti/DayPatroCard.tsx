@@ -7,6 +7,8 @@ import { formatTimeShort } from "@/lib/panchanga-format";
 import type { CalcNote, GrahaSpashtaRow, LagnaMatrixRow } from "@/lib/dainikKranti/month-patro-tables";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/i18n";
+import { parseCivilIso } from "@/lib/patro-day";
+import { resolveRashiDisplay } from "@/lib/rashi-i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import { DayPatroExpandPanel } from "./DayPatroExpandPanel";
 
@@ -30,10 +32,14 @@ type Props = {
   notes?: CalcNote[];
 };
 
-function fmtAd(dateAd: string, isEn: boolean): string {
-  const d = new Date(`${dateAd}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateAd;
-  return d.toLocaleDateString(isEn ? "en-US" : "ne-NP", { day: "numeric", month: "short" });
+function fmtAd(dateAd: string): string {
+  try {
+    return String(parseCivilIso(dateAd).day);
+  } catch {
+    const d = new Date(`${dateAd}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return dateAd;
+    return String(d.getDate());
+  }
 }
 
 function dowOf(dateAd: string): number {
@@ -99,8 +105,12 @@ export function DayPatroCard({
   const nakEnd = angaEnd(det?.nakshatra?.end ?? det?.nakshatra?.end_local_time, digits, isEn);
   const yogaEnd = angaEnd(det?.yoga?.end ?? det?.yoga?.end_local_time, digits, isEn);
   const karanaEnd = angaEnd(det?.karana?.end ?? det?.karana?.end_local_time, digits, isEn);
-  const sunRashi = pick(det?.surya_rashi_ne ?? "", det?.surya_rashi ?? "");
-  const moonRashi = pick(det?.chandra_rashi_ne ?? "", det?.chandra_rashi ?? "");
+  const sunRashi =
+    resolveRashiDisplay(det?.surya_rashi_ne, det?.surya_rashi, lang) ??
+    pick(det?.surya_rashi_ne ?? "", det?.surya_rashi ?? "");
+  const moonRashi =
+    resolveRashiDisplay(det?.chandra_rashi_ne ?? day.chandra_rashi_ne, det?.chandra_rashi ?? day.chandra_rashi, lang) ??
+    pick(det?.chandra_rashi_ne ?? "", det?.chandra_rashi ?? "");
   const isSaturday = dowOf(day.date_ad) === 6;
   const hasFestival = (day.festivals?.length ?? 0) > 0;
   const hasExtra = Boolean(lagna || graha || (notes?.length ?? 0) > 0);
@@ -132,7 +142,7 @@ export function DayPatroCard({
             >
               {pick(day.weekday_ne ?? day.weekday, day.weekday_en ?? day.weekday)}
             </Text>
-            <Text className="text-xs text-muted-foreground">{fmtAd(day.date_ad, isEn)}</Text>
+            <Text className="text-xs text-muted-foreground">{digits(fmtAd(day.date_ad))}</Text>
           </View>
         </View>
         {isToday ? (
@@ -190,7 +200,7 @@ export function DayPatroCard({
             <Text>
               {sunRashi || "—"}
               {det?.ayana_mark ? (
-                <Text className="text-xs">{det.ayana_mark}</Text>
+                <Text className="text-xs"> {det.ayana_mark}</Text>
               ) : null}
             </Text>
           }

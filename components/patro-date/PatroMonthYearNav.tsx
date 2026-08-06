@@ -12,6 +12,8 @@ type MonthYearNavProps = Omit<
   "mode" | "toolbar" | "mobileToolbar" | "mobileToolbarLower" | "hideNavLocation"
 > & {
   mobileToolbar?: ReactNode;
+  /** Phone row 2 right — e.g. dainik kranti paksha + location (web `mobileToolbarLower`). */
+  mobileToolbarLower?: ReactNode;
   /** Tablet+ right column (paksha + location on dainik kranti). */
   desktopAside?: ReactNode;
   className?: string;
@@ -24,6 +26,7 @@ type MonthYearNavProps = Omit<
  */
 export function PatroMonthYearNav({
   mobileToolbar,
+  mobileToolbarLower,
   desktopAside,
   className,
   location,
@@ -54,6 +57,7 @@ export function PatroMonthYearNav({
         location={location}
         onLocationChange={onLocationChange}
         mobileToolbar={mobileToolbar}
+        mobileToolbarLower={mobileToolbarLower}
         className={className}
       />
     );

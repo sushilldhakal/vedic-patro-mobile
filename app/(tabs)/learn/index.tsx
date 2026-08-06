@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/Card";
 import { LEARN_CATEGORIES, topicsInCategory, type LearnTopicMeta } from "@/lib/learn/learn-topics-meta";
+import { hrefForLearnSlug } from "@/lib/learn/learn-href";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import type { MobileNavIcon } from "@/lib/mobile-nav";
@@ -41,14 +42,7 @@ export default function LearnScreen() {
   const router = useRouter();
 
   const openTopic = (slug: string) => {
-    if (slug === "history") {
-      router.push("/learn/history");
-      return;
-    }
-    router.push({
-      pathname: "/learn/[slug]",
-      params: { slug },
-    });
+    router.push(hrefForLearnSlug(slug));
   };
 
   return (
