@@ -92,16 +92,23 @@ function aspectHousesFor(key: string): number[] {
   return SPECIAL_ASPECT_HOUSES[key] ?? [7];
 }
 
+export type HouseBadgeKind = "Q" | "T";
+
 /** Kendra (Q) / trikona (T) marker for a house number. */
-function houseBadge(house: number): "Q" | "T" | undefined {
+function houseBadge(house: number): HouseBadgeKind | undefined {
   if ([1, 4, 7, 10].includes(house)) return "Q";
   if ([1, 5, 9].includes(house)) return "T";
   return undefined;
 }
 
+export function formatHouseBadge(badge: HouseBadgeKind, lang: "en" | "ne"): string {
+  if (lang === "ne") return badge === "Q" ? "के" : "त्रि";
+  return badge;
+}
+
 export interface BhavaTableRow {
   house: number;
-  badge?: "Q" | "T";
+  badge?: HouseBadgeKind;
   residents: BhavaPlanetEntry[];
   owner?: string;
   rashi: number;

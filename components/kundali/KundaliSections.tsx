@@ -11,7 +11,12 @@ import type {
   VargaChartEntry,
   VargaCharts,
 } from "@/lib/api";
-import { buildBhavaTable, type BhavaTableRow, RASHI_QUALITIES } from "@/lib/bhava";
+import {
+  buildBhavaTable,
+  formatHouseBadge,
+  type BhavaTableRow,
+  RASHI_QUALITIES,
+} from "@/lib/bhava";
 import {
   GrahaInline,
   GrahaInlineChildren,
@@ -203,7 +208,9 @@ export function BhavaTable({
         cells: [
           <Text key="h" className="font-num text-[11px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
             {digits(r.house)}
-            {r.badge ? <Text className="text-muted-foreground"> ({r.badge})</Text> : null}
+            {r.badge ? (
+              <Text className="text-muted-foreground"> ({formatHouseBadge(r.badge, lang)})</Text>
+            ) : null}
           </Text>,
           r.residents.length ? (
             <GrahaKeysRow
