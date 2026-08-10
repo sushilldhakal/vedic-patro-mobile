@@ -27,6 +27,7 @@ const patroItems: DrawerNavItem[] = [
 ];
 
 const jyotishItems: DrawerNavItem[] = [
+  { id: "rashifal", href: "/rashifal", labelNe: "राशिफल", labelEn: "Rashifal", icon: "star-outline" },
   { id: "avakahada", href: "/panchanga/avakahada-chakra", labelNe: "अवकहडा चक्र", labelEn: "Avakahada", icon: "aperture-outline" },
   { id: "abhijit", href: "/abhijit-muhurta", labelNe: "अभिजित् मुहूर्त", labelEn: "Abhijit", icon: "flash-outline" },
   { id: "kundali", href: "/kundali", labelNe: "जन्मकुण्डली", labelEn: "Birth chart", icon: "sparkles-outline" },
@@ -34,6 +35,7 @@ const jyotishItems: DrawerNavItem[] = [
 ];
 
 const grahaItems: DrawerNavItem[] = [
+  { id: "aakash-gochar", href: "/aakash-gochar", labelNe: "३D आकाश गोचर", labelEn: "3D sky gochar", icon: "planet-outline" },
   { id: "gochar", href: "/gochar", labelNe: "गोचर", labelEn: "Gochar", icon: "git-branch-outline" },
   { id: "graha-sthiti", href: "/panchanga/graha-sthiti", labelNe: "ग्रह स्थिति", labelEn: "Graha sthiti", icon: "planet-outline" },
   { id: "graha-asta", href: "/panchanga/graha-asta", labelNe: "ग्रह अस्त", labelEn: "Heliacal set", icon: "sunny-outline" },

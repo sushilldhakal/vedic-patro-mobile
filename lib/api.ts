@@ -19,7 +19,7 @@ export const API_BASE =
   Platform.OS === "web" && __DEV__ ? "/api" : CONFIGURED_API_BASE;
 export const API_VERSION = (extra.apiVersion as string) ?? "v1";
 export const DATA_BASE = `${API_BASE}/${API_VERSION}`;
-export const PANCHANGA_CACHE_VERSION = "29";
+export const PANCHANGA_CACHE_VERSION = "4303";
 export const SAIT_CACHE_VERSION = "14";
 
 export interface PushkaraNavamshaHit {
@@ -46,6 +46,236 @@ export interface NavataraTableBlock {
   moon_label: string;
   moon_label_en?: string;
   rows: NavataraRow[];
+}
+
+export const RASHIFAL_PERIODS = ["daily", "weekly", "monthly", "yearly"] as const;
+export type RashifalPeriod = (typeof RASHIFAL_PERIODS)[number];
+
+export const RASHIFAL_DOMAINS = [
+  "career",
+  "finance",
+  "health",
+  "love",
+  "learning",
+  "travel",
+] as const;
+export type RashifalDomainKey = (typeof RASHIFAL_DOMAINS)[number];
+
+export interface RashifalComponent {
+  key: string;
+  label_ne: string;
+  label_en: string;
+  score: number;
+  percent: number;
+  weight: number;
+  tone: NavataraTone;
+  note_ne: string;
+  note_en: string;
+}
+
+export interface RashifalDomain {
+  key: RashifalDomainKey;
+  label_ne: string;
+  label_en: string;
+  score: number;
+  percent: number;
+  tone: NavataraTone;
+  houses: number[];
+  karaka: string[];
+  tenants: string[];
+}
+
+export interface RashifalGocharRow {
+  graha: string;
+  graha_ne: string;
+  graha_en: string;
+  sign: number;
+  sign_ne: string;
+  sign_en: string;
+  house: number;
+  favourable: boolean;
+  vedha_by: string | null;
+  vedha_by_ne: string | null;
+  bindu: number | null;
+  retrograde: boolean;
+  combust: boolean;
+  weight: number;
+  score: number;
+}
+
+export interface RashifalLordBlock {
+  score: number;
+  lord: string;
+  lord_ne: string;
+  lord_en: string;
+  house: number;
+  sign: number;
+  sign_ne: string;
+  sign_en: string;
+  dignity: string;
+  dignity_ne: string;
+  dignity_en: string;
+  combust: boolean;
+  retrograde: boolean;
+}
+
+export interface RashifalHoraWindow {
+  planet: string;
+  planet_ne: string;
+  planet_en: string;
+  start_local_time_short?: string | null;
+  end_local_time_short?: string | null;
+  phase?: string;
+}
+
+export interface RashifalDayMarker {
+  date_ad: string;
+  date_bs?: string | null;
+  score: number;
+  percent: number;
+  tone: NavataraTone;
+}
+
+export interface RashifalSignBlock {
+  index: number;
+  id: number;
+  name: string;
+  name_en: string;
+  title_en: string;
+  syllables_ne: string;
+  score: number;
+  percent: number;
+  stars: number;
+  tone?: NavataraTone;
+  grade?: "full" | "medium" | "small" | "nil";
+  grade_ne?: string;
+  grade_en?: string;
+  mean_score?: number;
+  tara?: string;
+  quality?: string;
+  tara_num?: number;
+  house_from_moon?: number;
+  moorti?: string;
+  moorti_ne?: string;
+  moorti_en?: string;
+  lucky_lord?: string;
+  lucky_lord_ne?: string;
+  lucky_lord_en?: string;
+  lucky_color_ne: string;
+  lucky_color_en: string;
+  lucky_number_ne: string;
+  lucky_number_en: string;
+  lucky_direction_ne?: string;
+  lucky_direction_en?: string;
+  lucky_time?: RashifalHoraWindow | null;
+  rashi_lord?: RashifalLordBlock;
+  components?: RashifalComponent[];
+  domains?: RashifalDomain[];
+  gochar?: RashifalGocharRow[];
+  ashtakavarga?: { score: number; sav: number; sav_trikona: number; sav_kendra: number };
+  cycle?: { score: number; graha: string; graha_ne: string; graha_en: string; house: number };
+  days_in_period?: number;
+  best_day?: RashifalDayMarker;
+  weak_day?: RashifalDayMarker;
+  remedy_ne?: string;
+  remedy_en?: string;
+  prediction_ne: string;
+  prediction_en: string;
+}
+
+export interface RashifalFrame {
+  date_ad: string;
+  jd_sunrise: number;
+  vaara_num: number;
+  paksha: string;
+  tithi_index: number;
+  day_fraction: number;
+  moon_sign: number;
+  moon_sign_ne: string;
+  moon_sign_en: string;
+  sun_sign: number;
+  sun_sign_ne: string;
+  sun_sign_en: string;
+  lagna_sign: number;
+  lagna_sign_ne: string;
+  lagna_sign_en: string;
+  sarvashtakavarga: number[];
+}
+
+export interface RashifalBlock {
+  period: RashifalPeriod;
+  anchor?: string;
+  method?: Record<string, unknown>;
+  moon_index?: number;
+  moon_label?: string;
+  moon_label_en?: string;
+  signs: RashifalSignBlock[];
+  frame?: RashifalFrame;
+  ingress?: unknown[];
+  range_start_ad?: string;
+  range_end_ad?: string;
+  bs_year?: number;
+  bs_month?: number;
+  bs_month_name_ne?: string;
+  bs_month_name_en?: string;
+  days_computed?: number;
+}
+
+export interface RashifalDashaPeriod {
+  lord: string;
+  lord_ne: string;
+  lord_en: string;
+  start: string;
+  end: string;
+}
+
+export interface RashifalDasha {
+  score: number;
+  mahadasha: RashifalDashaPeriod;
+  antardasha: RashifalDashaPeriod;
+}
+
+export interface RashifalPersonal {
+  period: RashifalPeriod;
+  anchor?: string;
+  date_ad?: string;
+  range_start_ad?: string;
+  range_end_ad?: string;
+  bs_year?: number;
+  bs_month?: number;
+  bs_month_name_ne?: string;
+  bs_month_name_en?: string;
+  days_in_period?: number;
+  lagna_sign: number;
+  lagna_sign_ne: string;
+  lagna_sign_en: string;
+  moon_sign: number;
+  moon_sign_ne: string;
+  moon_sign_en: string;
+  sun_sign: number;
+  sun_sign_ne: string;
+  sun_sign_en: string;
+  lucky_lord: string;
+  lucky_lord_ne: string;
+  lucky_lord_en: string;
+  lucky_color_ne: string;
+  lucky_color_en: string;
+  lucky_number: number;
+  lucky_number_ne: string;
+  lucky_number_en: string;
+  lucky_direction_ne: string;
+  lucky_direction_en: string;
+  score: number;
+  percent: number;
+  stars: number;
+  tone: NavataraTone;
+  dasha: RashifalDasha;
+  rashi_lord: RashifalLordBlock;
+  components: RashifalComponent[];
+  domains: RashifalDomain[];
+  gochar: RashifalGocharRow[];
+  prediction_ne: string;
+  prediction_en: string;
 }
 
 export interface BalamChip {
@@ -874,6 +1104,58 @@ export const fetchFestivals = (year: number, language: "ne" | "en" = "ne") =>
   get<FestivalsResponse>(
     withCache(`/nepal/festivals?year=${year}&era=bs&language=${language}`),
   );
+
+// ─── Rashifal ────────────────────────────────────────────────────────────────
+
+export const rashifalKeys = {
+  block: (dateAd: string, period: RashifalPeriod, loc?: LocationParams) =>
+    ["rashifal", PANCHANGA_CACHE_VERSION, dateAd, period, locationKey(loc)] as const,
+  personal: (
+    dateAd: string,
+    period: RashifalPeriod,
+    profileId: string,
+    loc?: LocationParams,
+  ) =>
+    [
+      "rashifal",
+      "personal",
+      PANCHANGA_CACHE_VERSION,
+      dateAd,
+      period,
+      profileId,
+      locationKey(loc),
+    ] as const,
+};
+
+export function fetchRashifal(
+  dateAd: string,
+  period: RashifalPeriod,
+  location?: LocationParams,
+) {
+  const params = new URLSearchParams({ date: dateAd, period });
+  return get<RashifalBlock>(
+    appendLocation(withCache(`/panchanga/rashifal?${params.toString()}`), location),
+  );
+}
+
+export function fetchPersonalRashifal(
+  dateAd: string,
+  period: RashifalPeriod,
+  birth: { birth: string; birthLat: number; birthLon: number; birthTz: string },
+  location?: LocationParams,
+) {
+  const params = new URLSearchParams({
+    date: dateAd,
+    period,
+    birth: birth.birth,
+    birth_lat: String(birth.birthLat),
+    birth_lon: String(birth.birthLon),
+    birth_tz: birth.birthTz,
+  });
+  return get<RashifalPersonal>(
+    appendLocation(`/panchanga/rashifal/personal?${params.toString()}`, location),
+  );
+}
 
 // ─── Gochar (planetary transits) ─────────────────────────────────────────────
 

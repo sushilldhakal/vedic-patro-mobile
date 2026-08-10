@@ -9,6 +9,7 @@ import { PanchangaAsidePanel } from "@/components/home/PanchangaAsidePanel";
 import { PanchangaMonthGrid } from "@/components/home/PanchangaMonthGrid";
 import { type HomePatroView } from "@/components/home/PatroViewToggle";
 import { PatroFooterNote } from "@/components/branding/PatroFooterNote";
+import { HomeRashifalSection } from "@/components/home/HomeRashifalSection";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 import { ErrorState } from "@/components/ui/States";
 import {
@@ -404,6 +405,14 @@ export default function HomeScreen() {
       <View className={splitAside ? "flex-row items-start gap-5" : "gap-5"}>
         {calendarBlock}
         <View onLayout={(e) => setAsideOffsetY(e.nativeEvent.layout.y)}>{asideBlock}</View>
+      </View>
+
+      <View className="mt-6">
+        <HomeRashifalSection
+          dateAd={asideAdDate}
+          location={location.params}
+          contentInset={contentInset}
+        />
       </View>
 
       <PatroFooterNote paddingHorizontal={contentInset} />

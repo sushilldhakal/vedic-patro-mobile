@@ -8,6 +8,12 @@ import {
   LearnNote,
   LearnSection,
 } from "@/components/learn/LearnProse";
+import {
+  AyanamshaDiagram,
+  EclipseDiagram,
+  SunEarthMoonDiagram,
+  TithiAngleDiagram,
+} from "@/components/learn/diagrams/LearnDiagramWidgets";
 import { useLocale } from "@/lib/i18n";
 
 function useDigits() {
@@ -46,6 +52,7 @@ export function AstronomyBasicsArticle() {
         />
         <LearnLink slug="solar-system">{pick("सौर्यमण्डल लेख", "Solar system article")}</LearnLink>
       </LearnSection>
+      <SunEarthMoonDiagram />
       <LearnSection kicker={pick("०२", "02")} title={pick("geocentric दृष्टि", "Geocentric view")}>
         <LearnLede>
           {pick(
@@ -84,6 +91,7 @@ export function SolarSystemArticle() {
           ]}
         />
       </LearnSection>
+      <SunEarthMoonDiagram />
       <LearnLink slug="tithi">{pick("तिथि कसरी बन्छ", "How tithi is formed")}</LearnLink>
     </>
   );
@@ -217,6 +225,7 @@ export function TithiArticle() {
           ]}
         />
       </LearnSection>
+      <TithiAngleDiagram />
       <View className="gap-2">
         <LearnLink slug="tithi-vriddhi">{pick("तिथि वृद्धि", "Tithi vriddhi")}</LearnLink>
         <LearnLink slug="tithi-kshaya">{pick("तिथि क्षय", "Tithi kshaya")}</LearnLink>
@@ -338,7 +347,16 @@ export function EclipsesArticle() {
           )}
         </LearnLede>
       </LearnSection>
-      <LearnAppRouteLink href="/eclipses">{pick("ग्रहण सूची", "Eclipse list")}</LearnAppRouteLink>
+      <EclipseDiagram mode="solar" />
+      <EclipseDiagram mode="lunar" />
+      <View className="gap-2">
+        <LearnAppRouteLink href="/panchanga/surya-grahan">
+          {pick("सूर्य ग्रहण सूची", "Solar eclipse list")}
+        </LearnAppRouteLink>
+        <LearnAppRouteLink href="/panchanga/chandra-grahan">
+          {pick("चन्द्र ग्रहण सूची", "Lunar eclipse list")}
+        </LearnAppRouteLink>
+      </View>
     </>
   );
 }
@@ -346,19 +364,22 @@ export function EclipsesArticle() {
 export function AyanamshaArticle() {
   const { pick } = useDigits();
   return (
-    <LearnSection kicker={pick("०१", "01")} title={pick("अयनांश", "Ayanamsha")}>
-      <LearnLede>
-        {pick(
-          "Tropical र sidereal zodiac बीचको offset — precession le बढ्दै जान्छ। Vedic Patro default Lahiri (Chitrapaksha); Raman/KP अन्य tradition।",
-          "Offset between tropical and sidereal zodiac — grows with precession. Vedic Patro defaults to Lahiri; Raman and KP are other traditions.",
-        )}
-      </LearnLede>
-      <LearnNote>
-        {pick(
-          "API responses Lahiri sidereal positions प्रयोग गर्छन् — web र mobile एउटै backend।",
-          "API responses use Lahiri sidereal positions — web and mobile share one backend.",
-        )}
-      </LearnNote>
-    </LearnSection>
+    <>
+      <LearnSection kicker={pick("०१", "01")} title={pick("अयनांश", "Ayanamsha")}>
+        <LearnLede>
+          {pick(
+            "Tropical र sidereal zodiac बीचको offset — precession le बढ्दै जान्छ। Vedic Patro default Lahiri (Chitrapaksha); Raman/KP अन्य tradition।",
+            "Offset between tropical and sidereal zodiac — grows with precession. Vedic Patro defaults to Lahiri; Raman and KP are other traditions.",
+          )}
+        </LearnLede>
+        <LearnNote>
+          {pick(
+            "API responses Lahiri sidereal positions प्रयोग गर्छन् — web र mobile एउटै backend।",
+            "API responses use Lahiri sidereal positions — web and mobile share one backend.",
+          )}
+        </LearnNote>
+      </LearnSection>
+      <AyanamshaDiagram />
+    </>
   );
 }

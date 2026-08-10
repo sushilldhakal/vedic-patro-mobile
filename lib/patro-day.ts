@@ -52,3 +52,16 @@ export function parseCivilIsoToDate(iso: string): Date {
   const { year, month, day } = parseCivilIso(iso);
   return new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T12:00:00`);
 }
+
+export function civilIsoFromDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function addCivilDays(d: Date, delta: number): Date {
+  const next = new Date(d);
+  next.setDate(next.getDate() + delta);
+  return next;
+}

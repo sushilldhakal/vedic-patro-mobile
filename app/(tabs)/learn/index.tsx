@@ -40,6 +40,7 @@ function LearnTopicRow({ topic, onOpen }: { topic: LearnTopicMeta; onOpen: (slug
 export default function LearnScreen() {
   const { pick } = useLocale();
   const router = useRouter();
+  const colors = useThemeColors();
 
   const openTopic = (slug: string) => {
     router.push(hrefForLearnSlug(slug));
@@ -48,10 +49,39 @@ export default function LearnScreen() {
   return (
     <AppShell
       title={pick("सिकाइ", "Learn")}
-      subtitle={pick("पात्रो, पञ्चाङ्ग र ज्योतिष — लेख र चित्र", "Calendar, panchanga & jyotish guides")}
+      subtitle={pick("पात्रो, पञ्चाङ्ग र ज्योतिष — लेख र ३D चित्र", "Calendar, panchanga & jyotish — with 3D diagrams")}
     >
+      <View className="mb-5 gap-2">
+        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/learn/history")}>
+          <Card className="flex-row items-center gap-3 border-secondary/30 bg-secondary/5 p-3">
+            <Ionicons name="time-outline" size={24} color={colors.secondary} />
+            <View className="flex-1">
+              <Text className="font-semibold text-foreground">{pick("इतिहास", "History")}</Text>
+              <Text className="text-xs text-muted-foreground">
+                {pick("सूर्य सिद्धान्त र पात्रोको जग", "Surya Siddhanta & patro heritage")}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => openTopic("how-we-calculate")}>
+          <Card className="flex-row items-center gap-3 p-3">
+            <Ionicons name="server-outline" size={24} color={colors.secondary} />
+            <View className="flex-1">
+              <Text className="font-semibold text-foreground">
+                {pick("हामी यो कसरी गणना गर्छौं", "How we calculate")}
+              </Text>
+              <Text className="text-xs text-muted-foreground">
+                {pick("API + ३D सौर्यमण्डल", "API pipeline + 3D orbits")}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+          </Card>
+        </TouchableOpacity>
+      </View>
+
       {LEARN_CATEGORIES.map((cat) => {
-        const topics = topicsInCategory(cat.id);
+        const topics = topicsInCategory(cat.id).filter((t) => t.slug !== "history");
         if (topics.length === 0) return null;
         return (
           <View key={cat.id} className="mb-5">
@@ -59,7 +89,9 @@ export default function LearnScreen() {
               {pick(cat.ne, cat.en)}
             </Text>
             <View className="gap-2">
-              {topics.map((t) => (
+              {topics
+                .filter((t) => t.slug !== "how-we-calculate")
+                .map((t) => (
                 <LearnTopicRow key={t.slug} topic={t} onOpen={openTopic} />
               ))}
             </View>

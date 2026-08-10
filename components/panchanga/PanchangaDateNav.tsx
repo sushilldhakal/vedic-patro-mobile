@@ -37,6 +37,11 @@ type Props = {
   /** Civil AD for headline fallback; defaults from `date`. */
   adDateStr?: string;
   hideNavLocation?: boolean;
+  /** Override prev/next (e.g. rashifal weekly/monthly window step). */
+  onPrev?: () => void;
+  onNext?: () => void;
+  /** Replace AD subtitle (e.g. rashifal range strip). */
+  crossEraSubtitleOverride?: string;
 };
 
 /** Panchanga day header — {@link PatroDateNav} mode `year-month-time` (web `PatroDayTimeNav`). */
@@ -56,6 +61,9 @@ export function PanchangaDateNav({
   wheelData,
   adDateStr: adDateStrProp,
   hideNavLocation,
+  onPrev: onPrevProp,
+  onNext: onNextProp,
+  crossEraSubtitleOverride,
 }: Props) {
   const [browseEra, setBrowseEra] = useState<PatroBrowseEra>(eraProp);
   const handleEraChange = onEraChange ?? setBrowseEra;
@@ -120,9 +128,9 @@ export function PanchangaDateNav({
       location={location}
       onLocationChange={onLocationChange}
       onToday={() => onDateChange(new Date(`${todayAd}T12:00:00`))}
-      onPrev={() => stepDay(-1)}
-      onNext={() => stepDay(1)}
-      crossEraSubtitle={crossEraSubtitle}
+      onPrev={onPrevProp ?? (() => stepDay(-1))}
+      onNext={onNextProp ?? (() => stepDay(1))}
+      crossEraSubtitle={crossEraSubtitleOverride ?? crossEraSubtitle}
       vikramEra={vikramEra}
       samvatsara={wheelData?.samvatsara as import("@/lib/samvatsara").SamvatsaraPayload | undefined}
       toolbar={toolbar}

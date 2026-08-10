@@ -5,6 +5,7 @@ import {
   LearnNote,
   LearnSection,
 } from "@/components/learn/LearnProse";
+import { SunEarthMoonDiagram } from "@/components/learn/diagrams/LearnDiagramWidgets";
 import { useLocale } from "@/lib/i18n";
 
 /** Native mobile article — mirrors web copy without WebView or website embeds. */
@@ -64,10 +65,11 @@ export function HowWeCalculateArticle() {
           )}
         </LearnLede>
       </LearnSection>
+      <SunEarthMoonDiagram />
       <LearnNote>
         {pick(
-          "विस्तृत चित्र र सन्दर्भ तालिका वेब संस्करणमा छन्; मोबाइलमा गणना परिणाम सधैं API बाट — उही स्रोत जुन vedicpatro.com ले प्रयोग गर्छ।",
-          "Full diagrams and reference tables live on the web app; on mobile, computed values always come from the same API the website uses.",
+          "माथिको ३D चित्र le खगोल visualize गर्छ — पञ्चाङ्ग गणना सधैं server मा (Swiss Ephemeris)।",
+          "The 3D view above illustrates the sky — panchanga math always runs on the server (Swiss Ephemeris).",
         )}
       </LearnNote>
     </>

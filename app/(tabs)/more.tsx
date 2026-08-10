@@ -12,6 +12,7 @@ import {
   SITEMAP_LEARN_SLUGS,
   SITEMAP_ROUTES,
   SITEMAP_SAIT_CATEGORIES,
+  type SitemapRoute,
 } from "@/lib/sitemap-routes";
 import { CEREMONY_META, ELEMENT_BY_ID } from "@/lib/panchanga-elements";
 import { LEARN_TOPIC_METAS } from "@/lib/learn/learn-topics-meta";
@@ -38,6 +39,19 @@ function RouteRow({
       <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
     </Pressable>
   );
+}
+
+const GROUP_TITLE: Record<SitemapRoute["group"], { ne: string; en: string }> = {
+  main: { ne: "मुख्य", en: "Main" },
+  panchanga: { ne: "पञ्चाङ्ग", en: "Panchanga" },
+  jyotish: { ne: "ज्योतिष", en: "Jyotish" },
+  learn: { ne: "सिकाइ", en: "Learn" },
+  sait: { ne: "शुभ साइत", en: "Ceremony muhurta" },
+  tools: { ne: "उपकरण", en: "Tools" },
+};
+
+function routesByGroup(group: SitemapRoute["group"]) {
+  return SITEMAP_ROUTES.filter((r) => r.group === group);
 }
 
 export default function MoreScreen() {
@@ -82,19 +96,24 @@ export default function MoreScreen() {
         </View>
       ) : null}
       <View className={isTablet ? "flex-row flex-wrap gap-4" : "gap-4"}>
-        <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
-          <Text className="mb-2 text-base font-semibold text-foreground">
-            {pick("मुख्य", "Main")}
-          </Text>
-          {SITEMAP_ROUTES.map((r) => (
-            <RouteRow
-              key={r.path}
-              path={r.path}
-              label={pick(r.ne, r.en)}
-              icon={r.icon}
-            />
-          ))}
-        </Card>
+        {(["main", "panchanga", "jyotish", "tools"] as const).map((group) => {
+          const routes = routesByGroup(group);
+          if (!routes.length) return null;
+          const title = GROUP_TITLE[group];
+          return (
+            <Card key={group} className={isTablet ? "min-w-[45%] flex-1" : ""}>
+              <Text className="mb-2 text-base font-semibold text-foreground">
+                {pick(title.ne, title.en)}
+              </Text>
+              {routes.map((r) => (
+                <RouteRow key={r.path} path={r.path} label={pick(r.ne, r.en)} icon={r.icon} />
+              ))}
+              {group === "tools" ? (
+                <RouteRow path="/account" label={pick("खाता", "Account")} icon="person-outline" />
+              ) : null}
+            </Card>
+          );
+        })}
 
         <Card className={isTablet ? "min-w-[45%] flex-1" : ""}>
           <Text className="mb-2 text-base font-semibold text-foreground">
