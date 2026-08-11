@@ -39,6 +39,11 @@ const SUN_AT: [number, number, number] = [1.5, 0, 0];
 const SUN_R = 0.2;
 const ARC_R = 0.44;
 const ARC_THICKNESS = 0.011;
+/** One tithi is 12° of elongation, and thirty of them close a lunar month. */
+const TITHI_DEG = 12;
+const TITHI_COUNT = 30;
+/** A sliver taken off each block so neighbours read as separate steps. */
+const TITHI_GAP_DEG = 1.6;
 
 type Props = {
   clock: DiagramClockRef;
@@ -50,6 +55,8 @@ type Props = {
     moon: string;
     /** "तिथि" / "Tithi" — the running count is appended. */
     tithi: string;
+    /** Names the whole sweep, e.g. "कुल कोण" / "Total angle". */
+    totalAngle: string;
   };
   digits: (v: string | number) => string;
 };
@@ -68,9 +75,9 @@ export const TithiAngleScene = memo(function TithiAngleScene({
   const moonRef = useRef<THREE.Group>(null);
   const moonRayRef = useRef<THREE.Mesh>(null);
   const sunRayRef = useRef<THREE.Mesh>(null);
-  const arcRef = useRef<THREE.Group>(null);
-  const arcMeshRef = useRef<THREE.Mesh>(null);
-  const arcSweep = useRef({ deg: -1 });
+  const stepRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const runningRef = useRef<THREE.Mesh>(null);
+  const runningSweep = useRef({ deg: -1 });
   const orbitPoints = useRef(ellipsePoints(MOON_ORBIT, 0, 72)).current;
 
   useFrame((_state, delta) => {
@@ -89,7 +96,19 @@ export const TithiAngleScene = memo(function TithiAngleScene({
     orientRay(moonRayRef.current, [0, 0, 0], moonAt);
     orientRay(sunRayRef.current, [0, 0, 0], [SUN_AT[0] * 0.7, 0, 0]);
 
-    setArcSweep(arcMeshRef.current, ARC_R, ARC_THICKNESS, angle, arcSweep.current);
+    /* The arc is never drawn as one sweep: whole tithis already closed show as
+       separate 12° blocks, and only the one in progress grows. Counting the
+       blocks is the point of the diagram. */
+    const completed = Math.floor(elong / TITHI_DEG);
+    for (let i = 0; i < TITHI_COUNT; i++) {
+      const step = stepRefs.current[i];
+      if (step) step.visible = i < completed;
+    }
+    const partialDeg = elong - completed * TITHI_DEG;
+    if (runningRef.current) {
+      runningRef.current.rotation.set(-Math.PI / 2, 0, completed * TITHI_DEG * RAD);
+      setArcSweep(runningRef.current, ARC_R, ARC_THICKNESS * 1.5, partialDeg * RAD, runningSweep.current);
+    }
 
     if (projector.begin()) {
       projector.push(
@@ -104,25 +123,41 @@ export const TithiAngleScene = memo(function TithiAngleScene({
         { id: "sun", text: copy.sun, color: DIAGRAM_LABEL_COLOR.sun },
         [SUN_AT[0], SUN_R + 0.16, 0],
       );
-      const half = angle / 2;
+      /* The whole sweep, named for what it is: an angle, not a tithi. */
       projector.push(
         {
           id: "angle",
-          text: `${digits(Math.round(elong))}°`,
-          color: DIAGRAM_LABEL_COLOR.arc,
-          size: 11,
+          text: `${copy.totalAngle} ${digits(Math.round(elong))}°`,
+          color: DIAGRAM_LABEL_COLOR.body,
+          size: 10,
         },
-        [0.6 * Math.cos(half), 0.02, -0.6 * Math.sin(half)],
+        arcPoint(elong / 2, 0.74),
       );
+      /* One block, named — this is the 12° the count is made of. */
+      projector.push(
+        { id: "unit", text: `${digits(12)}°`, color: DIAGRAM_LABEL_COLOR.arc, size: 9 },
+        arcPoint(TITHI_DEG / 2, ARC_R * 0.74),
+      );
+      /* And the block currently filling, which is the tithi you are in. */
       projector.push(
         {
           id: "tithi",
           text: `${copy.tithi} ${digits(tithiIndexFromElongation(elong))}`,
-          color: DIAGRAM_LABEL_COLOR.arc,
-          size: 10,
+          color: DIAGRAM_LABEL_COLOR.rashi,
+          size: 11,
+        },
+        arcPoint(completed * TITHI_DEG + TITHI_DEG / 2, ARC_R * 1.42),
+      );
+      /* The running total as a sum, so the arithmetic is on screen. */
+      projector.push(
+        {
+          id: "sum",
+          text: `${digits(completed)} × ${digits(12)}° + ${digits(Math.round(partialDeg))}°`,
+          color: DIAGRAM_LABEL_COLOR.dim,
+          size: 9,
           dy: 14,
         },
-        [0.6 * Math.cos(half), 0.02, -0.6 * Math.sin(half)],
+        arcPoint(elong / 2, 0.74),
       );
       projector.end();
     }
@@ -152,18 +187,46 @@ export const TithiAngleScene = memo(function TithiAngleScene({
         <cylinderGeometry args={[0.005, 0.005, 1, 6]} />
         <meshBasicMaterial color={DIAGRAM_COLOR.moon} transparent opacity={0.6} depthWrite={false} />
       </mesh>
-      <group ref={arcRef} rotation={[-Math.PI / 2, 0, 0]}>
-        <mesh ref={arcMeshRef}>
-          <torusGeometry args={[ARC_R, ARC_THICKNESS, 8, 4, 0.05]} />
-          <meshBasicMaterial color={DIAGRAM_COLOR.arc} depthWrite={false} />
+      {/* Closed tithis: one block each, with a gap between them so they can be
+          counted off the screen. */}
+      {Array.from({ length: TITHI_COUNT }, (_, i) => (
+        <mesh
+          key={i}
+          ref={(mesh) => {
+            stepRefs.current[i] = mesh;
+          }}
+          rotation={[-Math.PI / 2, 0, i * TITHI_DEG * RAD]}
+          visible={false}
+        >
+          <torusGeometry
+            args={[ARC_R, ARC_THICKNESS, 8, 10, (TITHI_DEG - TITHI_GAP_DEG) * RAD]}
+          />
+          <meshBasicMaterial
+            color={DIAGRAM_COLOR.arc}
+            transparent
+            opacity={0.75}
+            depthWrite={false}
+          />
         </mesh>
-      </group>
+      ))}
+
+      {/* The tithi in progress — the only part that grows. */}
+      <mesh ref={runningRef} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[ARC_R, ARC_THICKNESS * 1.5, 8, 4, 0.02]} />
+        <meshBasicMaterial color={DIAGRAM_COLOR.sun} depthWrite={false} />
+      </mesh>
 
       {/* Every 12° — the tithi boundaries, drawn once. */}
       <TithiTicks />
     </>
   );
 });
+
+/** A point on the count ring at a given angle from the Sun, degrees. */
+function arcPoint(deg: number, radius: number): [number, number, number] {
+  const a = deg * RAD;
+  return [radius * Math.cos(a), 0.02, -radius * Math.sin(a)];
+}
 
 /** The thirty 12° marks the arc is counted in. */
 function TithiTicks() {

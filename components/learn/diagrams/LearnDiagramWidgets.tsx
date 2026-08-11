@@ -165,6 +165,7 @@ export function TithiAngleDiagram() {
       earth: pick("पृथ्वी", "Earth"),
       moon: pick("चन्द्र", "Moon"),
       tithi: pick("तिथि", "Tithi"),
+      totalAngle: pick("कुल कोण", "Total angle"),
     }),
     [pick],
   );
@@ -178,13 +179,17 @@ export function TithiAngleDiagram() {
       target={TITHI_TARGET}
       idleSpin={0.03}
       legend={[
-        { color: DIAGRAM_COLOR.arc, label: pick("कोण (elongation)", "Elongation") },
-        { color: DIAGRAM_COLOR.sun, label: pick("१२° चिन्ह", "12° marks") },
+        { color: DIAGRAM_COLOR.arc, label: pick("पूरा भएका तिथि (१२° each)", "Completed tithis (12° each)") },
+        { color: DIAGRAM_COLOR.sun, label: pick("चालु तिथि", "Tithi in progress") },
         { color: DIAGRAM_COLOR.moon, label: pick("चन्द्र कक्ष", "Moon's orbit") },
       ]}
       readouts={[
-        { k: pick("कोण", "Angle"), v: `${digits(Math.round(elong))}°`, tone: "accent" },
-        { k: pick("तिथि", "Tithi"), v: digits(tithi), tone: "accent" },
+        { k: pick("कुल कोण", "Total angle"), v: `${digits(Math.round(elong))}°`, tone: "accent" },
+        {
+          k: pick("पूरा भएका तिथि", "Tithis completed"),
+          v: `${digits(Math.floor(elong / 12))} × ${digits(12)}°`,
+        },
+        { k: pick("चालु तिथि", "Tithi running"), v: digits(tithi), tone: "warn" },
         {
           k: pick("पक्ष", "Paksha"),
           v:
@@ -220,8 +225,8 @@ export function TithiAngleDiagram() {
       presetValue={day}
       presetTolerance={0.6}
       caption={pick(
-        "पृथ्वीबाट हेर्दा सूर्य र चन्द्रबीचको कोण नै तिथिको आधार हो — प्रत्येक १२° ले एक तिथि पूरा गर्छ, ३० तिथिमा एक चान्द्र महिना। चन्द्रको उज्यालो भाग पनि यही कोणले तय गर्छ, त्यसैले दृश्यमा चन्द्रको कला आफैँ मिल्छ।",
-        "Tithi is the Sun–Moon angle seen from Earth: every 12° closes one tithi, thirty of them a lunar month. The same angle sets how much of the Moon is lit, so the phase in the scene follows from the geometry rather than being drawn on.",
+        "पृथ्वीबाट हेर्दा सूर्य र चन्द्रबीचको कोण नै तिथिको आधार हो। एक तिथि = १२° — सिंगो कोण होइन। चापमा देखिने प्रत्येक हरियो टुक्रा एउटा पूरा भएको तिथि हो; पहेंलो टुक्रा अहिले चलिरहेको तिथि। जस्तै ९८° = ८ × १२° + २°, अर्थात् ८ तिथि सकिएर ९औँ चलिरहेको। ३० तिथिमा एक चान्द्र महिना पूरा हुन्छ।",
+        "Tithi is the Sun–Moon angle seen from Earth, and one tithi is 12° of it — not the whole sweep. Each green block on the arc is one completed tithi; the amber block is the one running now. So 98° = 8 × 12° + 2°: eight tithis closed and the 9th in progress. Thirty of them close a lunar month.",
       )}
     >
       {({ onLabels }) => (
