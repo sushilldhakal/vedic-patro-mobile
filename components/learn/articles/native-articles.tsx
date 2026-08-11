@@ -11,6 +11,7 @@ import {
 import {
   AyanamshaDiagram,
   EclipseDiagram,
+  SeasonsDiagram,
   SunEarthMoonDiagram,
   TithiAngleDiagram,
 } from "@/components/learn/diagrams/LearnDiagramWidgets";
@@ -61,6 +62,7 @@ export function AstronomyBasicsArticle() {
           )}
         </LearnLede>
       </LearnSection>
+      <SeasonsDiagram />
     </>
   );
 }
@@ -161,6 +163,7 @@ export function AdhikMaasArticle() {
           )}
         </LearnNote>
       </LearnSection>
+      <SunEarthMoonDiagram />
     </>
   );
 }
@@ -178,6 +181,8 @@ export function RituDriftArticle() {
         </LearnLede>
         <LearnLink slug="ayanamsha">{pick("अयनांश", "Ayanamsha")}</LearnLink>
       </LearnSection>
+      <SeasonsDiagram />
+      <AyanamshaDiagram />
     </>
   );
 }
@@ -316,6 +321,7 @@ export function SankrantiArticle() {
           )}
         </LearnLede>
       </LearnSection>
+      <SunEarthMoonDiagram />
       <LearnAppRouteLink href="/suryakranti">{pick("सूर्यक्रान्ति पृष्ठ", "Suryakranti screen")}</LearnAppRouteLink>
     </>
   );
