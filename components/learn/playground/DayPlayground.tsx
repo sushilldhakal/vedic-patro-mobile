@@ -50,10 +50,6 @@ import Slider from "@react-native-community/slider";
 import { Canvas } from "@/components/learn/diagrams/LearnCanvas";
 import { Text } from "@/components/ui/Text";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
-import {
-  NakshatraGlyphIcon,
-  RashiGlyphIcon,
-} from "@/components/panchanga/element/ElementGlyphIcon";
 import { useLocale } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme-context";
 import { nativeWindThemeVars } from "@/lib/nativewind-theme-vars";
@@ -80,6 +76,10 @@ import {
 import EotGraph from "@/components/learn/playground/EotGraph";
 import PerfMeter, { type PerfSample } from "@/components/learn/playground/PerfMeter";
 import type { PlaygroundLabel } from "@/components/learn/playground/playground-labels";
+import {
+  LABEL_TONE as TONE,
+  PlaygroundLabelText,
+} from "@/components/learn/playground/PlaygroundLabelText";
 import Scene, {
   type CameraState,
   type CameraTarget,
@@ -94,14 +94,6 @@ const DEG = Math.PI / 180;
 
 /** The 1× rung in {@link SPEED_MULTIPLIERS} — where every topic opens. */
 const DEFAULT_SPEED_RUNG = SPEED_MULTIPLIERS.indexOf(1);
-
-const TONE = {
-  sidereal: "#6cb6f5",
-  solar: "#e6e34a",
-  mean: "#f0736a",
-} as const;
-
-const GOLD = "#d8c84a";
 
 /** Card height. Fullscreen always takes the window. */
 const CARD_HEIGHT = 340;
@@ -733,7 +725,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
             projection — see `playground-labels.ts`. */}
         <View pointerEvents="none" className="absolute inset-0">
           {labels.map((label) => (
-            <SceneLabelText key={label.id} label={label} />
+            <PlaygroundLabelText key={label.id} label={label} />
           ))}
         </View>
 
@@ -1081,77 +1073,6 @@ function SheetPanel({
     </View>
   );
 }
-
-/**
- * One projected name over the canvas.
- *
- * Memoised on the label's own fields, because a pass replaces the whole list
- * and most of the sixty entries have not changed since the last one.
- *
- * The glyph is drawn only for the division the body is actually standing in.
- * The web draws one beside every name, which it can afford — there the labels
- * are DOM nodes that never re-render. Here a pass is a React render of every
- * label, and twenty-seven नक्षत्र SVGs in that render is the difference between
- * a smooth transport row and a stuttering one. The undimmed one is the only
- * glyph carrying information anyway: it says where the Sun or the Moon is.
- */
-const SceneLabelText = memo(function SceneLabelText({ label }: { label: PlaygroundLabel }) {
-  const color = label.tone
-    ? TONE[label.tone]
-    : label.kind === "rashi"
-      ? GOLD
-      : label.kind === "nakshatra"
-        ? "#8fb6d8"
-        : label.kind === "month"
-          ? "#e3d9a8"
-          : label.id === "b-rahu"
-            ? "#c4b5fd"
-            : label.id === "b-ketu"
-              ? "#fb7185"
-              : "#ffffff";
-
-  const glyph =
-    label.dim || label.index == null ? null : label.kind === "rashi" ? (
-      <RashiGlyphIcon number={label.index} size={13} />
-    ) : label.kind === "nakshatra" ? (
-      <NakshatraGlyphIcon number={label.index} size={15} />
-    ) : null;
-
-  return (
-    <View
-      pointerEvents="none"
-      className="absolute items-center"
-      style={{
-        left: label.x,
-        top: label.y,
-        /* Centred on the anchor without measuring: the box is free to overflow
-           its own origin, and it is lifted by half a line so the text does not
-           cover the point it names. */
-        transform: [{ translateX: -45 }, { translateY: -8 }],
-        width: 90,
-        opacity: label.dim ? 0.45 : 1,
-      }}
-    >
-      {glyph}
-      <Text
-        numberOfLines={1}
-        className="text-[10px] font-semibold"
-        style={[
-          nepaliTextStyle(10),
-          {
-            color,
-            fontSize: 10,
-            textAlign: "center",
-            textShadowColor: "rgba(0,0,0,0.95)",
-            textShadowRadius: 3,
-          },
-        ]}
-      >
-        {label.text}
-      </Text>
-    </View>
-  );
-});
 
 /**
  * Green / amber / red on the reading that actually decides whether it feels

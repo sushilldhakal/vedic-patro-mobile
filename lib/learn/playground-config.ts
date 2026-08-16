@@ -203,18 +203,8 @@ export const PLAYGROUND_BY_SLUG: Record<string, PlaygroundConfig> = {
   /* ── the year and the orbit ──────────────────────────────────────── */
   "bs-calendar": { mode: "year" },
   "solar-system": { mode: "year" },
-  "calendar-differences": {
-    mode: "year",
-    /* The whole topic is solar year against lunar year, so the Moon's lap and
-       the arc it still owes are on from the start. */
-    layers: { moon: true, moonLap: true, moonTrail: true },
-  },
-  "adhik-maas": {
-    mode: "year",
-    /* अधिक मास exists to absorb the eleven days twelve lunar months fall short
-       by, and `moonLap` is the picture of exactly that shortfall. */
-    layers: { moon: true, moonLap: true },
-  },
+  /* `calendar-differences` and `adhik-maas` are not here on purpose — they get
+     the सौरमान/चान्द्रमान study instead. See {@link TWO_SYSTEMS_SLUGS}. */
 
   /* ── the Moon: तिथि and its two irregularities ───────────────────── */
   tithi: {
@@ -256,6 +246,32 @@ export const PLAYGROUND_BY_SLUG: Record<string, PlaygroundConfig> = {
 
 export function playgroundFor(slug: string): PlaygroundConfig | undefined {
   return PLAYGROUND_BY_SLUG[slug];
+}
+
+/**
+ * Topics that carry the सौरमान/चान्द्रमान study instead of the day playground.
+ *
+ * A different scene answering a different question: the playground is a model
+ * you set the dials on, while `TwoSystemsStudy` runs the *real* ephemeris over
+ * the actual current year and lays the two ladders — twelve सङ्क्रान्ति against
+ * however many औंसी fit inside them — on one timeline. Only that second scene
+ * can end on the ~11-day shortfall by measuring it, which is what these two
+ * topics are for.
+ *
+ * The two sets are deliberately disjoint. Both scenes are WebGL canvases and
+ * both animate; putting a pair of them in one scrolling article costs two live
+ * GL contexts and two render loops on a device that has better uses for both.
+ * So each topic gets whichever scene argues its own point, and never both.
+ *
+ * The web places this scene differently — on its geocentric-vs-heliocentric and
+ * retrograde chapters, which have no counterpart in this app's topic list. The
+ * scene is the same; where it earns its place is not, because the two Learn
+ * libraries hold different articles.
+ */
+export const TWO_SYSTEMS_SLUGS = new Set(["calendar-differences", "adhik-maas"]);
+
+export function hasTwoSystems(slug: string): boolean {
+  return TWO_SYSTEMS_SLUGS.has(slug);
 }
 
 /** The config resolved into the full state the playground opens with. */
