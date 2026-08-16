@@ -13,6 +13,26 @@
 - Cross-links use `LearnLink` / `LearnAppRouteLink` in `LearnProse.tsx` (Expo Router), not external URLs.
 - `history` is a dedicated native screen at `app/(tabs)/learn/history.tsx`.
 
+### Learn 3D
+
+Two separate things, and they are not interchangeable:
+
+| | Where | What it is |
+|---|---|---|
+| Diagrams | `components/learn/diagrams/` | One scene per idea, wrapped in `LearnDiagram3D`. Small, fixed, illustrative. |
+| Playground | `components/learn/playground/` | **One** scene for every topic, configured per slug. |
+
+The playground is a port of the web app's `DayPlaygroundStudy` + `DaySimScene`,
+and it is meant to stay one. Its geometry files (`DaySimScene.tsx`,
+`EclipticWheel.tsx`) and its maths (`lib/sky3d/day-mechanics.ts`) are kept
+line-for-line with the web's so a fix on either side is a diff the other can
+take verbatim — the places where the platform forced a change are marked
+`── native ──`. See `docs/learn-playground.md` before editing them.
+
+Which topics carry a playground, and what each one opens with, is
+`lib/learn/playground-config.ts`. A topic with no entry gets none, which is the
+right default for the ones the sim cannot honestly illustrate.
+
 ## Patro date + location UI
 
 Single source: `components/patro-date/`.
