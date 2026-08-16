@@ -78,6 +78,7 @@ import {
   type PlaygroundConfig,
 } from "@/lib/learn/playground-config";
 import EotGraph from "@/components/learn/playground/EotGraph";
+import PerfMeter, { type PerfSample } from "@/components/learn/playground/PerfMeter";
 import type { PlaygroundLabel } from "@/components/learn/playground/playground-labels";
 import Scene, {
   type CameraState,
@@ -181,6 +182,10 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [sheet, setSheet] = useState<"controls" | "focus" | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
+  /* Off by default and reachable only from the controls sheet — see PerfMeter
+     for why it is not gated on `__DEV__`. */
+  const [perfOpen, setPerfOpen] = useState(false);
+  const [perf, setPerf] = useState<PerfSample | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
   /** Which planet preset is showing; `""` is this topic's own. */
@@ -590,6 +595,26 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         ["moonTrail", pick("चन्द्रपथ", "Moon trail")],
         ["moonLap", pick("मास फरक", "Month gap")],
       ])}
+
+      {/* Last, and its own section rather than a layer: it does not change what
+          the scene shows, it reports what the scene costs. `docs/learn-playground.md`
+          says what to do with the numbers. */}
+      <View className="gap-1.5 border-t border-white/10 pt-2.5">
+        <Text
+          className="text-[10px] font-bold uppercase tracking-wide"
+          style={[nepaliTextStyle(10), { color: "rgba(255,255,255,0.55)", fontSize: 10 }]}
+        >
+          {pick("मापन", "Measure")}
+        </Text>
+        <View className="flex-row flex-wrap gap-1.5">
+          {chip(
+            perfOpen,
+            pick("फ्रेम दर", "Frame rate"),
+            () => setPerfOpen((v) => !v),
+            "perf",
+          )}
+        </View>
+      </View>
     </SheetPanel>
   );
 
@@ -698,6 +723,9 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
               onSample={onSample}
             />
             <SceneReady onReady={() => setReady(true)} />
+            {/* Last in the tree on purpose: `useFrame` runs in mount order, so
+                this counts the sim's own work rather than racing it. */}
+            {perfOpen ? <PerfMeter onSample={setPerf} /> : null}
           </Suspense>
         </Canvas>
 
@@ -712,6 +740,26 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         {!ready ? (
           <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
             <VedicPatroLoader />
+          </View>
+        ) : null}
+
+        {/* Latin digits and a fixed-width feel on purpose: this is an
+            instrument, not a reading, and a number that changes script with the
+            app's language is harder to compare against a note in a doc. */}
+        {perfOpen && perf ? (
+          <View
+            pointerEvents="none"
+            className="absolute bottom-2.5 left-2.5 rounded-lg bg-black/70 px-2 py-1"
+          >
+            <Text className="text-[11px] font-bold" style={{ color: perfTone(perf), fontSize: 11 }}>
+              {`${perf.fps.toFixed(0)} fps · worst ${perf.worstMs.toFixed(0)} ms`}
+            </Text>
+            <Text
+              className="text-[10px]"
+              style={{ color: "rgba(255,255,255,0.55)", fontSize: 10 }}
+            >
+              {`${perf.drawCalls} draws · ${(perf.triangles / 1000).toFixed(1)}k tris`}
+            </Text>
           </View>
         ) : null}
 
@@ -1104,6 +1152,22 @@ const SceneLabelText = memo(function SceneLabelText({ label }: { label: Playgrou
     </View>
   );
 });
+
+/**
+ * Green / amber / red on the reading that actually decides whether it feels
+ * broken — the worst frame, not the average.
+ *
+ * 20ms is about three frames at 60Hz and is where a stall starts to be visible
+ * as a hitch; 40ms is where it reads as a stutter. The average has to be poor
+ * *as well* to earn amber, so a scene holding 55fps with one 45ms frame still
+ * shows red — which is the point, because that is exactly the shape a periodic
+ * label pass would make.
+ */
+function perfTone(p: PerfSample): string {
+  if (p.worstMs > 40) return "#f0736a";
+  if (p.worstMs > 20 || p.fps < 45) return "#e6b34a";
+  return "#6ee7a8";
+}
 
 /** Mounts once the scene's textures have resolved — drops the loader. */
 function SceneReady({ onReady }: { onReady: () => void }) {

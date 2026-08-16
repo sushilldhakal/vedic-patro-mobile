@@ -87,8 +87,59 @@ The Hermes bundle grew from **9.15 MB to 9.38 MB** — about 230 kB, since
 sky. Verified by building: `tsc --noEmit` reports nothing new, and
 `expo export` succeeds for ios, android and web.
 
-Frame rate on real hardware has **not** been measured. The scene is heavier than
-the diagrams beside it — sixty label projections and a belt of a few hundred
-line segments — and the two economies above were chosen with a mid-range Android
-in mind, but "chosen with in mind" is not "measured". That is the next thing to
-do with a device in hand.
+Frame rate on real hardware has **not** been measured yet. The scene is heavier
+than the diagrams beside it — sixty label projections and a belt of a few
+hundred line segments — and the economies above were chosen with a mid-range
+Android in mind, which is not the same as measuring one.
+
+## Measuring it
+
+The playground carries its own meter, so this needs a phone and about five
+minutes, not a profiler.
+
+**It must be a release build.** A dev bundle runs unoptimised JS and, with a
+debugger attached, an order of magnitude slower; a number read there is not the
+number a reader gets. `npx expo run:android --variant release` or
+`npx expo run:ios --configuration Release`, or any TestFlight / internal-track
+build.
+
+Then: open a Learn topic that has a playground, **Controls → Measure → Frame
+rate**, press play, and read the overlay at the bottom-left.
+
+Do it in these four states, because they stress different things:
+
+| State | What it stresses |
+| --- | --- |
+| `how-we-calculate`, playing | the day arcs — geometry rebuilds, few labels |
+| `nakshatra`, playing | **the label pass** — all 27 नक्षत्र plus 12 राशि and the months |
+| `nakshatra`, playing, fullscreen | the same, at full device resolution |
+| `eclipses`, playing, Moon trail on | the 160-point trail rebuild |
+
+### Reading the numbers
+
+`worst` is the reading that matters, not `fps`. The suspected cost is periodic —
+the label pass fires every tenth frame and replaces up to sixty `Text` nodes —
+and a periodic cost shows up as a spike, not as a lower average. The colour
+tracks `worst` for that reason.
+
+- **Green, and `worst` near `1000 / fps`.** Nothing to do. Write the numbers
+  into the table below and delete this section's warning.
+- **`worst` is 3–4× the average, `draws` and `tris` steady.** That is the label
+  pass. Raise `every` in `usePlaygroundLabels` (`playground-labels.ts`) from 10
+  to 15 or 20 and measure again — the labels lag a little more and nothing else
+  changes. If that fixes it, the belts are the cost and the next lever is
+  labelling every other नक्षत्र at small camera distances.
+- **`fps` low and flat, `worst` near the average.** Not the labels — this is
+  fill rate or draw count. Drop the `dpr` cap on the `Canvas` from 1.75 to 1.5,
+  and check `draws`: if it is high, the belt's `LineSegments` are the place to
+  look, since each `visible` toggle there is a separate draw.
+- **Only fullscreen is bad.** Purely fill rate. `dpr` is the only knob worth
+  turning.
+
+### Results
+
+Fill in when measured, so the next person is not guessing either.
+
+| Device | OS | Topic / state | fps | worst (ms) | draws | tris |
+| --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | |
