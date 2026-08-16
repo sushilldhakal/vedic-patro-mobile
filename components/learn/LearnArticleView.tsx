@@ -10,6 +10,8 @@ import {
 } from "@/lib/learn/learn-topics-meta";
 import { hrefForLearnSlug } from "@/lib/learn/learn-href";
 import { getLearnArticleContent } from "@/lib/learn/learn-topics";
+import { playgroundFor } from "@/lib/learn/playground-config";
+import { DayPlayground } from "@/components/learn/playground/DayPlayground";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useThemeColors } from "@/lib/theme-context";
@@ -62,6 +64,9 @@ export function LearnArticleView({ slug }: { slug: string }) {
   const category = meta ? LEARN_CATEGORIES.find((c) => c.id === meta.category) : undefined;
   const Content = getLearnArticleContent(slug);
   const { prev, next } = adjacentTopicMetas(slug);
+  /* Not every topic gets one, and that is the point: a topic with no entry in
+     the config is one the sim cannot honestly illustrate. */
+  const playground = playgroundFor(slug);
 
   if (!meta || !Content) {
     return (
@@ -86,6 +91,16 @@ export function LearnArticleView({ slug }: { slug: string }) {
       <View className="rounded-2xl border border-border bg-card p-4">
         <Content />
       </View>
+
+      {/* Below the prose rather than inside it: the playground is the whole
+          article's instrument, not one figure in an argument, and every one of
+          its layers reaches past whatever section it would otherwise sit in. */}
+      {playground ? (
+        <DayPlayground
+          config={playground}
+          title={pick(`${meta.titleNe} · आकाश`, `${meta.titleEn} · sky`)}
+        />
+      ) : null}
 
       <View className="flex-row gap-2">
         {prev ? (
