@@ -77,13 +77,12 @@ in `AakashGocharSky.tsx`:
 
 | Feature | Where it lives | State |
 | --- | --- | --- |
-| **Horizon view** | `mode === "horizon"` throughout the scene; the day/night wash keys off it in the shell too | No chip. Only Space and पृथ्वी गोला are offered, so it cannot be entered. |
+| ~~Horizon view~~ | — | **Audit error.** Neither app offers a horizon chip; both only switch space ↔ globe. The code is dead on the web too, so this is not a parity gap. |
 | **Alt-az grid** | `toggles.grid`, lines 1144–1178 | Defaults on, no chip to turn it off. |
 | **ध्रुव तारा field** | `toggles.poleStars`, lines 1101–1315 | Same. |
 | **अक्ष झुकाव marks** | `toggles.tilt`, lines 1080–1317 | Same. |
 
-Four chips and a `setMode("horizon")` would land all of it. That is the cheapest
-parity work in this repo by a wide margin.
+Three chips landed all of the live ones. **Done** — see the Layers sheet.
 
 ## Not missing — deliberately different
 
