@@ -1201,7 +1201,36 @@ export function AakashGocharScene({
     const height = state.size.height;
     const collect = toggles.labels && frame.current % 6 === 0;
     const collected: ScreenLabel[] = [];
+    /**
+     * Is the Earth between the camera and this point?
+     *
+     * In अन्तरिक्ष the globe is opaque and sits at the origin, but the names are
+     * overlay text and overlay text has no depth test — so `सूर्य` went on
+     * floating over the Pacific while the Sun itself was correctly hidden
+     * behind it. Ray against sphere, from the eye to the label: `oc` is the
+     * camera's own position because the sphere is centred on the origin.
+     */
+    const behindEarth = (at: [number, number, number]) => {
+      if (!space) return false;
+      const cam = state.camera.position;
+      const dx = at[0] - cam.x;
+      const dy = at[1] - cam.y;
+      const dz = at[2] - cam.z;
+      const reach = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (reach < 1e-4) return false;
+      const ix = dx / reach;
+      const iy = dy / reach;
+      const iz = dz / reach;
+      const b = cam.x * ix + cam.y * iy + cam.z * iz;
+      const c = cam.lengthSq() - EARTH_RADIUS * EARTH_RADIUS;
+      const disc = b * b - c;
+      if (disc <= 0) return false;
+      const hit = -b - Math.sqrt(disc);
+      return hit > 0 && hit < reach;
+    };
+
     const project = (label: Omit<ScreenLabel, "x" | "y">, at: [number, number, number]) => {
+      if (behindEarth(at)) return;
       scratch.current.set(at[0], at[1], at[2]).project(state.camera);
       if (scratch.current.z > 1) return;
       const x = (scratch.current.x * 0.5 + 0.5) * width;
