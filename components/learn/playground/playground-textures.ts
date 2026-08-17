@@ -17,7 +17,7 @@ import * as THREE from "three";
 import { useMemo } from "react";
 
 const MODULES = {
-  earth: require("@/assets/graha/earth.png"),
+  earth: require("@/assets/graha/earth-orig.png"),
   sun: require("@/assets/sky3d/sun.jpg"),
   moon: require("@/assets/sky3d/moon.jpg"),
   background: require("@/assets/sky3d/background.jpg"),
@@ -40,6 +40,7 @@ export function usePlaygroundTextures(): Record<PlaygroundTextureKey, THREE.Text
       const tex = loaded[i];
       if (!tex) return;
       tex.colorSpace = THREE.SRGBColorSpace;
+      tex.premultiplyAlpha = false;
       map[key] = tex;
     });
     return map;

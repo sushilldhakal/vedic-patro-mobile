@@ -94,6 +94,14 @@ const PI2 = Math.PI * 2;
 /** Radius of the mean orbit. Everything else is scaled against this. */
 export const MEAN_DISTANCE = 10;
 const PLANET_R = 1;
+/**
+ * How much of the map survives on the night side.
+ *
+ * Not zero: the far side of the planet is the thing a reader is trying to keep
+ * track of while it turns, and a black cap hides which country is about to come
+ * round. Dark enough that the lit side is unmistakably the lit side.
+ */
+const EARTH_NIGHT = 0.34;
 /** काठमाडौँ's longitude in radians — the spin phase that puts it at noon. */
 const KATHMANDU_LON = KATHMANDU.lon * (Math.PI / 180);
 /** Where the mean sun sits. Read-only — never mutate it. */
@@ -345,21 +353,38 @@ function setRingArc(mesh: THREE.Mesh, angle: number, segments: number) {
 function makeLine(geometry: THREE.BufferGeometry, color: number, opacity: number) {
   return new THREE.Line(
     geometry,
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthTest: true,
+      depthWrite: false,
+    }),
   );
 }
 
 /**
- * Solid globe. Scene lights and Mesh*Material blending are what made this look
- * like glass — lines and the far hemisphere showing through. This shader paints
- * the map, shades it by the Sun, and always writes opaque pixels.
+ * The globe: the map, lit by the Sun, on an always-opaque surface.
+ *
+ * Its own shader rather than a lit material, for two reasons.
+ *
+ * **Opacity.** Every fragment writes alpha 1 with blending off, so no amount of
+ * material state elsewhere can make the planet see-through, and it always
+ * writes depth — which is what stops the belts and orbit lines behind it from
+ * painting over its face.
+ *
+ * **The terminator.** Day and night come from `N·L` against the *true* Sun's
+ * world position, so the lit cap is centred on the subsolar point: it rides
+ * north through उत्तरायण and south through दक्षिणायन exactly as the Sun's
+ * declination does, and the boundary is a curve on the sphere rather than a
+ * straight cut. Night keeps the map at `ambient` — darker, never black.
  */
-function makeOpaqueEarthMaterial(map: THREE.Texture) {
-  const mat = new THREE.ShaderMaterial({
+function makeEarthMaterial(map: THREE.Texture) {
+  return new THREE.ShaderMaterial({
     uniforms: {
       map: { value: map },
       sunPosition: { value: new THREE.Vector3(MEAN_DISTANCE, 0, 0) },
-      ambient: { value: 0.58 },
+      ambient: { value: EARTH_NIGHT },
       sunOn: { value: 1 },
     },
     vertexShader: /* glsl */ `
@@ -386,10 +411,11 @@ function makeOpaqueEarthMaterial(map: THREE.Texture) {
         vec3 tex = texture2D(map, vUv).rgb;
         vec3 n = normalize(vWorldNormal);
         vec3 toSun = normalize(sunPosition - vWorldPos);
-        float ndl = dot(n, toSun);
-        float day = smoothstep(-0.12, 0.28, ndl);
-        float light = mix(ambient, 1.0, sunOn > 0.5 ? day : 1.0);
-        gl_FragColor = vec4(tex * light, 1.0);
+        /* Widened either side of 0 so the terminator is a soft band, the way
+           dawn and dusk actually are, instead of a drawn line. */
+        float day = smoothstep(-0.22, 0.30, dot(n, toSun));
+        float lit = mix(ambient, 1.0, day);
+        gl_FragColor = vec4(tex * mix(1.0, lit, sunOn), 1.0);
       }
     `,
     transparent: false,
@@ -400,8 +426,6 @@ function makeOpaqueEarthMaterial(map: THREE.Texture) {
     toneMapped: false,
     fog: false,
   });
-  mat.opacity = 1;
-  return mat;
 }
 
 /**
@@ -529,8 +553,10 @@ function DaySimScene({
 
   /* ── native ── bundler modules, not URLs. See `playground-textures.ts`. */
   const textures = usePlaygroundTextures();
+  /* Raw texels: the globe's own shader writes final pixels and does no
+     colour-space conversion of its own. See `makeEarthMaterial`. */
   textures.earth.colorSpace = THREE.NoColorSpace;
-  const earthMat = useMemo(() => makeOpaqueEarthMaterial(textures.earth), [textures.earth]);
+  const earthMat = useMemo(() => makeEarthMaterial(textures.earth), [textures.earth]);
   useEffect(() => () => earthMat.dispose(), [earthMat]);
 
   /* ── refs into the scene graph ───────────────────────────────────── */
@@ -977,13 +1003,14 @@ function DaySimScene({
     sunGroup.current.rotation.y = M * 15;
     sunLight.current.position.copy(sunPos);
     sunOrbitGroup.current.position.copy(sunPos);
+
+    /* The globe shades itself against the Sun's *world* place, which the frame
+       shift moves — read it back off the light rather than from `sunPos`, or
+       the lit side stops tracking the moment the reader changes focus. */
     {
-      const mat = planetMesh.current.material as THREE.ShaderMaterial;
-      if (mat.uniforms?.sunPosition) {
-        sunLight.current.getWorldPosition(mat.uniforms.sunPosition.value);
-        mat.uniforms.ambient.value = toggles.trueSun ? 0.58 : 0.85;
-        mat.uniforms.sunOn.value = toggles.trueSun ? 1 : 0;
-      }
+      const u = earthMat.uniforms;
+      sunLight.current.getWorldPosition(u.sunPosition.value as THREE.Vector3);
+      u.sunOn.value = toggles.trueSun ? 1 : 0;
     }
 
     /* Vertical drop from the true sun to the equatorial plane — the part of
@@ -1377,10 +1404,13 @@ function DaySimScene({
         push("b-rahu", "body", bodyNames.rahu, nodeAt(anchor, MOON_ORBIT), false);
         push("b-ketu", "body", bodyNames.ketu, nodeAt(anchor, -MOON_ORBIT), false);
       }
+      /* Names sit a fixed clearance off the *surface*, not a multiple of the
+         radius: scaled by radius the mean sun's name crowded its disc while the
+         true sun's floated away from one twice the size. */
       if (toggles.trueSun)
-        push("b-sun", "body", bodyNames.sun, anchor.copy(sunPos).setY(sunPos.y + SUN_R * 2.2), false);
+        push("b-sun", "body", bodyNames.sun, anchor.copy(sunPos).setY(sunPos.y + SUN_R + 0.34), false);
       if (toggles.meanSun)
-        push("b-mean", "body", bodyNames.meanSun, anchor.set(0, MEAN_SUN_R * 2.6, 0), false);
+        push("b-mean", "body", bodyNames.meanSun, anchor.set(0, MEAN_SUN_R + 0.34, 0), false);
 
       /* Clock labels ride the tick that marks each arc's zero direction. Their
          angles converge — the three ticks sit on top of each other at day 0,
@@ -1418,10 +1448,10 @@ function DaySimScene({
 
   return (
     <>
-      {/* Same fill as what-is-a-day: the night side stays a readable map.
-          The Sun's point light does the spherical shading — curved terminator,
-          sliding north/south with the Sun. */}
-      <ambientLight intensity={toggles.trueSun ? 0.4 : 0.7} />
+      {/* Lights are the **Moon's** now — the globe shades itself in its own
+          shader. Kept low so the Moon's phases stay phases: raise the fill and
+          the crescent fills in. */}
+      <ambientLight intensity={toggles.trueSun ? 0.22 : 0.7} />
 
       {/* Sky. `BackSide` alone turns the sphere outside-in — a negative scale
           as well would cancel it out and cull every face. */}
@@ -1455,7 +1485,10 @@ function DaySimScene({
           origin. Positions inside are written in the scene's own coordinates —
           the group carries the frame change. */}
       <group ref={frameRoot}>
-        <pointLight ref={sunLight} intensity={0.85} distance={0} decay={0} />
+        {/* No falloff: at this scale a physical inverse-square would leave the
+            Moon almost unlit. It also doubles as the globe's own sun position —
+            the shader reads its world place every frame. */}
+        <pointLight ref={sunLight} intensity={2.2} distance={0} decay={0} />
 
         {/* राशि · नक्षत्र · बिक्रम महिना.
 
@@ -1596,9 +1629,8 @@ function DaySimScene({
 
         {/* Planet and its three day-arcs */}
         <group ref={arcRoot}>
-          <mesh ref={planetMesh} renderOrder={1} frustumCulled={false}>
-            <sphereGeometry args={[PLANET_R, 48, 32]} />
-            <primitive object={earthMat} attach="material" />
+          <mesh ref={planetMesh} material={earthMat} frustumCulled={false}>
+            <sphereGeometry args={[PLANET_R, 64, 48]} />
             <primitive object={localMeridian} visible={toggles.primeMeridian} />
           </mesh>
 

@@ -692,12 +692,12 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
       >
         <Canvas
           camera={{ position: [0, 40, 26], fov: 46, near: 0.1, far: 600 }}
-          gl={{ antialias: true, alpha: false }}
+          gl={{ antialias: true, alpha: false, depth: true }}
           /* Capped: a 3× phone screen does not need a 3× framebuffer for a
              scene of lines and a few spheres, and fill rate is what costs
              battery here. Same cap the other learn diagrams use. */
           dpr={[1, 1.75]}
-          onCreated={({ gl }) => gl.setClearColor(CANVAS_BG)}
+          onCreated={({ gl }) => gl.setClearColor(CANVAS_BG, 1)}
         >
           <Suspense fallback={null}>
             <Scene

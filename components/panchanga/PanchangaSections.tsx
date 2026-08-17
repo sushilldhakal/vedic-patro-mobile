@@ -1,7 +1,7 @@
 import { View } from "react-native"
 import { Text } from "@/components/ui/Text"
 import type { PanchangaDay } from "@/lib/api";
-import { useTranslation } from "@/lib/i18n-translations.web";
+import { useTranslation } from "@/lib/i18n";
 import {
   formatAayanLabel,
   formatDurationFull,

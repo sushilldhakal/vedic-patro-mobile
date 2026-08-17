@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { View } from "react-native"
 import { Text } from "@/components/ui/Text"
-import { useTranslation } from "@/lib/i18n-translations.web";
+import { useTranslation } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useLocale } from "@/lib/i18n";
