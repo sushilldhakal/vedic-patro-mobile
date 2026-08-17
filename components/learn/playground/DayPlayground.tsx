@@ -48,12 +48,9 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 
 import { Canvas } from "@/components/learn/diagrams/LearnCanvas";
+import { OverlaySheet } from "@/components/ui/OverlaySheet";
 import { Text } from "@/components/ui/Text";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
-import {
-  NakshatraGlyphIcon,
-  RashiGlyphIcon,
-} from "@/components/panchanga/element/ElementGlyphIcon";
 import { useLocale } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme-context";
 import { nativeWindThemeVars } from "@/lib/nativewind-theme-vars";
@@ -80,6 +77,10 @@ import {
 import EotGraph from "@/components/learn/playground/EotGraph";
 import PerfMeter, { type PerfSample } from "@/components/learn/playground/PerfMeter";
 import type { PlaygroundLabel } from "@/components/learn/playground/playground-labels";
+import {
+  LABEL_TONE as TONE,
+  PlaygroundLabelText,
+} from "@/components/learn/playground/PlaygroundLabelText";
 import Scene, {
   type CameraState,
   type CameraTarget,
@@ -94,14 +95,6 @@ const DEG = Math.PI / 180;
 
 /** The 1× rung in {@link SPEED_MULTIPLIERS} — where every topic opens. */
 const DEFAULT_SPEED_RUNG = SPEED_MULTIPLIERS.indexOf(1);
-
-const TONE = {
-  sidereal: "#6cb6f5",
-  solar: "#e6e34a",
-  mean: "#f0736a",
-} as const;
-
-const GOLD = "#d8c84a";
 
 /** Card height. Fullscreen always takes the window. */
 const CARD_HEIGHT = 340;
@@ -515,7 +508,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   );
 
   const controlsSheet = (
-    <SheetPanel
+    <OverlaySheet
       title={pick("नियन्त्रण", "Controls")}
       onClose={() => setSheet(null)}
       maxHeight={canvasHeight * 0.82}
@@ -615,7 +608,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
           )}
         </View>
       </View>
-    </SheetPanel>
+    </OverlaySheet>
   );
 
   /* Focus: which body the view is hung on, and whether the camera rides round
@@ -623,7 +616,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
      thing; the follow switch is a separate question about that same choice, so
      it lives with it rather than among the layers. */
   const focusSheet = (
-    <SheetPanel
+    <OverlaySheet
       title={pick("केन्द्रविन्दु", "Focus")}
       onClose={() => setSheet(null)}
       maxHeight={canvasHeight * 0.82}
@@ -660,7 +653,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
           (v) => setSpeed(Math.round(v)),
         )}
       </View>
-    </SheetPanel>
+    </OverlaySheet>
   );
 
   const body = (
@@ -733,7 +726,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
             projection — see `playground-labels.ts`. */}
         <View pointerEvents="none" className="absolute inset-0">
           {labels.map((label) => (
-            <SceneLabelText key={label.id} label={label} />
+            <PlaygroundLabelText key={label.id} label={label} />
           ))}
         </View>
 
@@ -1041,118 +1034,6 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
  * adjusting — so on this platform the panel takes the bottom of the card
  * instead, where the scene above it stays visible while a layer is switched.
  */
-function SheetPanel({
-  title,
-  onClose,
-  maxHeight,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  maxHeight: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <View
-      className="absolute inset-x-0 bottom-0 border-t border-white/15"
-      style={{ backgroundColor: "rgba(4, 7, 13, 0.95)", maxHeight }}
-    >
-      <View className="flex-row items-center justify-between px-3 pb-1 pt-2.5">
-        <Text
-          className="text-[11px] font-bold uppercase tracking-wide"
-          style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.75)", fontSize: 11 }]}
-        >
-          {title}
-        </Text>
-        <Pressable
-          onPress={onClose}
-          accessibilityRole="button"
-          className="h-7 w-7 items-center justify-center rounded-full border border-white/20"
-        >
-          <Ionicons name="close" size={14} color="rgba(255,255,255,0.75)" />
-        </Pressable>
-      </View>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="gap-3 px-3 pb-3.5"
-      >
-        {children}
-      </ScrollView>
-    </View>
-  );
-}
-
-/**
- * One projected name over the canvas.
- *
- * Memoised on the label's own fields, because a pass replaces the whole list
- * and most of the sixty entries have not changed since the last one.
- *
- * The glyph is drawn only for the division the body is actually standing in.
- * The web draws one beside every name, which it can afford — there the labels
- * are DOM nodes that never re-render. Here a pass is a React render of every
- * label, and twenty-seven नक्षत्र SVGs in that render is the difference between
- * a smooth transport row and a stuttering one. The undimmed one is the only
- * glyph carrying information anyway: it says where the Sun or the Moon is.
- */
-const SceneLabelText = memo(function SceneLabelText({ label }: { label: PlaygroundLabel }) {
-  const color = label.tone
-    ? TONE[label.tone]
-    : label.kind === "rashi"
-      ? GOLD
-      : label.kind === "nakshatra"
-        ? "#8fb6d8"
-        : label.kind === "month"
-          ? "#e3d9a8"
-          : label.id === "b-rahu"
-            ? "#c4b5fd"
-            : label.id === "b-ketu"
-              ? "#fb7185"
-              : "#ffffff";
-
-  const glyph =
-    label.dim || label.index == null ? null : label.kind === "rashi" ? (
-      <RashiGlyphIcon number={label.index} size={13} />
-    ) : label.kind === "nakshatra" ? (
-      <NakshatraGlyphIcon number={label.index} size={15} />
-    ) : null;
-
-  return (
-    <View
-      pointerEvents="none"
-      className="absolute items-center"
-      style={{
-        left: label.x,
-        top: label.y,
-        /* Centred on the anchor without measuring: the box is free to overflow
-           its own origin, and it is lifted by half a line so the text does not
-           cover the point it names. */
-        transform: [{ translateX: -45 }, { translateY: -8 }],
-        width: 90,
-        opacity: label.dim ? 0.45 : 1,
-      }}
-    >
-      {glyph}
-      <Text
-        numberOfLines={1}
-        className="text-[10px] font-semibold"
-        style={[
-          nepaliTextStyle(10),
-          {
-            color,
-            fontSize: 10,
-            textAlign: "center",
-            textShadowColor: "rgba(0,0,0,0.95)",
-            textShadowRadius: 3,
-          },
-        ]}
-      >
-        {label.text}
-      </Text>
-    </View>
-  );
-});
-
 /**
  * Green / amber / red on the reading that actually decides whether it feels
  * broken — the worst frame, not the average.

@@ -1,4 +1,4 @@
-# The Learn playground on iOS and Android
+# The Learn 3D studies on iOS and Android
 
 The web app grew a single configurable 3D scene for the Learn section — the
 planet, its orbit, the three day-arcs, the राशि / नक्षत्र / महिना belts, the
@@ -16,6 +16,9 @@ scene, running on `expo-gl`.
 | `src/components/learn/EotGraph.tsx` | `components/learn/playground/EotGraph.tsx` | same maths and layout, `react-native-svg` marks |
 | `src/lib/learn/playground-config.ts` | `lib/learn/playground-config.ts` | same modes and speed ladder; slug map is this app's own |
 | `src/components/learn/DayPlaygroundStudy.tsx` | `components/learn/playground/DayPlayground.tsx` | rewritten — it was all DOM |
+| `src/lib/sky3d/two-systems.ts` | `lib/sky3d/two-systems.ts` | byte-identical — pure maths |
+| `src/components/learn/TwoSystemsScene.tsx` | `components/learn/playground/TwoSystemsScene.tsx` | same frame loop and constants; two marked deviations |
+| `src/components/learn/TwoSystemsStudy.tsx` | `components/learn/playground/TwoSystemsStudy.tsx` | rewritten — it was all DOM |
 
 Keeping the first four aligned is deliberate. The geometry is the part that is
 expensive to get right and cheap to keep in step, so a belt radius or an
@@ -143,3 +146,33 @@ Fill in when measured, so the next person is not guessing either.
 | Device | OS | Topic / state | fps | worst (ms) | draws | tris |
 | --- | --- | --- | --- | --- | --- | --- |
 | | | | | | | |
+
+## The second study: सौरमान र चान्द्रमान
+
+`TwoSystemsStudy` is the other scene, and it answers a different question from
+the playground. The playground is a *model* with dials on it — set the days per
+year to nine and watch what a day becomes. This one runs the **real ephemeris**
+over the actual current solar year, finds its twelve सङ्क्रान्ति and its औंसी by
+bisection, and lays both ladders on one timeline so the ~11-day shortfall that
+अधिक मास exists to absorb is measured rather than asserted.
+
+Both are WebGL canvases with a render loop, so the two slug sets in
+`playground-config.ts` are **disjoint**: no article carries both. `hasTwoSystems`
+owns that second set.
+
+Where the two apps place this scene differs, and deliberately. The web attaches
+it to its geocentric-vs-heliocentric and retrograde chapters, which this app's
+Learn library does not have; here it goes on `calendar-differences` and
+`adhik-maas`, whose closing argument *is* the drift ladder. Same scene, different
+home, because the two libraries hold different articles.
+
+### One native-only change
+
+`buildYearLadders` bisects twelve solar crossings and fourteen new moons — a few
+thousand Kepler solves. The web does that during render and nobody notices; on
+Hermes it is long enough to stall a part-drawn article. `useYearLadders` defers
+it past the first paint behind the loader.
+
+That does not make it cheaper, and the comment there says so: the JS thread is
+still blocked for that moment. Chunking the solve across frames would actually
+fix it, and is not worth doing until the frame-rate meter says it matters.
