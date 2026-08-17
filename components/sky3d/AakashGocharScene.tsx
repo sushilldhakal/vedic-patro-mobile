@@ -26,6 +26,7 @@ import {
   eclipticToVec3,
   GRAHA_COLOR,
   NAKSHATRA_ARC,
+  normalizeDeg,
   RASHI_ARC,
 } from "@/lib/sky3d/geocentric-model";
 import {
@@ -87,6 +88,8 @@ export const RASHI_OUTER = 10.3;
 const NAK_INNER = 10.4;
 const NAK_OUTER = 11.1;
 const RASHI_MID = (RASHI_INNER + RASHI_OUTER) / 2;
+/** Inside the राशि band — a बिक्रम month *is* its rashi, so it needs no ring. */
+const MONTH_LABEL_R = RASHI_INNER - 0.9;
 const NAK_MID = (NAK_INNER + NAK_OUTER) / 2;
 
 /** Radius of the horizon dome. Everything on the sky sits on it. */
@@ -165,6 +168,7 @@ export type ScreenLabel = {
   kind:
     | "rashi"
     | "nakshatra"
+    | "month"
     | "graha"
     | "cardinal"
     | "azimuth"
@@ -186,6 +190,8 @@ export type ScreenLabel = {
   year?: number;
   /** The obliquity marker: the angle it is calling out, degrees. */
   deg?: number;
+  /** महिना labels: true for every month but the one the Sun is standing in. */
+  dim?: boolean;
   x: number;
   y: number;
 };
@@ -202,7 +208,20 @@ export type SkySample = {
 };
 
 export type SceneToggles = {
-  belts: boolean;
+  /** The twelve राशि — the gold band, its dividers and their names. */
+  rashiBelt: boolean;
+  /** The twenty-seven नक्षत्र — the green strip, its dividers and the पाद ticks. */
+  nakshatraBelt: boolean;
+  /**
+   * बिक्रम month names, in the inner half of each राशि cell. No extra ring —
+   * the 12-fold is already the राशि.
+   */
+  monthRing: boolean;
+  /**
+   * काठमाडौँ's meridian, pole to pole on the Earth — the line noon is
+   * reckoned against. Same object as the Learn playground's काठमाडौँ रेखा.
+   */
+  primeMeridian: boolean;
   /** The alt-az cage: almucantars and verticals every 15°. */
   grid: boolean;
   /**
@@ -255,6 +274,21 @@ function circlePoints(radius: number, segments = 128): THREE.Vector3[] {
     const a = (i / segments) * Math.PI * 2;
     return new THREE.Vector3(radius * Math.cos(a), 0, -radius * Math.sin(a));
   });
+}
+
+/**
+ * Half a great circle, pole to pole, in the XY plane.
+ *
+ * Rotate the returned line about +Y by a longitude and it becomes that place's
+ * meridian. Slightly proud of the surface (1.003) so it is not fighting the
+ * globe's own depth for the same pixels.
+ */
+function makePrimeMeridian(radius: number) {
+  const points = Array.from({ length: 49 }, (_, i) => {
+    const a = -Math.PI / 2 + (i / 48) * Math.PI;
+    return new THREE.Vector3(radius * 1.003 * Math.cos(a), radius * 1.003 * Math.sin(a), 0);
+  });
+  return makeLine(points, "#dd2222", 0.95);
 }
 
 function makeLine(points: THREE.Vector3[], color: string, opacity: number) {
@@ -628,6 +662,18 @@ export function AakashGocharScene({
   const subsolarRef = useRef<THREE.Mesh | null>(null);
   const spaceOnlyRef = useRef<THREE.Group | null>(null);
 
+  /*
+   * काठमाडौँ's meridian, on both Earths.
+   *
+   * One for the little globe in the space view and one for the big one, because
+   * they are different radii — but the same line in both: the meridian every
+   * time this app quotes is reckoned from. The space copy carries the Earth's
+   * spin as well as the longitude, since that Earth is turning; the globe copy
+   * hangs inside the spinning group and so needs only the longitude.
+   */
+  const spaceMeridian = useMemo(() => makePrimeMeridian(EARTH_RADIUS), []);
+  const globeMeridian = useMemo(() => makePrimeMeridian(GLOBE_R), []);
+
   /* Sight rays: one two-point line per graha, rewritten every frame. */
   const rays = useMemo(() => {
     const out = {} as Record<GrahaKey, THREE.Line>;
@@ -651,22 +697,31 @@ export function AakashGocharScene({
    * in sky coordinates and is re-projected onto the dome every frame.
    */
   const skyLines = useMemo(() => {
-    const band = (src: EclipticPoint[], color: string, opacity: number, segments = false) => ({
+    /* `layer` is which belt chip owns the line. `shared` is the ecliptic
+       itself, which belongs to neither and should survive either one being on. */
+    const band = (
+      layer: "rashi" | "nakshatra" | "shared",
+      src: EclipticPoint[],
+      color: string,
+      opacity: number,
+      segments = false,
+    ) => ({
+      layer,
       src,
       object: segments
         ? makeDynamicSegments(src.length, color, opacity)
         : makeDynamicLine(src.length, color, opacity),
     });
     return [
-      band(BAND_EDGES.rashiOuter, ZODIAC, 0.85),
-      band(BAND_EDGES.rashiInner, ZODIAC, 0.85),
-      band(BAND_EDGES.nakOuter, NAKSHATRA, 0.7),
-      band(BAND_EDGES.nakInner, NAKSHATRA, 0.7),
-      band(BAND_EDGES.ecliptic, ZODIAC, 0.5),
-      band(RASHI_DIVIDERS, ZODIAC, 0.75, true),
-      band(NAKSHATRA_DIVIDERS, NAKSHATRA, 0.6, true),
-      band(PADA_TICKS, NAKSHATRA, 0.35, true),
-      band(DEGREE_TICKS, ZODIAC, 0.45, true),
+      band("rashi", BAND_EDGES.rashiOuter, ZODIAC, 0.85),
+      band("rashi", BAND_EDGES.rashiInner, ZODIAC, 0.85),
+      band("nakshatra", BAND_EDGES.nakOuter, NAKSHATRA, 0.7),
+      band("nakshatra", BAND_EDGES.nakInner, NAKSHATRA, 0.7),
+      band("shared", BAND_EDGES.ecliptic, ZODIAC, 0.5),
+      band("rashi", RASHI_DIVIDERS, ZODIAC, 0.75, true),
+      band("nakshatra", NAKSHATRA_DIVIDERS, NAKSHATRA, 0.6, true),
+      band("nakshatra", PADA_TICKS, NAKSHATRA, 0.35, true),
+      band("rashi", DEGREE_TICKS, ZODIAC, 0.45, true),
     ];
   }, []);
 
@@ -860,7 +915,7 @@ export function AakashGocharScene({
   // the projection was skipped, so the vertices are wherever they were left.
   useEffect(() => {
     lastBelt.current = null;
-  }, [toggles.belts, toggles.asterisms]);
+  }, [toggles.rashiBelt, toggles.nakshatraBelt, toggles.monthRing, toggles.asterisms]);
 
   useFrame((state, delta) => {
     try {
@@ -1036,7 +1091,7 @@ export function AakashGocharScene({
     if (zodiac && beltMoved) {
       lastBelt.current = { mode, lst: beltLst, ayan: beltAyan, eps: beltEps };
 
-      if (toggles.belts) {
+      if (toggles.rashiBelt || toggles.nakshatraBelt) {
         for (const { src, object } of skyLines) {
           for (let i = 0; i < src.length; i += 1) {
             setPoint(object, i, place(src[i].lon, src[i].lat, 0));
@@ -1129,7 +1184,7 @@ export function AakashGocharScene({
         }
       }
 
-      if (horizon && toggles.belts) {
+      if (horizon && (toggles.rashiBelt || toggles.nakshatraBelt)) {
         for (let i = 0; i <= ECLIPTIC_STEPS; i += 1) {
           // Declination 0 all the way round — the celestial equator, which the
           // ecliptic crosses at the two equinoxes and nowhere else. On the
@@ -1151,19 +1206,42 @@ export function AakashGocharScene({
       flushLine(gridSegments.object);
     }
 
-    if (collect && toggles.belts) {
-      for (let i = 0; i < 12; i += 1) {
-        const lon = (i + 0.5) * RASHI_ARC;
-        const at = place(lon, zodiac ? RASHI_LABEL_LAT : 0, RASHI_MID);
-        if (labelVisible(at)) {
-          project({ id: `r-${i}`, kind: "rashi", index: i + 1 }, at);
+    if (collect) {
+      if (toggles.rashiBelt) {
+        for (let i = 0; i < 12; i += 1) {
+          const lon = (i + 0.5) * RASHI_ARC;
+          const at = place(lon, zodiac ? RASHI_LABEL_LAT : 0, RASHI_MID);
+          if (labelVisible(at)) {
+            project({ id: `r-${i}`, kind: "rashi", index: i + 1 }, at);
+          }
         }
       }
-      for (let i = 0; i < 27; i += 1) {
-        const lon = (i + 0.5) * NAKSHATRA_ARC;
-        const at = place(lon, zodiac ? NAK_LABEL_LAT : 0, NAK_MID);
-        if (labelVisible(at)) {
-          project({ id: `n-${i}`, kind: "nakshatra", index: i + 1 }, at);
+      /*
+       * बिक्रम months, in space only, and dimmed off the **Sun**.
+       *
+       * A बिक्रम month is a solar rashi, so the month on is whichever sign the
+       * Sun stands in — dimming them against the selected graha instead would
+       * say nothing, since the Moon being in वृष does not make it वैशाख. Space
+       * only because the ring reads as a ring there; on the dome and the globe
+       * the same twelve names would crowd the राशि they are already inside.
+       */
+      if (space && toggles.monthRing) {
+        const sunRashi = Math.floor(normalizeDeg(sky.sun.longitude) / RASHI_ARC) % 12;
+        for (let i = 0; i < 12; i += 1) {
+          const lon = (i + 0.5) * RASHI_ARC;
+          const at = place(lon, 0, MONTH_LABEL_R);
+          if (labelVisible(at)) {
+            project({ id: `m-${i}`, kind: "month", index: i + 1, dim: i !== sunRashi }, at);
+          }
+        }
+      }
+      if (toggles.nakshatraBelt) {
+        for (let i = 0; i < 27; i += 1) {
+          const lon = (i + 0.5) * NAKSHATRA_ARC;
+          const at = place(lon, zodiac ? NAK_LABEL_LAT : 0, NAK_MID);
+          if (labelVisible(at)) {
+            project({ id: `n-${i}`, kind: "nakshatra", index: i + 1 }, at);
+          }
         }
       }
     }
@@ -1306,7 +1384,15 @@ export function AakashGocharScene({
     if (groundRef.current) groundRef.current.visible = horizon && !globe;
     if (spaceOnlyRef.current) spaceOnlyRef.current.visible = space;
     if (globeRootRef.current) globeRootRef.current.visible = globe;
-    for (const { object } of skyLines) object.visible = zodiac && toggles.belts;
+    for (const { layer, object } of skyLines) {
+      const on =
+        layer === "shared"
+          ? toggles.rashiBelt || toggles.nakshatraBelt
+          : layer === "rashi"
+            ? toggles.rashiBelt
+            : toggles.nakshatraBelt;
+      object.visible = zodiac && on;
+    }
     // The star groups belong to the sky, so they live wherever the belt does.
     for (const { object } of starField.groups) object.visible = zodiac && toggles.asterisms;
     starField.lines.visible = zodiac && toggles.asterisms;
@@ -1316,7 +1402,8 @@ export function AakashGocharScene({
     // The tilt is only drawn where the Earth is: the globe view.
     tiltMarks.eclipticAxis.visible = globe && toggles.tilt;
     tiltMarks.arc.visible = globe && toggles.tilt;
-    equatorLine.visible = horizon && !globe && toggles.belts;
+    equatorLine.visible =
+      horizon && !globe && (toggles.rashiBelt || toggles.nakshatraBelt);
     gridSegments.object.visible = horizon && !globe && toggles.grid;
     horizonRing.visible = horizon && !globe;
     if (horizonGroupRef.current) horizonGroupRef.current.quaternion.identity();
@@ -1360,7 +1447,13 @@ export function AakashGocharScene({
       // taking a sine of, and only its remainder means anything.
       earthRef.current.rotation.y =
         (((dtDays * 86400) / SIDEREAL_DAY_S) * Math.PI * 2) % (Math.PI * 2);
+      /* The little Earth's meridian rides its spin; the globe's rides the group
+         it hangs in, so that one only carries the longitude. */
+      spaceMeridian.rotation.y = earthRef.current.rotation.y + observer.lon * DEG;
     }
+    spaceMeridian.visible = space && toggles.primeMeridian;
+    globeMeridian.rotation.y = observer.lon * DEG;
+    globeMeridian.visible = globe && toggles.primeMeridian;
     if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.04;
 
     // The Sun is the only real light source; put it exactly where the Sun is drawn.
@@ -1546,6 +1639,7 @@ export function AakashGocharScene({
             metalness={0.02}
           />
         </mesh>
+        <primitive object={spaceMeridian} />
         <mesh ref={cloudRef}>
           <sphereGeometry args={[EARTH_RADIUS * 1.02, 48, 48]} />
           <meshStandardMaterial map={textures.earthclouds} transparent opacity={0.45} depthWrite={false} />
@@ -1592,6 +1686,7 @@ export function AakashGocharScene({
 
         {/* Turns once a sidereal day; the ring globe it does not. */}
         <group ref={globeSpinRef}>
+          <primitive object={globeMeridian} />
           {globeLines.parallels.map(({ object }, i) => (
             <primitive key={`par-${i}`} object={object} />
           ))}
@@ -1642,12 +1737,16 @@ export function AakashGocharScene({
           <ShellLine key={key} points={points} attach={attach} />
         ))}
 
-        {toggles.belts ? (
+        {/* Rashi belt: 12 × 30°. */}
+        {toggles.rashiBelt ? (
           <group>
-            {/* Rashi belt: 12 × 30°. */}
             <Belt inner={RASHI_INNER} outer={RASHI_OUTER} color="#0f3234" opacity={0.8} />
             <BeltDivisions count={12} inner={RASHI_INNER} outer={RASHI_OUTER} color={SEP} opacity={0.85} />
-            {/* Nakshatra belt: 27 × 13°20′, with pada ticks at 108. */}
+          </group>
+        ) : null}
+        {/* Nakshatra belt: 27 × 13°20′, with pada ticks at 108. */}
+        {toggles.nakshatraBelt ? (
+          <group>
             <Belt inner={NAK_INNER} outer={NAK_OUTER} color="#0a2426" opacity={0.8} />
             <BeltDivisions count={27} inner={NAK_INNER} outer={NAK_OUTER} color={SEP} opacity={0.6} />
             <BeltDivisions count={108} inner={NAK_OUTER - 0.2} outer={NAK_OUTER} color={INK_DIM} opacity={0.4} />

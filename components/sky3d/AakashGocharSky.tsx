@@ -13,10 +13,18 @@ import { Modal, PanResponder, Pressable, ScrollView, useWindowDimensions, View }
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@/components/sky3d/GeocentricSkyCanvas";
+import { OverlaySheet, SheetSection } from "@/components/ui/OverlaySheet";
 import { Text } from "@/components/ui/Text";
 import type { GocharGraha } from "@/lib/api";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
-import { adToBS, bsMonthLabel, bsToAD, WEEKDAYS_SHORT_NE } from "@/lib/bs-calendar";
+import {
+  adToBS,
+  bsMonthLabel,
+  bsToAD,
+  BS_MONTHS_NE,
+  BS_MONTH_NAMES,
+  WEEKDAYS_SHORT_NE,
+} from "@/lib/bs-calendar";
 import { BsDateTimePicker } from "@/components/panchanga/BsDateTimePicker";
 import { windowedBrowseYears } from "@/lib/patro-browse-years";
 import { bikramFromSun } from "@/lib/sky3d/bikram-solar";
@@ -25,10 +33,10 @@ import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { nativeWindThemeVars } from "@/lib/nativewind-theme-vars";
-import { formatRashiByNumber } from "@/lib/rashi-i18n";
+import { formatRashiByNumber, getRashiList } from "@/lib/rashi-i18n";
 import { useTheme, useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
-import { GRAHA_COLOR } from "@/lib/sky3d/geocentric-model";
+import { GRAHA_COLOR, normalizeDeg } from "@/lib/sky3d/geocentric-model";
 import { KATHMANDU, type Observer } from "@/lib/sky3d/horizon";
 import {
   ayanamsa,
@@ -83,6 +91,24 @@ const LABEL_COLOR = {
  * The speed ladder, in simulated seconds per real second. Pressing a fast
  * button repeatedly climbs it; pause drops back to the first rung.
  */
+/**
+ * What the camera can be hung on, besides पृथ्वी.
+ *
+ * The seven the eye can see plus the Sun and Moon — the same nine a पञ्चाङ्ग
+ * tables. राहु and केतु are left out on purpose: they are the crossings of the
+ * Moon's plane, not places, so centring on one puts the camera on a point that
+ * is only defined by two other things.
+ */
+const FOCUS_TARGETS: { key: GrahaKey; ne: string; en: string }[] = [
+  { key: "sun", ne: "सूर्य", en: "Sun" },
+  { key: "moon", ne: "चन्द्र", en: "Moon" },
+  { key: "mercury", ne: "बुध", en: "Mercury" },
+  { key: "venus", ne: "शुक्र", en: "Venus" },
+  { key: "mars", ne: "मंगल", en: "Mars" },
+  { key: "jupiter", ne: "बृहस्पति", en: "Jupiter" },
+  { key: "saturn", ne: "शनि", en: "Saturn" },
+];
+
 const SPEED_LADDER = [
   { seconds: 60, ne: "१ मिनेट/से", en: "1 min/s" },
   { seconds: 7200, ne: "२ घण्टा/से", en: "2 hr/s" },
@@ -180,7 +206,10 @@ export function AakashGocharSky({
   const [selectedKey, setSelectedKey] = useState<GrahaKey | null>(null);
   const [sample, setSample] = useState<SkySample | null>(null);
   const [toggles, setToggles] = useState<SceneToggles>({
-    belts: true,
+    rashiBelt: true,
+    nakshatraBelt: true,
+    monthRing: true,
+    primeMeridian: true,
     grid: true,
     lockStars: true,
     lockCenter: false,
@@ -189,6 +218,9 @@ export function AakashGocharSky({
     tilt: true,
     labels: true,
   });
+  /* Which overlay panel is open, if any. One at a time: both are anchored to
+     the bottom of the canvas and would otherwise sit on top of each other. */
+  const [sheet, setSheet] = useState<"layers" | "focus" | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   /* Fullscreen only: the whole control row folds away to a single chevron, so
      the sky can have the entire screen when you just want to watch it. */
@@ -282,8 +314,15 @@ export function AakashGocharSky({
   );
 
   const onSample = useCallback((next: SkySample) => setSample(next), []);
-  const onSelect = useCallback((key: GrahaKey) => {
-    setSelectedKey((prev) => (prev === key ? null : key));
+  /**
+   * Tapping a graha in the sky toggles it; the focus sheet names one outright.
+   *
+   * `null` is the sheet's पृथ्वी row — an explicit "nothing selected", which the
+   * toggle behaviour could never express, since pressing पृथ्वी is not a second
+   * press of whatever happened to be selected.
+   */
+  const onSelect = useCallback((key: GrahaKey | null) => {
+    setSelectedKey((prev) => (key === null ? null : prev === key ? null : key));
   }, []);
 
   const { height: windowHeight } = useWindowDimensions();
@@ -295,6 +334,39 @@ export function AakashGocharSky({
   const simDate = sample ? new Date(sample.timeMs) : date;
   /* The Sun the scene has already computed — the calendar past the table's end. */
   const sunLongitude = sample?.sky.sun.longitude;
+
+  /* The twelve राशि and the twelve बिक्रम months, which are the same twelve
+     divisions read two ways — so one index serves both. */
+  const rashiNames = useMemo(() => getRashiList(lang), [lang]);
+  const monthNames = useMemo(
+    () => (lang === "en" ? ([...BS_MONTH_NAMES] as string[]) : BS_MONTHS_NE),
+    [lang],
+  );
+  const sunRashi =
+    sunLongitude == null ? null : Math.floor(normalizeDeg(sunLongitude) / 30) % 12;
+
+  /*
+   * सङ्क्रान्ति, caught by watching the Sun's own rashi change.
+   *
+   * The scene samples a few times a second, so at the fast speeds this page
+   * offers the crossing is one sample wide; the banner is held on a timer for
+   * long enough to be read. The first sample after a mount is not a crossing —
+   * there is nothing to have crossed *from* — hence the null guard.
+   */
+  const [sankranti, setSankranti] = useState<number | null>(null);
+  const lastRashi = useRef<number | null>(null);
+  useEffect(() => {
+    if (sunRashi == null) return;
+    const previous = lastRashi.current;
+    lastRashi.current = sunRashi;
+    if (previous === null || previous === sunRashi) return;
+    setSankranti(sunRashi);
+  }, [sunRashi]);
+  useEffect(() => {
+    if (sankranti === null) return;
+    const id = setTimeout(() => setSankranti(null), 2600);
+    return () => clearTimeout(id);
+  }, [sankranti]);
   const sunSpeed = sample?.sky.sun.speedDegPerDay;
 
   /* Rashi/nakshatra text grows past its base size once the camera pulls back
@@ -455,26 +527,30 @@ export function AakashGocharSky({
     </>
   );
 
+  /** One layer switch, for use inside the sheets. */
+  const sheetChip = (key: keyof SceneToggles, label: string) => (
+    <Chip
+      key={key}
+      active={toggles[key]}
+      label={label}
+      onPress={() => setToggles((t) => ({ ...t, [key]: !t[key] }))}
+      overlay
+    />
+  );
+
+  /*
+   * The chips that stay in the transport row are the ones reached *while
+   * watching*: names on or off, and whether the sky holds still. Everything
+   * else — the belts, the guides, what the camera follows — moved into the two
+   * sheets below, because a phone's control row can hold about five things
+   * before it becomes a scroll nobody reads to the end of.
+   */
   const toggleChips = (
     <>
       <Chip
         active={toggles.labels}
         label={pick("नाम", "Labels")}
         onPress={() => setToggles((t) => ({ ...t, labels: !t.labels }))}
-        overlay={fullscreen}
-        compact={fullscreen}
-      />
-      <Chip
-        active={toggles.belts}
-        label={pick("राशि/नक्षत्र", "Zodiac")}
-        onPress={() => setToggles((t) => ({ ...t, belts: !t.belts }))}
-        overlay={fullscreen}
-        compact={fullscreen}
-      />
-      <Chip
-        active={toggles.asterisms}
-        label={pick("तारापुञ्ज", "Star groups")}
-        onPress={() => setToggles((t) => ({ ...t, asterisms: !t.asterisms }))}
         overlay={fullscreen}
         compact={fullscreen}
       />
@@ -486,18 +562,98 @@ export function AakashGocharSky({
         compact={fullscreen}
       />
       <IconButton
-        name="locate"
-        label={
-          selectedKey
-            ? pick("चयनित ग्रह केन्द्रमा", "Lock view on selected graha")
-            : pick("पहिले ग्रह छान्नुहोस्", "Select a graha on the sky first")
-        }
-        active={toggles.lockCenter}
+        name="layers"
+        label={pick("तह", "Layers")}
+        active={sheet === "layers"}
         overlay={fullscreen}
         compact={fullscreen}
-        onPress={() => setToggles((t) => ({ ...t, lockCenter: !t.lockCenter }))}
+        onPress={() => setSheet((v) => (v === "layers" ? null : "layers"))}
+      />
+      <IconButton
+        name="locate"
+        label={pick("केन्द्रविन्दु", "Focus")}
+        active={sheet === "focus"}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={() => setSheet((v) => (v === "focus" ? null : "focus"))}
       />
     </>
+  );
+
+  /* Guides and belts, grouped the way the web groups them. `ध्रुव तारा` and
+     `अक्ष झुकाव` are only offered where they are drawn — the pole circle needs
+     a sky to sit in and the obliquity marks need the Earth. */
+  const layersSheet = (
+    <OverlaySheet
+      title={pick("तह", "Layers")}
+      onClose={() => setSheet(null)}
+      maxHeight={canvasHeight * 0.8}
+    >
+      <SheetSection heading={pick("मार्गदर्शक", "Guides")}>
+        {sheetChip("grid", pick("ग्रिड", "Grid"))}
+        {sheetChip("primeMeridian", pick("काठमाडौँ रेखा", "Kathmandu meridian"))}
+        {sheetChip("asterisms", pick("तारापुञ्ज", "Star groups"))}
+        {mode !== "space" ? sheetChip("poleStars", pick("ध्रुव तारा", "Pole stars")) : null}
+        {mode === "globe" ? sheetChip("tilt", pick("अक्ष झुकाव", "Tilt")) : null}
+      </SheetSection>
+      <SheetSection heading={pick("वलय", "Belts")}>
+        {sheetChip("rashiBelt", pick("राशि", "Rashi"))}
+        {sheetChip("nakshatraBelt", pick("नक्षत्र", "Nakshatra"))}
+        {sheetChip("monthRing", pick("महिना", "Months"))}
+      </SheetSection>
+    </OverlaySheet>
+  );
+
+  /*
+   * What the camera is hung on.
+   *
+   * पृथ्वी is the way back: it clears the selection, which is also what turns
+   * the follow switch off, since there is nothing left to follow. Everything
+   * else selects that graha — the same thing tapping it on the sky does, so the
+   * two controls cannot disagree.
+   */
+  const focusSheet = (
+    <OverlaySheet
+      title={pick("के पछ्याउने?", "What should the camera follow?")}
+      onClose={() => setSheet(null)}
+      maxHeight={canvasHeight * 0.8}
+    >
+      <SheetSection heading={pick("केन्द्रविन्दु", "Focus")}>
+        <Chip
+          active={!selectedKey}
+          label={pick("पृथ्वी", "Earth")}
+          overlay
+          onPress={() => {
+            onSelect(null);
+            setToggles((t) => ({ ...t, lockCenter: false }));
+          }}
+        />
+        {FOCUS_TARGETS.map(({ key, ne: neName, en }) => (
+          <Chip
+            key={key}
+            active={selectedKey === key}
+            label={pick(neName, en)}
+            overlay
+            onPress={() => onSelect(key)}
+          />
+        ))}
+      </SheetSection>
+      <SheetSection heading={pick("पछ्याउनुहोस्", "Follow")}>
+        <Chip
+          active={toggles.lockCenter && !!selectedKey}
+          label={
+            selectedKey
+              ? pick("ग्रह पछ्याउनुहोस्", "Follow graha")
+              : pick("पहिले ग्रह छान्नुहोस्", "Pick a graha first")
+          }
+          overlay
+          onPress={() => {
+            if (!selectedKey) return;
+            setToggles((t) => ({ ...t, lockCenter: !t.lockCenter }));
+          }}
+        />
+      </SheetSection>
+    </OverlaySheet>
   );
 
   const body = (
@@ -565,6 +721,27 @@ export function AakashGocharSky({
             onPress={() => setFullscreen((f) => !f)}
           />
         </View>
+
+        {/* सङ्क्रान्ति — the Sun crossing into the next राशि, which is also the
+            first day of the next बिक्रम month. One frame wide in the scene, so
+            the banner outlives it on a timer. */}
+        {sankranti !== null ? (
+          <View pointerEvents="none" className="absolute inset-x-0 items-center" style={{ top: overlayTop }}>
+            <View className="rounded-full border border-amber-400/60 bg-amber-500/25 px-3 py-1">
+              <Text
+                className="text-[12px] font-bold"
+                style={[nepaliTextStyle(12), { color: "#fde68a", fontSize: 12 }]}
+              >
+                {`${pick("सङ्क्रान्ति", "Sankranti")} · ${rashiNames[sankranti]} · ${
+                  monthNames[sankranti]
+                } ${digits(1)}`}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {sheet === "layers" ? layersSheet : null}
+        {sheet === "focus" ? focusSheet : null}
       </View>
 
       {/* Floating over the canvas, this panel is always dark glass — so it runs
@@ -753,6 +930,32 @@ const SkyLabels = memo(function SkyLabels({
   return (
     <View style={{ position: "absolute", inset: 0 }} pointerEvents="none">
       {labels.map((label) => {
+        if (label.kind === "month" && label.index) {
+          /* Inside the राशि band, and dimmed off the Sun: a बिक्रम month *is* a
+             solar rashi, so the one lit is whichever sign the Sun stands in. No
+             glyph — the राशि label just outside already carries it. */
+          const boxWidth = 64 * scale;
+          return (
+            <Text
+              key={label.id}
+              numberOfLines={1}
+              className="absolute font-semibold"
+              style={[
+                nepaliTextStyle(11 * scale),
+                {
+                  left: label.x - boxWidth / 2,
+                  top: label.y - 7 * scale,
+                  width: boxWidth,
+                  textAlign: "center",
+                  color: "#e3d9a8",
+                  opacity: label.dim ? 0.45 : 1,
+                },
+              ]}
+            >
+              {bsMonthLabel(label.index, lang)}
+            </Text>
+          );
+        }
         if (label.kind === "rashi" && label.index) {
           const Icon = RASHI_ICONS[label.index - 1];
           const iconSize = 22 * scale;

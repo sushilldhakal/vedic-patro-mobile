@@ -48,6 +48,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 
 import { Canvas } from "@/components/learn/diagrams/LearnCanvas";
+import { OverlaySheet } from "@/components/ui/OverlaySheet";
 import { Text } from "@/components/ui/Text";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 import { useLocale } from "@/lib/i18n";
@@ -507,7 +508,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   );
 
   const controlsSheet = (
-    <SheetPanel
+    <OverlaySheet
       title={pick("नियन्त्रण", "Controls")}
       onClose={() => setSheet(null)}
       maxHeight={canvasHeight * 0.82}
@@ -607,7 +608,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
           )}
         </View>
       </View>
-    </SheetPanel>
+    </OverlaySheet>
   );
 
   /* Focus: which body the view is hung on, and whether the camera rides round
@@ -615,7 +616,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
      thing; the follow switch is a separate question about that same choice, so
      it lives with it rather than among the layers. */
   const focusSheet = (
-    <SheetPanel
+    <OverlaySheet
       title={pick("केन्द्रविन्दु", "Focus")}
       onClose={() => setSheet(null)}
       maxHeight={canvasHeight * 0.82}
@@ -652,7 +653,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
           (v) => setSpeed(Math.round(v)),
         )}
       </View>
-    </SheetPanel>
+    </OverlaySheet>
   );
 
   const body = (
@@ -1033,47 +1034,6 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
  * adjusting — so on this platform the panel takes the bottom of the card
  * instead, where the scene above it stays visible while a layer is switched.
  */
-function SheetPanel({
-  title,
-  onClose,
-  maxHeight,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  maxHeight: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <View
-      className="absolute inset-x-0 bottom-0 border-t border-white/15"
-      style={{ backgroundColor: "rgba(4, 7, 13, 0.95)", maxHeight }}
-    >
-      <View className="flex-row items-center justify-between px-3 pb-1 pt-2.5">
-        <Text
-          className="text-[11px] font-bold uppercase tracking-wide"
-          style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.75)", fontSize: 11 }]}
-        >
-          {title}
-        </Text>
-        <Pressable
-          onPress={onClose}
-          accessibilityRole="button"
-          className="h-7 w-7 items-center justify-center rounded-full border border-white/20"
-        >
-          <Ionicons name="close" size={14} color="rgba(255,255,255,0.75)" />
-        </Pressable>
-      </View>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="gap-3 px-3 pb-3.5"
-      >
-        {children}
-      </ScrollView>
-    </View>
-  );
-}
-
 /**
  * Green / amber / red on the reading that actually decides whether it feels
  * broken — the worst frame, not the average.
