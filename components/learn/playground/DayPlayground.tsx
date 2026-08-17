@@ -848,7 +848,10 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
       </View>
 
       {graphOpen ? (
-        <View className="absolute inset-x-2.5 bottom-2.5 rounded-xl border border-white/15 bg-black/85 p-2.5">
+        <View
+          className="absolute bottom-2.5 left-2.5 max-h-[70%] overflow-hidden rounded-xl border border-white/15 bg-black/85 p-2.5"
+          style={{ width: "92%", maxWidth: 340 }}
+        >
           <EotGraph
             eccentricity={eccentricity}
             tilt={tilt}

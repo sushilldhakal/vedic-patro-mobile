@@ -1,22 +1,15 @@
 /**
- * The equation of time, drawn as a curve.
+ * The equation of time, drawn the way a sundial would plot it.
  *
- * Two effects add here, and the graph exists so they can be pulled apart by
- * hand. The **eccentricity** term is one hump per year — the planet runs fast
- * near perihelion and slow near aphelion. The **tilt** term is two humps per
- * year — the Sun's motion along the ecliptic projects onto the equator at a
- * changing rate, which is zero at the solstices and largest at the equinoxes.
- *
- * Set eccentricity to zero in the playground and one hump survives; set the
- * tilt to zero and the other does. On Earth's real values they combine into
- * the familiar lopsided double wave, which is the same shape as the long axis
- * of an analemma.
+ * Year runs **down** the page (January to January) and the offset runs across
+ * — late to the left, early to the right. Two fills, not a line: the red lobe
+ * is when a sundial lags a clock, the olive lobe when it leads. Zero the
+ * eccentricity in the playground and one wave survives; zero the tilt and the
+ * other does.
  *
  * A straight port of the web app's `EotGraph`, drawn with `react-native-svg`
- * instead of DOM SVG: identical geometry, identical maths, and the same
- * hand-rolled path — the whole curve is 240 points of arithmetic, so a chart
- * library would be the heavier answer on either platform. What differs is only
- * that colours are literals here rather than `currentColor`, since a native SVG
+ * instead of DOM SVG: identical geometry and the same January–January sample.
+ * Colours are literals here rather than `currentColor`, since a native SVG
  * has no inherited text colour to pick up.
  */
 
@@ -26,18 +19,97 @@ import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { Text } from "@/components/ui/Text";
 import { useLocale } from "@/lib/i18n";
-import { BS_MONTHS_NE, BS_MONTH_NAMES } from "@/lib/bs-calendar";
+import { AD_MONTHS_SHORT, AD_MONTHS_SHORT_NE } from "@/lib/patro-month-labels";
 import { toNepaliDigits } from "@/lib/panchanga-format";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { eotCurve, solarMonthStarts } from "@/lib/sky3d/day-mechanics";
+import {
+  equationOfTime,
+  euclideanModulo,
+  meanAnomalyAt,
+  PERIHELION,
+  VERNAL,
+} from "@/lib/sky3d/day-mechanics";
 
-const W = 520;
-const H = 158;
-const PAD = { l: 34, r: 8, t: 12, b: 26 };
+const W = 328;
+const H = 400;
+const PAD = { l: 46, r: 10, t: 8, b: 28 };
 
-const SOLAR = "#dddd00";
-/** What `currentColor` resolved to on the web panel — this graph is always dark. */
+const PI2 = Math.PI * 2;
+const NOW = "#2888e4";
+const GRID = "#1a4a7c";
+const LATE = "hsla(3, 80%, 55%, 0.5)";
+const EARLY = "hsla(60, 100%, 43%, 0.5)";
 const INK = "#e2e8f0";
+
+/** Non-leap Gregorian month starts, plus the next January. */
+const MONTH_START_DAYS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
+
+type Pt = { t: number; minutes: number };
+
+function eotCalendarCurve(e: number, tilt: number, samples = 240): Pt[] {
+  const p = PERIHELION - VERNAL;
+  const out: Pt[] = [];
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples;
+    const M = euclideanModulo(t * PI2 - PERIHELION, PI2);
+    out.push({ t, minutes: (equationOfTime(M, e, tilt, p) * 24 * 60) / PI2 });
+  }
+  return out;
+}
+
+function withZeroCrossings(pts: Pt[]): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i < pts.length; i += 1) {
+    const cur = pts[i]!;
+    if (i > 0) {
+      const prev = pts[i - 1]!;
+      if (prev.minutes * cur.minutes < 0) {
+        const u = prev.minutes / (prev.minutes - cur.minutes);
+        out.push({ t: prev.t + u * (cur.t - prev.t), minutes: 0 });
+      }
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+function areaPath(
+  pts: Pt[],
+  x: (min: number) => number,
+  y: (t: number) => number,
+  side: "late" | "early",
+): string {
+  if (pts.length === 0) return "";
+  const clamp = (m: number) => (side === "late" ? Math.min(m, 0) : Math.max(m, 0));
+  const x0 = x(0);
+  let d = `M ${x0.toFixed(1)} ${y(pts[0]!.t).toFixed(1)}`;
+  for (const p of pts) {
+    d += ` L ${x(clamp(p.minutes)).toFixed(1)} ${y(p.t).toFixed(1)}`;
+  }
+  d += ` L ${x0.toFixed(1)} ${y(pts[pts.length - 1]!.t).toFixed(1)} Z`;
+  return d;
+}
+
+function durationTicks(peakMin: number): { minutes: number; sec: number }[] {
+  const peakSec = peakMin * 60;
+  const stepSec = peakSec > 480 ? 200 : peakSec > 240 ? 100 : 60;
+  const axisSec = Math.max(stepSec * Math.ceil(peakSec / stepSec), stepSec);
+  const out: { minutes: number; sec: number }[] = [];
+  for (let s = -axisSec; s <= axisSec + 1e-6; s += stepSec) {
+    out.push({ minutes: s / 60, sec: s });
+  }
+  return out;
+}
+
+function formatDuration(sec: number, num: (v: number | string) => string): string {
+  if (Math.abs(sec) < 30) return `${num(0)}s`;
+  const sign = sec < 0 ? "−" : "";
+  const n = Math.abs(sec);
+  const hours = Math.floor(n / 3600);
+  const minutes = Math.floor((n - hours * 3600) / 60);
+  if (hours !== 0) return `${sign}${num(hours)}h${minutes ? `${num(minutes)}m` : ""}`;
+  return `${sign}${num(minutes)}m`;
+}
 
 export interface EotGraphProps {
   eccentricity: number;
@@ -54,149 +126,154 @@ export function EotGraph({ eccentricity, tilt, dayOfYear, daysPerYear }: EotGrap
   const ne = lang !== "en";
   const num = (v: number | string) => (ne ? toNepaliDigits(String(v)) : String(v));
 
-  const curve = useMemo(() => eotCurve(eccentricity, tilt), [eccentricity, tilt]);
-
-  /**
-   * Symmetric scale, floored at ±4 min.
-   *
-   * Without the floor, a circular upright orbit — where the answer is a
-   * dead-flat zero — would rescale until numerical noise filled the frame and
-   * looked like signal.
-   */
-  const peak = useMemo(() => {
-    const m = curve.reduce((a, p) => Math.max(a, Math.abs(p.minutes)), 0);
-    return Math.max(4, Math.ceil(m / 4) * 4);
-  }, [curve]);
-
-  const x = (day: number) => PAD.l + (day / 365) * (W - PAD.l - PAD.r);
-  const y = (min: number) => {
-    const h = H - PAD.t - PAD.b;
-    return PAD.t + h / 2 - (min / peak) * (h / 2);
-  };
-
-  const path = useMemo(
-    () =>
-      curve
-        .map((p, i) => `${i ? "L" : "M"}${x(p.day).toFixed(1)} ${y(p.minutes).toFixed(1)}`)
-        .join(" "),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [curve, peak],
+  const curve = useMemo(
+    () => withZeroCrossings(eotCalendarCurve(eccentricity, tilt)),
+    [eccentricity, tilt],
   );
 
-  /* The sim's year may be any length; the curve is always a real 365. */
-  const markerDay = ((dayOfYear / daysPerYear) * 365) % 365;
-  const markerMin = curve[Math.round((markerDay / 365) * (curve.length - 1))]?.minutes ?? 0;
+  const peak = useMemo(() => {
+    const m = curve.reduce((a, p) => Math.max(a, Math.abs(p.minutes)), 0);
+    return Math.max(4, m);
+  }, [curve]);
 
-  const ticks = [peak, peak / 2, 0, -peak / 2, -peak];
+  const ticks = useMemo(() => durationTicks(peak), [peak]);
+  const axisMin = ticks[0]?.minutes ?? -peak;
+  const axisMax = ticks[ticks.length - 1]?.minutes ?? peak;
 
-  /* बिक्रम months, not Gregorian ones — and they are not evenly spaced, because
-     a बिक्रम month is 30° of the Sun's travel rather than a fixed run of days.
-     Their unevenness is the same eccentricity the curve is plotting. */
-  const monthStarts = useMemo(() => solarMonthStarts(eccentricity), [eccentricity]);
-  const monthNames = ne ? BS_MONTHS_NE : ([...BS_MONTH_NAMES] as string[]);
+  const plotL = PAD.l;
+  const plotR = W - PAD.r;
+  const plotT = PAD.t;
+  const plotB = H - PAD.b;
+  const x = (min: number) => plotL + ((min - axisMin) / (axisMax - axisMin)) * (plotR - plotL);
+  const y = (t: number) => plotT + t * (plotB - plotT);
+
+  const latePath = useMemo(() => areaPath(curve, x, y, "late"), [curve, axisMin, axisMax]);
+  const earlyPath = useMemo(() => areaPath(curve, x, y, "early"), [curve, axisMin, axisMax]);
+
+  const markerM = meanAnomalyAt(dayOfYear / daysPerYear);
+  const markerT = euclideanModulo((markerM + PERIHELION) / PI2, 1);
+  const markerMin =
+    (equationOfTime(markerM, eccentricity, tilt, PERIHELION - VERNAL) * 24 * 60) / PI2;
+
+  const monthNames = ne ? AD_MONTHS_SHORT_NE : AD_MONTHS_SHORT;
   const currentMonth = useMemo(() => {
+    const day = markerT * 365;
     let idx = 0;
-    for (let i = 0; i < 12; i += 1) if (markerDay >= monthStarts[i]!) idx = i;
+    for (let i = 0; i < 12; i += 1) if (day >= MONTH_START_DAYS[i]!) idx = i;
     return idx;
-  }, [markerDay, monthStarts]);
+  }, [markerT]);
+
+  const legend = [
+    { color: NOW, label: pick("अहिले", "Now") },
+    { color: LATE, label: pick("घाम पछाडि", "Sundial Late") },
+    { color: EARLY, label: pick("घाम अगाडि", "Sundial Early") },
+  ];
 
   return (
     <View className="w-full">
-      {/* The aspect box is the wrapper's, not the SVG's: unlike DOM SVG,
-          `react-native-svg` will not work a height out from the viewBox on its
-          own, and a percentage height inside an auto-sized parent collapses to
-          nothing. Given a sized parent, `100%` on both axes is exact. */}
-      <View style={{ width: "100%", aspectRatio: W / H }}>
-      <Svg
-        viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        height="100%"
-        accessibilityRole="image"
-        accessibilityLabel={pick(
-          "समयको समीकरण — वर्षभरि साँचो सौर समय र माध्य सौर समयबीचको फरक",
-          "The equation of time — true solar time minus mean solar time across a year",
-        )}
-      >
-        {/* horizontal grid + minute labels */}
-        {ticks.map((t) => (
-          <G key={t}>
-            <Line
-              x1={PAD.l}
-              x2={W - PAD.r}
-              y1={y(t)}
-              y2={y(t)}
-              stroke={INK}
-              strokeOpacity={t === 0 ? 0.42 : 0.14}
-              strokeWidth={t === 0 ? 1 : 0.6}
+      <View className="mb-1.5 flex-row flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        {legend.map((item) => (
+          <View key={item.label} className="flex-row items-center gap-1.5">
+            <View
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 2,
+                backgroundColor: item.color,
+              }}
             />
-            <SvgText
-              x={PAD.l - 5}
-              y={y(t) + 3}
-              textAnchor="end"
-              fontSize={8}
-              fill={INK}
-              fillOpacity={0.55}
+            <Text
+              className="text-[10px]"
+              style={[nepaliTextStyle(10), { color: "rgba(226,232,240,0.8)", fontSize: 10 }]}
             >
-              {num(t === 0 ? 0 : `${t > 0 ? "+" : "−"}${Math.abs(t)}`)}
-            </SvgText>
-          </G>
+              {item.label}
+            </Text>
+          </View>
         ))}
-
-        {/* बिक्रम month boundaries, each one a सङ्क्रान्ति */}
-        {monthStarts.map((d, i) => {
-          const next = i === 11 ? 365 : monthStarts[i + 1]!;
-          return (
-            <G key={i}>
-              <Line
-                x1={x(d)}
-                x2={x(d)}
-                y1={PAD.t}
-                y2={H - PAD.b + 3}
-                stroke={INK}
-                strokeOpacity={i === 0 ? 0.34 : 0.14}
-                strokeWidth={0.7}
-              />
-              <SvgText
-                x={x((d + next) / 2)}
-                y={H - PAD.b + 12}
-                textAnchor="middle"
-                fontSize={7.5}
-                fill={INK}
-                fillOpacity={i === currentMonth ? 0.95 : 0.45}
-                fontWeight={i === currentMonth ? "700" : "400"}
-              >
-                {monthNames[i]}
-              </SvgText>
-            </G>
-          );
-        })}
-
-        <Path d={path} fill="none" stroke={SOLAR} strokeWidth={1.8} strokeLinejoin="round" />
-
-        {/* where the sim is now */}
-        <Line
-          x1={x(markerDay)}
-          x2={x(markerDay)}
-          y1={PAD.t}
-          y2={H - PAD.b}
-          stroke={INK}
-          strokeOpacity={0.45}
-          strokeWidth={0.9}
-          strokeDasharray="3 3"
-        />
-        <Circle cx={x(markerDay)} cy={y(markerMin)} r={3.6} fill={SOLAR} />
-
-        <SvgText
-          x={W - PAD.r}
-          y={PAD.t + 7}
-          textAnchor="end"
-          fontSize={9}
-          fontWeight="600"
-          fill={SOLAR}
+      </View>
+      <View style={{ width: "100%", aspectRatio: W / H }}>
+        <Svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          height="100%"
+          accessibilityRole="image"
+          accessibilityLabel={pick(
+            "समयको समीकरण — वर्षभरि साँचो सौर समय र माध्य सौर समयबीचको फरक",
+            "The equation of time — true solar time minus mean solar time across a year",
+          )}
         >
-          {`${markerMin >= 0 ? "+" : "−"}${num(Math.abs(markerMin).toFixed(1))} ${pick("मिनेट", "min")}`}
-        </SvgText>
-      </Svg>
+          {ticks.map((tick) => {
+            const px = x(tick.minutes);
+            const isZero = tick.sec === 0;
+            return (
+              <G key={tick.sec}>
+                <Line
+                  x1={px}
+                  x2={px}
+                  y1={plotT}
+                  y2={plotB}
+                  stroke={GRID}
+                  strokeOpacity={isZero ? 0.85 : 0.45}
+                  strokeWidth={isZero ? 1 : 0.6}
+                />
+                <SvgText
+                  x={px}
+                  y={H - 8}
+                  textAnchor="middle"
+                  fontSize={8}
+                  fill={INK}
+                  fillOpacity={0.55}
+                >
+                  {formatDuration(tick.sec, num)}
+                </SvgText>
+              </G>
+            );
+          })}
+
+          {MONTH_START_DAYS.map((day, i) => {
+            const t = day / 365;
+            const py = y(t);
+            const name = monthNames[i % 12];
+            const active = i < 12 && i === currentMonth;
+            return (
+              <G key={`m-${i}`}>
+                <Line
+                  x1={plotL}
+                  x2={plotR}
+                  y1={py}
+                  y2={py}
+                  stroke={GRID}
+                  strokeOpacity={i === 0 || i === 12 ? 0.7 : 0.45}
+                  strokeWidth={i === 12 ? 1 : 0.6}
+                />
+                <SvgText
+                  x={plotL - 6}
+                  y={py + 3}
+                  textAnchor="end"
+                  fontSize={8}
+                  fill={INK}
+                  fillOpacity={active ? 0.95 : 0.5}
+                  fontWeight={active ? "700" : "400"}
+                >
+                  {name}
+                </SvgText>
+              </G>
+            );
+          })}
+
+          <Path d={latePath} fill={LATE} />
+          <Path d={earlyPath} fill={EARLY} />
+
+          <Line
+            x1={plotL}
+            x2={plotR}
+            y1={y(markerT)}
+            y2={y(markerT)}
+            stroke="rgba(255,255,255,0.4)"
+            strokeWidth={1}
+          />
+          <Circle cx={x(markerMin)} cy={y(markerT)} r={5} fill={NOW} />
+        </Svg>
       </View>
       <Text
         className="mt-1.5 text-[11px] leading-snug"
