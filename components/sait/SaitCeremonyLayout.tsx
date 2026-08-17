@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -23,6 +23,8 @@ import type { PanchangaLocation } from "@/lib/use-panchanga-location";
 export function SaitCeremonyLayout({
   title,
   subtitle,
+  era,
+  onEraChange,
   year,
   onYearChange,
   location,
@@ -40,6 +42,9 @@ export function SaitCeremonyLayout({
 }: {
   title: string;
   subtitle: string;
+  /** Browse era, owned by the page (web `usePatroYearDataPage().yearBrowse`). */
+  era: PatroBrowseEra;
+  onEraChange: (era: PatroBrowseEra) => void;
   year: number;
   onYearChange: (year: number) => void;
   location: PanchangaLocation;
@@ -83,15 +88,13 @@ export function SaitCeremonyLayout({
         `${days.length} auspicious days in ${year}`,
       );
 
-  const [era, setEra] = useState<PatroBrowseEra>("bs");
-
   return (
     <AppShell title={title} showHeader={false}>
       <SaitRulesSection method={method} rules={rules} engineVersion={engineVersion} />
 
       <PatroYearNavBlock
         era={era}
-        onEraChange={setEra}
+        onEraChange={onEraChange}
         year={year}
         onYearChange={onYearChange}
         location={location}

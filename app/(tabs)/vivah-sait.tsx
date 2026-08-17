@@ -2,17 +2,18 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SaitCeremonyLayout } from "@/components/sait/SaitCeremonyLayout";
 import { SaitProfilePicker } from "@/components/sait/SaitProfilePicker";
 import { SuitabilityLegend } from "@/components/sait/SaitSuitability";
-import { useBsYear } from "@/components/pickers/BsYearMonthPicker";
 import { fetchSaitDetail, saitDetailKey } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
+import { isGregorianBrowseEra } from "@/lib/patro-era";
 import { SAIT_RULES_CONTENT } from "@/lib/sait-rules-content";
 import { useSaitPersonalize } from "@/lib/sait-personalize";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 
 export default function VivahSaitScreen() {
   const { pick, digits } = useLocale();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
   const content = SAIT_RULES_CONTENT.vivah;
   const personalize = useSaitPersonalize(year, "vivah", location.params);
 
@@ -30,6 +31,8 @@ export default function VivahSaitScreen() {
         "शास्त्रीय नियमबाट गणना गरिएका विवाहका शुभ मुहूर्त",
         "Auspicious marriage windows computed from the classical rules",
       )}
+      era={era}
+      onEraChange={setEra}
       year={year}
       onYearChange={setYear}
       location={location}
@@ -57,10 +60,15 @@ export default function VivahSaitScreen() {
         "No marriage muhurta found for this year.",
       )}
       countLabel={(count, y) =>
-        pick(
-          `वि.सं. ${digits(y)} मा ${digits(count)} विवाह साइत`,
-          `${count} marriage muhurtas in BS ${y}`,
-        )
+        isGregorianBrowseEra(era)
+          ? pick(
+              `ई.सं. ${digits(y)} मा ${digits(count)} विवाह साइत`,
+              `${count} marriage muhurtas in ${y} AD`,
+            )
+          : pick(
+              `वि.सं. ${digits(y)} मा ${digits(count)} विवाह साइत`,
+              `${count} marriage muhurtas in BS ${y}`,
+            )
       }
     />
   );

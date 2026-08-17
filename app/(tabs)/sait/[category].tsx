@@ -4,21 +4,22 @@ import { AppShell } from "@/components/AppShell";
 import { SaitCeremonyLayout } from "@/components/sait/SaitCeremonyLayout";
 import { SaitProfilePicker } from "@/components/sait/SaitProfilePicker";
 import { SuitabilityLegend } from "@/components/sait/SaitSuitability";
-import { useBsYear } from "@/components/pickers/BsYearMonthPicker";
 import { Text } from "@/components/ui/Text";
 import { fetchSaitDetail, saitDetailKey } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { isGregorianBrowseEra } from "@/lib/patro-era";
 import { SAIT_CATEGORY_LABELS, type SaitCategoryId } from "@/lib/sait-data";
 import { SAIT_RULES_CONTENT } from "@/lib/sait-rules-content";
 import { useSaitPersonalize } from "@/lib/sait-personalize";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
+import { usePatroYearBrowse } from "@/lib/use-patro-year-browse";
 
 export default function SaitCategoryScreen() {
   const { category } = useLocalSearchParams<{ category: string }>();
   const { pick, digits } = useLocale();
   const { location, setLocation } = usePanchangaLocation();
-  const { year, setYear } = useBsYear();
+  const { era, setEra, year, setYear } = usePatroYearBrowse();
 
   const id = category as SaitCategoryId | undefined;
   const labels = id ? SAIT_CATEGORY_LABELS[id] : undefined;
@@ -52,6 +53,8 @@ export default function SaitCategoryScreen() {
         "शास्त्रीय नियमबाट गणना गरिएका शुभ मुहूर्त",
         "Auspicious windows computed from the classical rules",
       )}
+      era={era}
+      onEraChange={setEra}
       year={year}
       onYearChange={setYear}
       location={location}
@@ -79,10 +82,15 @@ export default function SaitCategoryScreen() {
         `No ${labels.en} muhurta found for this year.`,
       )}
       countLabel={(count, y) =>
-        pick(
-          `वि.सं. ${digits(y)} मा ${digits(count)} ${labels.ne} साइत`,
-          `${count} ${title} muhurtas in BS ${y}`,
-        )
+        isGregorianBrowseEra(era)
+          ? pick(
+              `ई.सं. ${digits(y)} मा ${digits(count)} ${labels.ne} साइत`,
+              `${count} ${title} muhurtas in ${y} AD`,
+            )
+          : pick(
+              `वि.सं. ${digits(y)} मा ${digits(count)} ${labels.ne} साइत`,
+              `${count} ${title} muhurtas in BS ${y}`,
+            )
       }
     />
   );

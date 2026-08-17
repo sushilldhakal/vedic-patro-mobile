@@ -13,12 +13,31 @@ import {
   toNepaliDigits,
 } from "@/lib/rashifal-ui";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { civilIsoFromDate } from "@/lib/patro-day";
+import { formatPatroCivilDayLabel } from "@/lib/patro-headline-subtitle";
 import { useThemeColors } from "@/lib/theme-context";
 
 type Props = {
   name: string;
   personal: RashifalPersonal;
 };
+
+/**
+ * Dasha end date, in the same locale-aware AD label the rest of the app uses
+ * (static month-name tables + digit localisation) — not the platform's own
+ * Intl data, which cannot be relied on to carry full Nepali month names.
+ */
+function formatDasha(
+  iso: string,
+  lang: string,
+  digitFn: (n: number | string) => string,
+): string {
+  try {
+    return formatPatroCivilDayLabel(civilIsoFromDate(new Date(iso)), lang, digitFn);
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
 
 function StarMeter({ stars, tone }: { stars: number; tone: RashifalPersonal["tone"] }) {
   return (
@@ -55,9 +74,15 @@ export function RashifalPersonalCard({ name, personal }: Props) {
           <Text className="text-base font-bold text-foreground" style={nepaliTextStyle(16)}>
             {name}
           </Text>
-          <Text className="mt-1 text-xs text-muted-foreground">
-            {pick("व्यक्तिगत राशिफल", "Personal rashifal")} ·{" "}
-            {ne ? personal.moon_sign_ne : personal.moon_sign_en}
+          {/* Leads with the Rashi (Moon sign) — "राशि" in everyday usage — with
+              the Lagna named explicitly alongside rather than standing in for
+              it. The engine's scoring is Lagna-anchored; only display order
+              changes here. Mirrors web `rashifal.personal.lagna_line`. */}
+          <Text className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {pick(
+              `राशि ${personal.moon_sign_ne} · लग्न ${personal.lagna_sign_ne} · सूर्य ${personal.sun_sign_ne}`,
+              `Rashi ${personal.moon_sign_en} · Lagna ${personal.lagna_sign_en} · Sun ${personal.sun_sign_en}`,
+            )}
           </Text>
         </View>
       </View>
@@ -71,6 +96,23 @@ export function RashifalPersonalCard({ name, personal }: Props) {
           {digits(pct)}%
         </Text>
       </View>
+
+      {/* Running dasha — the layer only a birth chart can give. */}
+      {dasha ? (
+        <View className="flex-row items-center gap-1.5 border-b border-border/60 bg-muted/20 px-4 py-2">
+          <Ionicons name="time-outline" size={14} color={colors.secondary} />
+          <Text
+            numberOfLines={1}
+            className="flex-1 text-xs font-semibold text-foreground"
+            style={nepaliTextStyle(12)}
+          >
+            {pick(
+              `${dasha.mahadasha.lord_ne} महादशा, ${dasha.antardasha.lord_ne} अन्तर्दशा चलिरहेको`,
+              `Running ${dasha.mahadasha.lord_en} Mahadasha, ${dasha.antardasha.lord_en} Antardasha`,
+            )}
+          </Text>
+        </View>
+      ) : null}
 
       {personal.domains?.length ? (
         <View className="flex-row flex-wrap border-b border-border/60 px-4 py-3">
@@ -110,12 +152,6 @@ export function RashifalPersonalCard({ name, personal }: Props) {
             {pick("दिशा", "Direction")}: {luckyDirection}
           </Text>
         ) : null}
-        {dasha ? (
-          <Text className="text-xs text-muted-foreground">
-            {pick("महादशा", "Mahadasha")}: {ne ? dasha.mahadasha.lord_ne : dasha.mahadasha.lord_en} ·{" "}
-            {pick("अन्तर्दशा", "Antardasha")}: {ne ? dasha.antardasha.lord_ne : dasha.antardasha.lord_en}
-          </Text>
-        ) : null}
       </View>
 
       <Pressable
@@ -143,11 +179,50 @@ export function RashifalPersonalCard({ name, personal }: Props) {
               </Text>
             </View>
           ))}
+          {personal.gochar?.length ? (
+            <View className="mt-3 flex-row flex-wrap gap-1.5 border-t border-border/60 pt-3">
+              {personal.gochar.map((row) => (
+                <View
+                  key={row.graha}
+                  className={cn(
+                    "flex-row items-center gap-1 rounded-md px-1.5 py-0.5",
+                    row.vedha_by ? "bg-tone-neutral" : row.favourable ? "bg-tone-good" : "bg-tone-bad",
+                  )}
+                >
+                  <Text className="text-[10px] font-semibold">
+                    {ne ? row.graha_ne : row.graha_en}
+                  </Text>
+                  <Text className="text-[10px] font-semibold tabular-nums opacity-80">
+                    {toNepaliDigits(row.house, lang)}
+                  </Text>
+                  {row.vedha_by ? (
+                    <Ionicons name="close-circle-outline" size={11} color={colors.mutedForeground} />
+                  ) : null}
+                  {row.retrograde ? (
+                    <Ionicons name="refresh-outline" size={11} color={colors.mutedForeground} />
+                  ) : null}
+                  {row.combust ? (
+                    <Ionicons name="flame-outline" size={11} color={colors.mutedForeground} />
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           {lord ? (
+            <Text className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+              {pick(
+                `${lord.lord_ne} ${lord.house} भावमा, ${lord.sign_ne} राशिमा — ${lord.dignity_ne}`,
+                `${lord.lord_en} in house ${lord.house}, ${lord.sign_en} — ${lord.dignity_en}`,
+              )}
+            </Text>
+          ) : null}
+
+          {dasha ? (
             <Text className="mt-2 text-xs text-muted-foreground">
               {pick(
-                `${lord.lord_ne} · ${lord.house}`,
-                `${lord.lord_en} · house ${lord.house}`,
+                `${dasha.mahadasha.lord_ne} महादशा ${formatDasha(dasha.mahadasha.end, lang, digits)}सम्म। ${dasha.antardasha.lord_ne} अन्तर्दशा ${formatDasha(dasha.antardasha.end, lang, digits)}सम्म।`,
+                `${dasha.mahadasha.lord_en} Mahadasha until ${formatDasha(dasha.mahadasha.end, lang, digits)}. ${dasha.antardasha.lord_en} Antardasha until ${formatDasha(dasha.antardasha.end, lang, digits)}.`,
               )}
             </Text>
           ) : null}
