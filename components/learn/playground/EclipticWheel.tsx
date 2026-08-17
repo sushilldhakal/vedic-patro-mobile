@@ -32,6 +32,8 @@ const COLOR = {
   solar: 0xdddd00,
   belt: 0x8a7c2e,
   nakshatra: 0x4a6b8a,
+  grid: 0x2761a1,
+  gridPlane: 0x001b3d,
 } as const;
 
 /** ecliptic longitude → a point in the equatorial / belt plane, app convention. */
@@ -117,9 +119,9 @@ function buildGuideGrid(innerR = 4) {
   const spokes = new THREE.LineSegments(
     rg,
     new THREE.LineBasicMaterial({
-      color: 0x1e4a7a,
+      color: COLOR.grid,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.5,
       depthWrite: false,
     }),
   );
@@ -127,16 +129,14 @@ function buildGuideGrid(innerR = 4) {
   const rings = [innerR, 8, 12, MONTH_R, BELT_INNER, BELT_OUTER, NAK_OUTER];
   const unique = [...new Set(rings)].filter((r) => r >= innerR).sort((a, b) => a - b);
   for (const r of unique) {
-    const ring = makeLine(ellipseGeometry(r, r, 96), 0x1e4a7a, 0.4);
+    const ring = makeLine(ellipseGeometry(r, r, 96), COLOR.grid, 0.4);
     (ring.material as THREE.LineBasicMaterial).depthWrite = false;
-    (ring.material as THREE.LineBasicMaterial).depthTest = false;
     ring.renderOrder = 1;
     ring.frustumCulled = false;
     group.add(ring);
   }
   spokes.renderOrder = 1;
   spokes.frustumCulled = false;
-  (spokes.material as THREE.LineBasicMaterial).depthTest = false;
   return group;
 }
 
@@ -264,7 +264,7 @@ export function GuideGrid({
           <circleGeometry args={[NAK_OUTER, 64]} />
         )}
         <meshBasicMaterial
-          color={0x000022}
+          color={COLOR.gridPlane}
           transparent={planeOpacity < 1}
           opacity={planeOpacity}
           side={THREE.DoubleSide}

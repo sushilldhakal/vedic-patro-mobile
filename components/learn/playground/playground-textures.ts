@@ -17,7 +17,7 @@ import * as THREE from "three";
 import { useMemo } from "react";
 
 const MODULES = {
-  earth: require("@/assets/sky3d/earth.jpg"),
+  earth: require("@/assets/graha/earth.png"),
   sun: require("@/assets/sky3d/sun.jpg"),
   moon: require("@/assets/sky3d/moon.jpg"),
   background: require("@/assets/sky3d/background.jpg"),

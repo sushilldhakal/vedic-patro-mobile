@@ -1,16 +1,15 @@
 /**
  * The equation of time, drawn the way a sundial would plot it.
  *
- * Year runs **down** the page (January to January) and the offset runs across
+ * Year runs **down** the page (बैशाख to बैशाख) and the offset runs across
  * — late to the left, early to the right. Two fills, not a line: the red lobe
  * is when a sundial lags a clock, the olive lobe when it leads. Zero the
  * eccentricity in the playground and one wave survives; zero the tilt and the
  * other does.
  *
  * A straight port of the web app's `EotGraph`, drawn with `react-native-svg`
- * instead of DOM SVG: identical geometry and the same January–January sample.
- * Colours are literals here rather than `currentColor`, since a native SVG
- * has no inherited text colour to pick up.
+ * instead of DOM SVG. Sampled from मेष सङ्क्रान्ति so the month ticks are
+ * बिक्रम months, not Gregorian ones.
  */
 
 import { useMemo } from "react";
@@ -19,20 +18,22 @@ import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { Text } from "@/components/ui/Text";
 import { useLocale } from "@/lib/i18n";
-import { AD_MONTHS_SHORT, AD_MONTHS_SHORT_NE } from "@/lib/patro-month-labels";
+import { BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { toNepaliDigits } from "@/lib/panchanga-format";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import {
+  eotCurve,
   equationOfTime,
   euclideanModulo,
   meanAnomalyAt,
+  solarMonthStarts,
   PERIHELION,
   VERNAL,
 } from "@/lib/sky3d/day-mechanics";
 
-const W = 328;
+const W = 336;
 const H = 400;
-const PAD = { l: 46, r: 10, t: 8, b: 28 };
+const PAD = { l: 54, r: 10, t: 8, b: 28 };
 
 const PI2 = Math.PI * 2;
 const NOW = "#2888e4";
@@ -41,20 +42,10 @@ const LATE = "hsla(3, 80%, 55%, 0.5)";
 const EARLY = "hsla(60, 100%, 43%, 0.5)";
 const INK = "#e2e8f0";
 
-/** Non-leap Gregorian month starts, plus the next January. */
-const MONTH_START_DAYS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
-
 type Pt = { t: number; minutes: number };
 
-function eotCalendarCurve(e: number, tilt: number, samples = 240): Pt[] {
-  const p = PERIHELION - VERNAL;
-  const out: Pt[] = [];
-  for (let i = 0; i <= samples; i += 1) {
-    const t = i / samples;
-    const M = euclideanModulo(t * PI2 - PERIHELION, PI2);
-    out.push({ t, minutes: (equationOfTime(M, e, tilt, p) * 24 * 60) / PI2 });
-  }
-  return out;
+function eotYearCurve(e: number, tilt: number): Pt[] {
+  return eotCurve(e, tilt).map((p) => ({ t: p.day / 365, minutes: p.minutes }));
 }
 
 function withZeroCrossings(pts: Pt[]): Pt[] {
@@ -127,7 +118,7 @@ export function EotGraph({ eccentricity, tilt, dayOfYear, daysPerYear }: EotGrap
   const num = (v: number | string) => (ne ? toNepaliDigits(String(v)) : String(v));
 
   const curve = useMemo(
-    () => withZeroCrossings(eotCalendarCurve(eccentricity, tilt)),
+    () => withZeroCrossings(eotYearCurve(eccentricity, tilt)),
     [eccentricity, tilt],
   );
 
@@ -151,17 +142,19 @@ export function EotGraph({ eccentricity, tilt, dayOfYear, daysPerYear }: EotGrap
   const earlyPath = useMemo(() => areaPath(curve, x, y, "early"), [curve, axisMin, axisMax]);
 
   const markerM = meanAnomalyAt(dayOfYear / daysPerYear);
-  const markerT = euclideanModulo((markerM + PERIHELION) / PI2, 1);
+  const markerT = euclideanModulo(dayOfYear / daysPerYear, 1);
   const markerMin =
     (equationOfTime(markerM, eccentricity, tilt, PERIHELION - VERNAL) * 24 * 60) / PI2;
 
-  const monthNames = ne ? AD_MONTHS_SHORT_NE : AD_MONTHS_SHORT;
+  const monthStarts = useMemo(() => solarMonthStarts(eccentricity), [eccentricity]);
+  const monthTicks = useMemo(() => [...monthStarts, 365], [monthStarts]);
+  const monthNames = ne ? BS_MONTHS_NE : ([...BS_MONTH_NAMES] as string[]);
   const currentMonth = useMemo(() => {
     const day = markerT * 365;
     let idx = 0;
-    for (let i = 0; i < 12; i += 1) if (day >= MONTH_START_DAYS[i]!) idx = i;
+    for (let i = 0; i < 12; i += 1) if (day >= monthStarts[i]!) idx = i;
     return idx;
-  }, [markerT]);
+  }, [markerT, monthStarts]);
 
   const legend = [
     { color: NOW, label: pick("अहिले", "Now") },
@@ -230,7 +223,7 @@ export function EotGraph({ eccentricity, tilt, dayOfYear, daysPerYear }: EotGrap
             );
           })}
 
-          {MONTH_START_DAYS.map((day, i) => {
+          {monthTicks.map((day, i) => {
             const t = day / 365;
             const py = y(t);
             const name = monthNames[i % 12];
