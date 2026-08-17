@@ -24,11 +24,14 @@ default to `true`, so they are on screen right now with no way to turn them off.
 That reframes the work: the expensive half (the geometry) is done, and what is
 absent is chips.
 
+> **Status:** everything below has since been closed. Kept as the record of what
+> the gap actually was, since the line-count reading of it was wrong.
+
 ## Genuinely absent
 
-### 1. Eclipses
+### 1. Eclipses — *done*
 
-The one substantial feature gap. Web-only, in both files:
+The one substantial feature gap. Was web-only, in both files:
 
 - `eclipseOf` / `circSep` — the angular test for whether Sun, Moon, Earth and a
   node share a line, and how nearly.
@@ -44,7 +47,7 @@ Note the sim in the Learn playground already does this test (`ECLIPSE_LAT_LIMIT_
 and the syzygy window in `DaySimScene`), so the astronomy is in this repo twice
 over. It is the sky's own drawing of it that is not.
 
-### 2. The focus picker
+### 2. The focus picker — *done*
 
 Web has a "के पछ्याउने?" menu: point the camera at Earth, at your own place on
 the globe, or at any one graha. Mobile has only `lockCenter`, which follows
@@ -52,20 +55,20 @@ whichever graha you last tapped — so Earth and "your location" are not
 selectable targets. `FocusKey` is exported by the mobile scene and never used by
 the mobile shell.
 
-### 3. काठमाडौँ रेखा
+### 3. काठमाडौँ रेखा — *done*
 
 `makePrimeMeridian` and the `primeMeridian` toggle are web-only in both layers —
 the meridian noon is reckoned against, the same line the Learn playground draws
 on its globe. Not in the mobile scene at all.
 
-### 4. Belt granularity
+### 4. Belt granularity — *done*
 
 Web splits the belt three ways — **राशि**, **नक्षत्र**, **महिना** — each its own
 chip. Mobile has one **राशि/नक्षत्र** toggle and no बिक्रम month ring at all.
 Mobile does have a separate **तारापुञ्ज** toggle for the asterisms, which the
 web folds into its nakshatra layer; that one is mobile's own and better.
 
-### 5. The sankranti HUD
+### 5. The sankranti HUD — *done*
 
 Web keeps a "सूर्य राशि · महिना" readout and flashes **सङ्क्रान्ति** when the
 Sun crosses a boundary. Mobile has neither.
@@ -112,13 +115,17 @@ Roughly, and not to be over-read:
 So the line gap overstates the feature gap by a good margin, and the feature gap
 is smaller again once the unreachable layers are wired up.
 
-## Suggested order
+## What is left
 
-1. **Chips for the four built-but-hidden features.** Hours, not days, and it is
-   the only item here where the hard part is already paid for.
-2. **काठमाडौँ रेखा** — small, and the geometry can be lifted from the Learn
-   playground's `localMeridian`.
-3. **Belt split + महिना ring** — mostly shell work.
-4. **Focus picker.**
-5. **Eclipses.** The real port, and worth doing last so the cheap wins are not
-   held behind it.
+Nothing on this list. The remaining differences are the deliberate ones above —
+torus nodes instead of rasterised SVG, `patro-date/` instead of a bespoke
+picker — plus web-only concerns (SEO, prerendering) that have no mobile meaning.
+
+Two things worth knowing rather than doing:
+
+- **The horizon view is dead code on both platforms.** Neither shell can enter
+  it. That is a shared question, not a parity gap, and it is worth deciding
+  once: wire it up in both, or delete it from both.
+- **Frame rate is still unmeasured**, and the sky is heavier than the Learn
+  scenes. The playground's meter (`docs/learn-playground.md`) is the tool; the
+  sky has no equivalent yet.

@@ -345,6 +345,24 @@ export function AakashGocharSky({
   const sunRashi =
     sunLongitude == null ? null : Math.floor(normalizeDeg(sunLongitude) / 30) % 12;
 
+  const eclipse = sample?.eclipse ?? null;
+  /*
+   * अमावस्या / पूर्णिमा, within a degree of exact.
+   *
+   * A degree is about two hours of the Moon's own motion, so at wall-clock
+   * speed the banner sits for a couple of hours of simulated time and at the
+   * calendar speeds it blinks past — which is the honest shape of the thing.
+   * Suppressed while an eclipse is showing, since a ग्रहण *is* a syzygy and
+   * naming both at once says the same thing twice.
+   */
+  const syzygy = useMemo((): "amavasya" | "purnima" | null => {
+    if (!sample || eclipse) return null;
+    const elong = normalizeDeg(sample.sky.moon.longitude - sample.sky.sun.longitude);
+    if (Math.min(elong, 360 - elong) < 1) return "amavasya";
+    if (Math.abs(elong - 180) < 1) return "purnima";
+    return null;
+  }, [sample, eclipse]);
+
   /*
    * सङ्क्रान्ति, caught by watching the Sun's own rashi change.
    *
@@ -735,6 +753,51 @@ export function AakashGocharSky({
                 {`${pick("सङ्क्रान्ति", "Sankranti")} · ${rashiNames[sankranti]} · ${
                   monthNames[sankranti]
                 } ${digits(1)}`}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/*
+          ग्रहण and the two syzygies, named as they pass.
+
+          Not on a timer like the सङ्क्रान्ति banner: an eclipse is a *state*
+          that lasts while the alignment holds, so it shows for exactly as long
+          as the scene says one is happening. The अमावस्या / पूर्णिमा line is
+          the same idea one step weaker — a syzygy with no node, which is the
+          fortnightly case an eclipse is the rare exception to.
+        */}
+        {eclipse || syzygy ? (
+          <View
+            pointerEvents="none"
+            className="absolute inset-x-0 items-center"
+            style={{ top: overlayTop + (sankranti !== null ? 34 : 0) }}
+          >
+            <View
+              className="rounded-full border px-3 py-1"
+              style={
+                eclipse
+                  ? { borderColor: "rgba(248,113,113,0.6)", backgroundColor: "rgba(127,29,29,0.5)" }
+                  : { borderColor: "rgba(148,163,184,0.5)", backgroundColor: "rgba(15,23,42,0.6)" }
+              }
+            >
+              <Text
+                className="text-[12px] font-bold"
+                style={[
+                  nepaliTextStyle(12),
+                  { color: eclipse ? "#fecaca" : "#e2e8f0", fontSize: 12 },
+                ]}
+              >
+                {eclipse
+                  ? eclipse.kind === "solar"
+                    ? pick("सूर्यग्रहण · चन्द्र सूर्यलाई ढाक्छ", "Solar eclipse · Moon covers the Sun")
+                    : pick(
+                        "चन्द्रग्रहण · पृथ्वीको छाया चन्द्रमा",
+                        "Lunar eclipse · Earth's shadow on the Moon",
+                      )
+                  : syzygy === "amavasya"
+                    ? pick("औंसी · चन्द्र सूर्य–पृथ्वीको बीचमा", "Amavasya · Moon between Sun and Earth")
+                    : pick("पूर्णिमा · पृथ्वी सूर्य–चन्द्रको बीचमा", "Purnima · Earth between Sun and Moon")}
               </Text>
             </View>
           </View>
