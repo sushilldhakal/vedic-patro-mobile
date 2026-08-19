@@ -82,6 +82,7 @@ import {
   SKY_TEXTURE_SOURCES,
   type SkyTextureKey,
 } from "@/lib/sky3d/sky-textures";
+import { buildHorizonTerrain, terrainSeed } from "@/lib/sky3d/terrain";
 
 /** Belt radii in space view — the nakshatra ring sits just outside the rashi ring. */
 export const RASHI_INNER = 9.0;
@@ -95,6 +96,37 @@ const NAK_MID = (NAK_INNER + NAK_OUTER) / 2;
 
 /** Radius of the horizon dome. Everything on the sky sits on it. */
 const DOME = 100;
+
+/**
+ * How far below the eye the valley floor starts.
+ *
+ * Small on purpose: a plane this close under the camera covers the whole lower
+ * hemisphere, which is what makes it read as ground going off to the horizon
+ * rather than as a disc you are hovering over.
+ */
+const GROUND_Y = -0.6;
+/**
+ * How far the tallest ridge stands above {@link GROUND_Y}.
+ *
+ * Read as an angle — `atan(9 / 102)` ≈ 5° — which is about what the valley rim
+ * subtends from the middle of काठमाडौँ. Enough that the skyline is unmistakably
+ * a skyline, and small enough that a graha low in the west is behind hills
+ * rather than behind a wall.
+ */
+const GROUND_RELIEF = 9;
+/** Land under starlight: cold and nearly neutral, a shade off the sky's own blue. */
+const GROUND_NIGHT = new THREE.Color("#38484f");
+/** Land under the Sun: the warm dry brown of the hills in the dry season. */
+const GROUND_DAY = new THREE.Color("#8a7360");
+/**
+ * Sun altitudes the ground crosses from night colour to day colour, degrees.
+ *
+ * Spanning the civil twilight rather than switching at the horizon: the ground
+ * is still lit well after sunset and the Sun's own disc is only half up at 0°,
+ * so a hard cut at zero reads as the hills changing colour in one frame.
+ */
+const GROUND_DUSK = -6;
+const GROUND_DAWN = 4;
 /** Zoom value up to which the observer stands inside the sphere. */
 const INSIDE_ZOOM_MAX = 45;
 /** How far back the camera sits in the Earth-globe view. */
@@ -824,6 +856,7 @@ export function AakashGocharScene({
   const ambientRef = useRef<THREE.AmbientLight | null>(null);
   const starsRef = useRef<THREE.Mesh | null>(null);
   const groundRef = useRef<THREE.Group | null>(null);
+  const groundMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const horizonGroupRef = useRef<THREE.Group | null>(null);
   const shellRef = useRef<THREE.Mesh | null>(null);
   const globeRootRef = useRef<THREE.Group | null>(null);
@@ -1027,6 +1060,23 @@ export function AakashGocharScene({
   }, []);
 
   const horizonRing = useMemo(() => makeLine(circlePoints(DOME * 0.999, 128), "#8fbfc1", 0.5), []);
+
+  /**
+   * The ground: hills the whole way round, raised from the observer's own
+   * coordinates so one place keeps one skyline. Moving the observer is the only
+   * thing that can change it, so that is the only thing it is rebuilt for.
+   */
+  const terrain = useMemo(
+    () =>
+      buildHorizonTerrain({
+        radius: DOME * 1.02,
+        baseY: GROUND_Y,
+        relief: GROUND_RELIEF,
+        seed: terrainSeed(observer.lat, observer.lon),
+      }),
+    [observer.lat, observer.lon],
+  );
+  useEffect(() => () => terrain.geometry.dispose(), [terrain]);
 
   const shells = useMemo(
     () =>
@@ -1601,6 +1651,15 @@ export function AakashGocharScene({
     // The globe replaces the ground: from out here you are looking at the whole
     // Earth, not standing on a patch of it.
     if (groundRef.current) groundRef.current.visible = horizon && !globe;
+    /* Light on the hills, following the Sun through the twilight. The geometry's
+       own vertex colours hold the relief and the haze; this is only the colour
+       they are shading — which is why the ground can go warm at sunrise without
+       anything being rebuilt. */
+    if (groundMatRef.current) {
+      const x = (sunAltitude - GROUND_DUSK) / (GROUND_DAWN - GROUND_DUSK);
+      const t = Math.min(1, Math.max(0, x));
+      groundMatRef.current.color.copy(GROUND_NIGHT).lerp(GROUND_DAY, t * t * (3 - 2 * t));
+    }
     if (spaceOnlyRef.current) spaceOnlyRef.current.visible = space;
     if (globeRootRef.current) globeRootRef.current.visible = globe;
     for (const { layer, object } of skyLines) {
@@ -1920,15 +1979,32 @@ export function AakashGocharScene({
           stays nailed to the stars. */}
       <group ref={horizonGroupRef}>
         <group ref={groundRef} visible={false}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]}>
-            <circleGeometry args={[DOME * 1.02, 96]} />
+          {/* Writes no depth, so the alt-az cage and the far half of the zodiac
+              stay readable *through* the ground rather than being culled behind
+              it. That is also why the terrain's height field is built to be
+              single-valued from the origin — with depth off, hills that could
+              overlap on screen would blend into each other instead of the
+              nearer one simply winning. See `lib/sky3d/terrain.ts`. */}
+          <mesh geometry={terrain.geometry} renderOrder={2} frustumCulled={false}>
             {/* Not opaque: the sky below your feet still belongs to the sphere,
-                so it stays faintly readable rather than becoming a black slab. */}
+                so it stays faintly readable rather than becoming a black slab.
+
+                `vertexColors` carries what the geometry baked in: the shading
+                ramp from lit ground underfoot to a silhouetted rim, and the
+                alpha that fades the last of the skyline into haze. Both
+                multiply the land colour the frame loop sets here, which is why
+                the ground can go from starlit slate to daylit brown without the
+                mesh being touched — and why no `color` is given here, since
+                handing JSX one of the two module-level `THREE.Color` constants
+                risks the material aliasing it and the per-frame `lerp` then
+                walking the constant itself to daylight for good. */}
             <meshBasicMaterial
-              color="#06110f"
+              ref={groundMatRef}
+              vertexColors
               side={THREE.DoubleSide}
               transparent
-              opacity={0.82}
+              depthWrite={false}
+              opacity={0.94}
             />
           </mesh>
         </group>
