@@ -1260,6 +1260,8 @@ export interface GocharGraha {
   speed_deg_day?: number;
   motion?: string;
   is_retrograde?: boolean;
+  /** अस्त — combust (within the Sun's combustion orb). */
+  is_combust?: boolean;
   next_rashi_entry?: GocharNextEntry | null;
   next_nakshatra_entry?: GocharNextEntry | null;
   next_pada_entry?: GocharNextEntry | null;
@@ -1276,6 +1278,26 @@ export interface GocharGraha {
   is_exalted?: boolean;
 }
 
+/**
+ * One of the named वैदिक तारा — अगस्त्य, अभिजित्, सप्तर्षि and the rest —
+ * positioned server-side from the Swiss Ephemeris fixed-star catalogue
+ * (sefstars.txt). `lon`/`lat` are already sidereal ecliptic degrees for the
+ * date this response was computed for; the client plots them as-is; it does
+ * not re-derive or precess them.
+ */
+export interface VedicStarPosition {
+  ne: string;
+  en: string;
+  /** Bayer designation and catalogue number, for a hint line. */
+  designation: string;
+  /** Sidereal ecliptic longitude, degrees. */
+  lon: number;
+  /** Ecliptic latitude, degrees. */
+  lat: number;
+  /** Apparent visual magnitude. */
+  mag: number;
+}
+
 export interface GocharResponse {
   date_ad: string;
   date_bs?: string;
@@ -1286,6 +1308,8 @@ export interface GocharResponse {
    */
   ayanamsa?: { name: string; degrees: number };
   gochar: Record<string, GocharGraha>;
+  /** Optional: older cached responses predate the field. */
+  vedic_stars?: VedicStarPosition[];
 }
 
 export const gocharKeys = {
