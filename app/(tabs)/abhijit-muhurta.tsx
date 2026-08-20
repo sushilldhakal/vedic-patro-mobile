@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -11,9 +11,10 @@ import { apiKeys, fetchMonthCalendar, type CalendarDay } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { formatPatroMonthCrossEraSubtitle } from "@/lib/patro-headline-subtitle";
-import { computeAbhijitFromSunTimes, formatClockNepali } from "@/lib/panchanga-format";
+import { abhijitFromCalendarDay, formatClockNepali } from "@/lib/panchanga-format";
 import { civilIsoDayOfMonth } from "@/lib/patro-day";
 import { usePatroMonthBrowse } from "@/lib/use-patro-month-browse";
+import { applyMonthLimits } from "@/lib/use-patro-capabilities";
 import { useBreakpoint } from "@/lib/responsive";
 import { colorWithAlpha } from "@/lib/theme";
 import { useThemeColors } from "@/lib/theme-context";
@@ -22,13 +23,12 @@ import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 
 type AbhijitRow = {
   day: CalendarDay;
-  abhijit: NonNullable<ReturnType<typeof computeAbhijitFromSunTimes>>;
+  abhijit: NonNullable<ReturnType<typeof abhijitFromCalendarDay>>;
 };
 
 function buildRows(days: CalendarDay[]): AbhijitRow[] {
   return days.flatMap((day) => {
-    if (!day.sunrise || !day.sunset) return [];
-    const abhijit = computeAbhijitFromSunTimes(day.sunrise, day.sunset);
+    const abhijit = abhijitFromCalendarDay(day);
     return abhijit ? [{ day, abhijit }] : [];
   });
 }
@@ -150,6 +150,10 @@ export default function AbhijitMuhurtaScreen() {
       fetchMonthCalendar(year, month, location.params, { era: "bs" }),
     staleTime: 1000 * 60 * 60,
   });
+
+  useEffect(() => {
+    applyMonthLimits(monthQ.data?.limits);
+  }, [monthQ.data?.limits]);
 
   const rows = useMemo(() => buildRows(monthQ.data?.calendar ?? []), [monthQ.data?.calendar]);
   const todayRow = useMemo(

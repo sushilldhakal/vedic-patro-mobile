@@ -59,11 +59,9 @@ export function formatTimeInput(raw: string): string {
 
 export function parseBirthDateParts(raw: string): { y: number; m: number; d: number } | null {
   const s = toAsciiDigits(raw).trim();
-  const m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  if (y < 1800 || y > 2200 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  return { y, m: mo, d };
+  const sep = /(\d{4})\s*\D+\s*(\d{1,2})\s*\D+\s*(\d{1,2})/.exec(s);
+  if (sep) return { y: +sep[1], m: +sep[2], d: +sep[3] };
+  const digits = s.replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  return { y: +digits.slice(0, 4), m: +digits.slice(4, 6), d: +digits.slice(6, 8) };
 }

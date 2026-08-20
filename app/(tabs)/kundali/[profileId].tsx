@@ -12,7 +12,6 @@ import { KundaliLoginPrompt } from "@/components/kundali/KundaliLoginPrompt";
 import { KundaliPageShell } from "@/components/kundali/KundaliPageShell";
 import {
   KundaliProfileHeader,
-  formatProfileBirthDateLabel,
 } from "@/components/kundali/KundaliProfileHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -24,12 +23,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useLocale } from "@/lib/i18n";
 import { getStoredAyanamshaMode, setStoredAyanamshaMode } from "@/lib/kundali/ayanamsha-storage";
 import { useKundaliSection } from "@/lib/kundali/use-kundali-section";
-import { instantFromCivilIso } from "@/lib/instant-query";
-import {
-  parseBirthDate,
-  profileChartParams,
-  profileLocation,
-} from "@/lib/kundali/profile-chart";
+import { formatProfileBirthLabel, profileChartParams, profileLocation } from "@/lib/kundali/profile-chart";
 import { PROFILES_QUERY_KEY, useProfilesQuery } from "@/lib/kundali/profiles-query";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { toNepaliDigits } from "@/lib/panchanga-format";
@@ -69,14 +63,9 @@ export default function KundaliDetailScreen() {
     () => profiles?.find((p) => p.id === profileId) ?? null,
     [profiles, profileId],
   );
-  const birthDate = useMemo(() => (profile ? parseBirthDate(profile) : null), [profile]);
   const location = useMemo(() => (profile ? profileLocation(profile) : null), [profile]);
   const chart = profile ? profileChartParams(profile) : null;
-
-  const moment = useMemo(
-    () => (chart ? instantFromCivilIso(chart.adDate, chart.clock) : null),
-    [chart],
-  );
+  const moment = chart?.moment ?? null;
 
   const detailQueryKey = useMemo(
     () =>
@@ -95,10 +84,10 @@ export default function KundaliDetailScreen() {
   });
 
   const detail = detailQuery.data;
-  const canShowChart = Boolean(birthDate && location && chart);
+  const canShowChart = Boolean(moment && location && chart);
 
   const birthDateLabel = profile
-    ? formatProfileBirthDateLabel(profile, birthDate, lang, lang === "en" ? digits : toNepaliDigits)
+    ? formatProfileBirthLabel(profile, lang, lang === "en" ? digits : toNepaliDigits)
     : "—";
   const birthTime = profile?.birth_time ? digits(profile.birth_time) : "—";
   const place = profile?.location_label || profile?.city || "—";
@@ -232,7 +221,7 @@ export default function KundaliDetailScreen() {
           detail={detail}
           section={section}
           ayanamshaMode={ayanamshaMode}
-          timeZone={profile?.timezone}
+          timeZone={profile?.timezone ?? undefined}
           birthMoment={moment}
           birthLocation={chart?.location.params}
           reportDisabled={false}

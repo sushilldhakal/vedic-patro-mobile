@@ -21,7 +21,6 @@ import { cn } from "@/lib/utils";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KundaliMilanResult } from "@/components/kundali/KundaliMilanResult";
 import { fetchKundaliMilan, milanKeys, type MilanPersonQuery } from "@/lib/api";
-import { instantFromCivilIso } from "@/lib/instant-query";
 import { profileChartParams } from "@/lib/kundali/profile-chart";
 
 export default function KundaliMilanScreen() {
@@ -311,7 +310,7 @@ function milanPersonQuery(profile: Profile | null): MilanPersonQuery | null {
   const chart = profileChartParams(profile);
   if (!chart) return null;
   return {
-    moment: instantFromCivilIso(chart.adDate, chart.clock),
+    moment: chart.moment,
     lat: chart.location.params.lat,
     lon: chart.location.params.lon,
     timezone: profile.timezone ?? chart.location.params.timezone,

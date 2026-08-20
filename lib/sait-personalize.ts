@@ -26,15 +26,14 @@ export function useSaitPersonalize(
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
 
   const birth = selectedProfile ? profileChartParams(selectedProfile) : null;
-  const birthDatetime = birth ? `${birth.adDate}T${birth.clock}` : "";
   const birthTz = selectedProfile?.timezone ?? "Asia/Kathmandu";
   const gender = selectedProfile?.gender ?? "";
 
   const query = useQuery({
-    queryKey: saitPersonalizeKey(year, category, location, birthDatetime, birthTz, gender),
+    queryKey: saitPersonalizeKey(year, category, location, birth?.moment ?? null, birthTz, gender),
     queryFn: () =>
-      fetchSaitPersonalize(year, category, location, birthDatetime, birthTz, gender),
-    enabled: Boolean(category) && Boolean(selectedProfile) && Boolean(birthDatetime),
+      fetchSaitPersonalize(year, category, location, birth!.moment, birthTz, gender),
+    enabled: Boolean(category) && Boolean(selectedProfile) && Boolean(birth?.moment),
     staleTime: 1000 * 60 * 60,
     placeholderData: keepPreviousData,
   });

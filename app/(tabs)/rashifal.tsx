@@ -21,6 +21,7 @@ import {
   type RashifalPeriod,
 } from "@/lib/api";
 import { profileChartParams } from "@/lib/kundali/profile-chart";
+import { instantCacheKey } from "@/lib/instant-query";
 import { useLocale } from "@/lib/i18n";
 import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 import {
@@ -90,13 +91,14 @@ export default function RashifalScreen() {
       period,
       selectedProfile?.id ?? "",
       location.params,
+      profileChart ? instantCacheKey(profileChart.moment) : "",
     ),
     queryFn: () =>
       fetchPersonalRashifal(
         dateAd,
         period,
         {
-          birth: `${profileChart!.adDate}T${profileChart!.clock}`,
+          moment: profileChart!.moment,
           birthLat: profileChart!.location.params.lat as number,
           birthLon: profileChart!.location.params.lon as number,
           birthTz: profileChart!.location.params.timezone ?? "Asia/Kathmandu",

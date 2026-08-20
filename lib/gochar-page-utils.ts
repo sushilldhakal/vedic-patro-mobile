@@ -6,7 +6,7 @@
 import type { GocharGraha, GocharIngressEvent } from "@/lib/api";
 import { adToBS, BS_MONTH_NAMES, BS_MONTHS_NE } from "@/lib/bs-calendar";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
-import { nakshatraFieldsFromLongitude, toNepaliDigits } from "@/lib/panchanga-format";
+import { toNepaliDigits } from "@/lib/panchanga-format";
 import { parseCivilIsoToDate } from "@/lib/patro-day";
 import { resolveRashiDisplay, toWesternRashi } from "@/lib/rashi-i18n";
 
@@ -14,25 +14,12 @@ export type IngressFilter = "all" | "rashi" | "nakshatra" | "retrograde" | "asta
 
 type Lang = "ne" | "en";
 
-/** Rashi number (1–12) where each graha is exalted in Lahiri sidereal reckoning. */
-const EXALTATION_RASHI: Partial<Record<GrahaKey, number>> = {
-  sun: 1,
-  moon: 2,
-  mars: 10,
-  mercury: 6,
-  jupiter: 4,
-  venus: 12,
-  saturn: 7,
-};
-
 function datePart(iso: string): string {
   return iso.includes("T") ? (iso.split("T")[0] ?? iso) : iso.slice(0, 10);
 }
 
-export function grahaExalted(key: GrahaKey, g: GocharGraha): boolean {
-  const target = EXALTATION_RASHI[key];
-  if (!target || g.rashi_no == null) return false;
-  return g.rashi_no === target;
+export function grahaExalted(_key: GrahaKey, g: GocharGraha): boolean {
+  return Boolean(g.is_exalted);
 }
 
 export function grahaNakshatraLine(
@@ -40,11 +27,11 @@ export function grahaNakshatraLine(
   lang: Lang,
   digits?: (v: number | string) => string,
 ): string {
-  if (g.longitude == null) return "—";
-  const { nakshatraNe, nakshatraEn, pada } = nakshatraFieldsFromLongitude(g.longitude);
-  const nak = lang === "en" ? (nakshatraEn ?? nakshatraNe) : (nakshatraNe ?? nakshatraEn);
-  if (pada == null) return nak ?? "—";
-  const p = lang === "en" ? String(pada) : (digits ?? String)(pada);
+  const nak =
+    lang === "en" ? (g.nakshatra ?? g.nakshatra_ne) : (g.nakshatra_ne ?? g.nakshatra);
+  if (!nak) return "—";
+  if (g.pada == null) return nak;
+  const p = lang === "en" ? String(g.pada) : (digits ?? String)(g.pada);
   return `${nak} · ${p}`;
 }
 

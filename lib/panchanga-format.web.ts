@@ -1791,19 +1791,28 @@ export function computeAbhijitFromSunTimes(
 export function getAbhijitMuhurta(p: PanchangaDay): AbhijitMuhurtaInfo | null {
   const detail = getPanchangaDetail(p);
   const m = (detail?.muhurta ?? p.muhurta) as MuhurtaDetail | undefined;
-  const ab = m?.abhijit;
-  if (ab?.start_time && ab?.end_time) {
-    const rangeDisplay = formatMuhurtaRange(ab.start_time, ab.end_time);
-    if (!rangeDisplay) return null;
-    return {
-      start_time: ab.start_time,
-      end_time: ab.end_time,
-      solar_noon: ab.solar_noon,
-      rangeDisplay,
-      noonDisplay: ab.solar_noon ? formatClockNepali(ab.solar_noon) : undefined,
-    };
-  }
-  return computeAbhijitFromSunTimes(getSunrise(p), getSunset(p));
+  return abhijitFromWindow(m?.abhijit);
+}
+
+/** Abhijit window the month calendar already computed. */
+export function abhijitFromCalendarDay(day: CalendarDay): AbhijitMuhurtaInfo | null {
+  const nested = day.panchanga as { muhurta?: { abhijit?: { start_time?: string; end_time?: string; solar_noon?: string } } } | undefined;
+  return abhijitFromWindow(day.abhijit ?? nested?.muhurta?.abhijit);
+}
+
+function abhijitFromWindow(
+  ab?: { start_time?: string; end_time?: string; solar_noon?: string } | null,
+): AbhijitMuhurtaInfo | null {
+  if (!ab?.start_time || !ab?.end_time) return null;
+  const rangeDisplay = formatMuhurtaRange(ab.start_time, ab.end_time);
+  if (!rangeDisplay) return null;
+  return {
+    start_time: ab.start_time,
+    end_time: ab.end_time,
+    solar_noon: ab.solar_noon,
+    rangeDisplay,
+    noonDisplay: ab.solar_noon ? formatClockNepali(ab.solar_noon) : undefined,
+  };
 }
 
 export interface InauspiciousWindow {

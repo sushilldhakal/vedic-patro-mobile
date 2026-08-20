@@ -19,6 +19,7 @@ import { LocaleProvider } from "@/lib/i18n";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
+import { usePatroCapabilities } from "@/lib/use-patro-capabilities";
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* Expo Go / hot reload may not register a native splash view controller. */
@@ -77,6 +78,7 @@ export default function RootLayout() {
 
 function RootShell({ loaded }: { loaded: boolean }) {
   const { colors } = useTheme();
+  usePatroCapabilities();
 
   return (
     <>

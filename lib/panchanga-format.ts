@@ -659,19 +659,29 @@ export function computeAbhijitFromSunTimes(
 export function getAbhijitMuhurta(p: PanchangaDay, lang?: string): AbhijitMuhurtaInfo | null {
   const detail = getPanchangaDetail(p);
   const m = detail?.muhurta ?? p.muhurta;
-  const ab = m?.abhijit;
-  if (ab?.start_time && ab?.end_time) {
-    const rangeDisplay = formatMuhurtaRange(ab.start_time, ab.end_time, lang);
-    if (!rangeDisplay) return null;
-    return {
-      start_time: ab.start_time,
-      end_time: ab.end_time,
-      solar_noon: ab.solar_noon,
-      rangeDisplay,
-      noonDisplay: ab.solar_noon ? formatClockNepali(ab.solar_noon, lang) : undefined,
-    };
-  }
-  return computeAbhijitFromSunTimes(getSunrise(p), getSunset(p), lang);
+  return abhijitFromWindow(m?.abhijit, lang);
+}
+
+/** Abhijit window the month calendar already computed. */
+export function abhijitFromCalendarDay(day: CalendarDay, lang?: string): AbhijitMuhurtaInfo | null {
+  const nested = day.panchanga as { muhurta?: { abhijit?: { start_time?: string; end_time?: string; solar_noon?: string } } } | undefined;
+  return abhijitFromWindow(day.abhijit ?? nested?.muhurta?.abhijit, lang);
+}
+
+function abhijitFromWindow(
+  ab?: { start_time?: string; end_time?: string; solar_noon?: string } | null,
+  lang?: string,
+): AbhijitMuhurtaInfo | null {
+  if (!ab?.start_time || !ab?.end_time) return null;
+  const rangeDisplay = formatMuhurtaRange(ab.start_time, ab.end_time, lang);
+  if (!rangeDisplay) return null;
+  return {
+    start_time: ab.start_time,
+    end_time: ab.end_time,
+    solar_noon: ab.solar_noon,
+    rangeDisplay,
+    noonDisplay: ab.solar_noon ? formatClockNepali(ab.solar_noon, lang) : undefined,
+  };
 }
 
 export function getTarabalaTable(p: PanchangaDay) {

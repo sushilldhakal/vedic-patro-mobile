@@ -1,10 +1,9 @@
 import { ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Profile } from "@/lib/auth/client";
-import { formatBsDateLong } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
+import { formatProfileBirthLabel } from "@/lib/kundali/profile-chart";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { toNepaliDigits } from "@/lib/panchanga-format";
 import { useThemeColors } from "@/lib/theme-context";
 
 function MetaItem({
@@ -146,14 +145,9 @@ function ScrollViewMetaRow({
 
 export function formatProfileBirthDateLabel(
   profile: Profile,
-  birthDate: Date | null,
+  _birthDate: Date | null,
   lang: string,
   digits: (v: string | number) => string,
 ): string {
-  if (!profile.birth_date) return "—";
-  if (!birthDate) {
-    const era = profile.birth_era ?? "bs";
-    return `${digits(profile.birth_date)} ${era.toUpperCase()}`;
-  }
-  return formatBsDateLong(birthDate, lang, lang.startsWith("en") ? undefined : toNepaliDigits);
+  return formatProfileBirthLabel(profile, lang, digits);
 }

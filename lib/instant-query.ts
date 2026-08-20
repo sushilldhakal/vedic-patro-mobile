@@ -9,7 +9,7 @@
 
 import { parseCivilIso } from "@/lib/patro-day";
 
-export type Era = "ad" | "bs" | "bbs";
+export type Era = "ad" | "bc" | "bs" | "bbs";
 
 /** A civil day in `inputEra`, plus the local time of day on it. */
 export type InstantQuery = {
@@ -61,5 +61,17 @@ export function appendInstantParams(
   params.set("month", String(q.month));
   params.set("day", String(q.day));
   params.set("clock", q.clock);
+  return params;
+}
+
+export function appendBirthInstantParams(
+  params: URLSearchParams,
+  q: InstantQuery,
+): URLSearchParams {
+  params.set("birth_era", q.inputEra);
+  params.set("birth_year", String(q.year));
+  params.set("birth_month", String(q.month));
+  params.set("birth_day", String(q.day));
+  params.set("birth_clock", q.clock);
   return params;
 }

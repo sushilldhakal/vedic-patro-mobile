@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
@@ -9,12 +9,14 @@ import { GrahaBanner } from "@/components/graha/GrahaPageParts";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { defaultClockForTimezone } from "@/components/panchanga/use-panchanga-mode";
 import { Text } from "@/components/ui/Text";
-import { fetchGochar, fetchGocharIngress, gocharKeys } from "@/lib/api";
+import { apiKeys, fetchGochar, fetchGocharIngress, fetchMonthCalendar, gocharKeys } from "@/lib/api";
 import { adToBS, bsToAD, BS_MONTH_NAMES, BS_MONTHS_NE, getBSMonthLength, shiftBsMonth } from "@/lib/bs-calendar";
 import { formatGocharPatroDate } from "@/lib/gochar-page-utils";
 import type { GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
+import { applyPatroApiLimits } from "@/lib/patro-browse-years";
+import { formatBsDateKey } from "@/lib/patro-day";
 import { useBreakpoint } from "@/lib/responsive";
 import { useThemeColors } from "@/lib/theme-context";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
@@ -48,17 +50,43 @@ export default function GocharScreen() {
     placeholderData: keepPreviousData,
   });
 
-  // Ingress list covers the browsed BS month, as on web.
+  const monthQ = useQuery({
+    queryKey: apiKeys.month(bs.year, bs.month, location.params, "bs"),
+    queryFn: () => fetchMonthCalendar(bs.year, bs.month, location.params, { era: "bs" }),
+    staleTime: 1000 * 60 * 30,
+    placeholderData: keepPreviousData,
+  });
+
+  useEffect(() => {
+    if (monthQ.data?.limits) applyPatroApiLimits(monthQ.data.limits);
+  }, [monthQ.data?.limits]);
+
+  // Ingress list covers the browsed BS month. Range keys stay in BS so the API
+  // owns conversion; local calendar tables are not used to mint the request.
   const ingressRange = useMemo(() => {
-    const from = toAdStr(bsToAD(bs.year, bs.month, 1));
-    const to = toAdStr(bsToAD(bs.year, bs.month, getBSMonthLength(bs.year, bs.month)));
-    return { from, to };
-  }, [bs.year, bs.month]);
+    const days = (monthQ.data?.calendar ?? []).filter((d) => !d.outsideMonth);
+    const first = days[0];
+    const last = days[days.length - 1];
+    if (!first || !last) return null;
+    return {
+      from: formatBsDateKey(bs.year, bs.month, first.day),
+      to: formatBsDateKey(bs.year, bs.month, last.day),
+    };
+  }, [monthQ.data?.calendar, bs.year, bs.month]);
 
   const ingressQ = useQuery({
-    queryKey: gocharKeys.ingress(ingressRange.from, ingressRange.to, "patro", location.params),
+    queryKey: gocharKeys.ingress(
+      ingressRange?.from ?? "",
+      ingressRange?.to ?? "",
+      "patro",
+      location.params,
+    ),
     queryFn: () =>
-      fetchGocharIngress(ingressRange.from, ingressRange.to, location.params, { level: "patro" }),
+      fetchGocharIngress(ingressRange!.from, ingressRange!.to, location.params, {
+        level: "patro",
+        era: "bs",
+      }),
+    enabled: Boolean(ingressRange),
     staleTime: 1000 * 60 * 30,
     placeholderData: keepPreviousData,
   });

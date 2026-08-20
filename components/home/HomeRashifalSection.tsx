@@ -12,6 +12,7 @@ import {
   type LocationParams,
   type RashifalSignBlock,
 } from "@/lib/api";
+import { instantCacheKey } from "@/lib/instant-query";
 import { profileChartParams } from "@/lib/kundali/profile-chart";
 import { useProfilesQuery } from "@/lib/kundali/profiles-query";
 import { useLocale } from "@/lib/i18n";
@@ -46,13 +47,14 @@ export function HomeRashifalSection({ dateAd, location, contentInset = 0 }: Prop
       "monthly",
       defaultProfile?.id ?? "",
       location,
+      profileChart ? instantCacheKey(profileChart.moment) : "",
     ),
     queryFn: () =>
       fetchPersonalRashifal(
         dateAd,
         "monthly",
         {
-          birth: `${profileChart!.adDate}T${profileChart!.clock}`,
+          moment: profileChart!.moment,
           birthLat: profileChart!.location.params.lat as number,
           birthLon: profileChart!.location.params.lon as number,
           birthTz: profileChart!.location.params.timezone ?? "Asia/Kathmandu",

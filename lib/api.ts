@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import {
+  appendBirthInstantParams,
   appendInstantParams,
   instantCacheKey,
   type InstantQuery,
@@ -19,8 +20,33 @@ export const API_BASE =
   Platform.OS === "web" && __DEV__ ? "/api" : CONFIGURED_API_BASE;
 export const API_VERSION = (extra.apiVersion as string) ?? "v1";
 export const DATA_BASE = `${API_BASE}/${API_VERSION}`;
-export const PANCHANGA_CACHE_VERSION = "4303";
+// Keep in step with CACHE_PAYLOAD_VERSION. Prefer GET /meta/capabilities
+// `cache_payload_version` at runtime; this is the bootstrap until that lands.
+export const PANCHANGA_CACHE_VERSION = "4703";
 export const SAIT_CACHE_VERSION = "14";
+
+export interface PatroApiLimits {
+  signed_year_min: number;
+  signed_year_max: number;
+  ephemeris_signed_min: number;
+  ephemeris_signed_max: number;
+  ad_year_min: number;
+  ad_year_max: number;
+  bc_year_min: number;
+  bc_year_max: number;
+  bbs_url_year_max: number;
+  festival_stack_min_year: number;
+  cache_payload_version?: number;
+}
+
+export const patroCapabilitiesKey = ["meta", "capabilities"] as const;
+
+/** Host-owned year bounds and cache version — not mirrored in the client. */
+export const fetchPatroCapabilities = async (): Promise<PatroApiLimits> => {
+  const res = await fetch(`${API_BASE}/meta/capabilities`);
+  if (!res.ok) throw new Error(`API ${res.status}: /meta/capabilities`);
+  return res.json();
+};
 
 export interface PushkaraNavamshaHit {
   degree?: number;
@@ -582,12 +608,21 @@ export interface CalendarDay {
   is_public_holiday?: boolean;
   outsideMonth?: boolean;
   panchanga?: CalendarDayDetail;
+  abhijit?: {
+    start_time?: string;
+    end_time?: string;
+    solar_noon?: string;
+    is_auspicious?: boolean;
+  };
 }
 
 export interface MonthCalendar {
   year_bs: number;
   month_bs: number;
   calendar: CalendarDay[];
+  month_length?: number;
+  first_weekday?: number;
+  limits?: PatroApiLimits;
 }
 
 type PanchangaAnga = {
@@ -1115,6 +1150,7 @@ export const rashifalKeys = {
     period: RashifalPeriod,
     profileId: string,
     loc?: LocationParams,
+    birthKey?: string,
   ) =>
     [
       "rashifal",
@@ -1123,6 +1159,7 @@ export const rashifalKeys = {
       dateAd,
       period,
       profileId,
+      birthKey ?? "",
       locationKey(loc),
     ] as const,
 };
@@ -1141,19 +1178,19 @@ export function fetchRashifal(
 export function fetchPersonalRashifal(
   dateAd: string,
   period: RashifalPeriod,
-  birth: { birth: string; birthLat: number; birthLon: number; birthTz: string },
+  birth: { moment: InstantQuery; birthLat: number; birthLon: number; birthTz: string },
   location?: LocationParams,
 ) {
   const params = new URLSearchParams({
     date: dateAd,
     period,
-    birth: birth.birth,
     birth_lat: String(birth.birthLat),
     birth_lon: String(birth.birthLon),
     birth_tz: birth.birthTz,
   });
+  appendBirthInstantParams(params, birth.moment);
   return get<RashifalPersonal>(
-    appendLocation(`/panchanga/rashifal/personal?${params.toString()}`, location),
+    appendLocation(withCache(`/panchanga/rashifal/personal?${params.toString()}`), location),
   );
 }
 
@@ -1226,6 +1263,17 @@ export interface GocharGraha {
   next_rashi_entry?: GocharNextEntry | null;
   next_nakshatra_entry?: GocharNextEntry | null;
   next_pada_entry?: GocharNextEntry | null;
+  nakshatra?: string;
+  nakshatra_ne?: string;
+  nakshatra_no?: number;
+  nakshatra_lord?: string;
+  nakshatra_lord_ne?: string;
+  nakshatra_lord_en?: string;
+  sub_lord?: string;
+  sub_lord_ne?: string;
+  sub_lord_en?: string;
+  pada?: number;
+  is_exalted?: boolean;
 }
 
 export interface GocharResponse {
@@ -1723,7 +1771,7 @@ export const saitPersonalizeKey = (
   year: number,
   category: string,
   location: LocationParams | undefined,
-  birthDatetime: string,
+  birth: InstantQuery | null,
   birthTz: string,
   gender?: string | null,
 ) =>
@@ -1734,25 +1782,22 @@ export const saitPersonalizeKey = (
     year,
     category,
     locationCacheKey(location),
-    birthDatetime,
+    birth ? instantCacheKey(birth) : "",
     birthTz,
     gender ?? "",
   ] as const;
 
-/**
- * Annotate the year's general dates with a native verdict from a birth moment.
- * `birthDatetime` is a naive local ISO (`YYYY-MM-DDTHH:MM`) read in `birthTz`.
- */
+/** Annotate the year's general dates with a native verdict from a birth moment. */
 export const fetchSaitPersonalize = (
   year: number,
   category: string,
   location: LocationParams | undefined,
-  birthDatetime: string,
+  birth: InstantQuery,
   birthTz: string,
   gender?: string | null,
 ) => {
   let path = appendLocation(`/nepal/sait/${year}/${category}/personalize`, location);
-  const params = new URLSearchParams({ birth: birthDatetime, birth_tz: birthTz });
+  const params = appendBirthInstantParams(new URLSearchParams({ birth_tz: birthTz }), birth);
   if (gender) params.set("gender", gender);
   path = `${path}${path.includes("?") ? "&" : "?"}${params.toString()}`;
   return get<SaitPersonalizeResponse>(path);

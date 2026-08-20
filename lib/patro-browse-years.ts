@@ -3,24 +3,46 @@ import type { PatroBrowseEra } from "@/lib/patro-era";
 /** @deprecated use {@link PatroBrowseEra} */
 export type MonthBrowseEra = PatroBrowseEra;
 
-/** Mirrors web `PATRO_EPHEMERIS_SIGNED_MAX` / `BBS_URL_YEAR_MAX`. */
+/** Bootstrap until `GET /meta/capabilities` arrives. */
 export const PATRO_BS_BROWSE_YEAR_MAX = 17247;
 export const PATRO_BBS_BROWSE_YEAR_MAX = 13201;
 export const PATRO_AD_BROWSE_YEAR_MAX = 17191;
 export const PATRO_BC_BROWSE_YEAR_MAX = 13201;
+
+let live = {
+  bsMax: PATRO_BS_BROWSE_YEAR_MAX,
+  bbsMax: PATRO_BBS_BROWSE_YEAR_MAX,
+  adMax: PATRO_AD_BROWSE_YEAR_MAX,
+  bcMax: PATRO_BC_BROWSE_YEAR_MAX,
+};
+
+/** Apply host-owned bounds from `/meta/capabilities` or a month `limits` block. */
+export function applyPatroApiLimits(c: {
+  ephemeris_signed_max?: number;
+  bbs_url_year_max?: number;
+  ad_year_max?: number;
+  bc_year_max?: number;
+}): void {
+  live = {
+    bsMax: c.ephemeris_signed_max ?? live.bsMax,
+    bbsMax: c.bbs_url_year_max ?? live.bbsMax,
+    adMax: c.ad_year_max ?? live.adMax,
+    bcMax: c.bc_year_max ?? live.bcMax,
+  };
+}
 
 const NATIVE_SELECT_YEAR_RADIUS = 100;
 
 export function maxBrowseYearForEra(era: PatroBrowseEra): number {
   switch (era) {
     case "bbs":
-      return PATRO_BBS_BROWSE_YEAR_MAX;
+      return live.bbsMax;
     case "ad":
-      return PATRO_AD_BROWSE_YEAR_MAX;
+      return live.adMax;
     case "bc":
-      return PATRO_BC_BROWSE_YEAR_MAX;
+      return live.bcMax;
     default:
-      return PATRO_BS_BROWSE_YEAR_MAX;
+      return live.bsMax;
   }
 }
 
