@@ -304,6 +304,11 @@ export type SceneToggles = {
    */
   tilt: boolean;
   labels: boolean;
+  /**
+   * The hillside underfoot in the horizon view. Off elsewhere — there is no
+   * ground to switch when the camera is outside the sphere looking in.
+   */
+  landscape: boolean;
 };
 
 /* ── shared primitives ─────────────────────────────────────────────────── */
@@ -1650,7 +1655,7 @@ export function AakashGocharScene({
     if (earthGroupRef.current) earthGroupRef.current.visible = space;
     // The globe replaces the ground: from out here you are looking at the whole
     // Earth, not standing on a patch of it.
-    if (groundRef.current) groundRef.current.visible = horizon && !globe;
+    if (groundRef.current) groundRef.current.visible = horizon && !globe && toggles.landscape;
     /* Light on the hills, following the Sun through the twilight. The geometry's
        own vertex colours hold the relief and the haze; this is only the colour
        they are shading — which is why the ground can go warm at sunrise without

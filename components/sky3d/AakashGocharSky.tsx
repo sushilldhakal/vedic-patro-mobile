@@ -132,6 +132,9 @@ const SYSTEM_DISTANCE = 26;
 const HORIZON_WIDE = 45;
 /** Default zoom in the Earth-globe view — frames the globe and its ring. */
 const GLOBE_VIEW = 78;
+/** Camera angles the horizon view opens on — behind you, low to the ground. */
+const HORIZON_YAW = Math.PI;
+const HORIZON_PITCH = 0.12;
 
 export type AakashGocharSkyProps = {
   /** Gochar rows for {@link date} — the API longitudes the model is pinned to. */
@@ -217,6 +220,7 @@ export function AakashGocharSky({
     poleStars: true,
     tilt: true,
     labels: true,
+    landscape: true,
   });
   /* Which overlay panel is open, if any. One at a time: both are anchored to
      the bottom of the canvas and would otherwise sit on top of each other. */
@@ -533,6 +537,19 @@ export function AakashGocharSky({
         compact={fullscreen}
       />
       <Chip
+        active={mode === "horizon"}
+        label={pick("क्षितिज", "Horizon")}
+        onPress={() => {
+          setMode("horizon");
+          /* Standing at your own place here, so a graha-follow left over from
+             another view means nothing until you pick one again. */
+          setToggles((t) => (t.lockCenter && !selectedKey ? { ...t, lockCenter: false } : t));
+          view.current = { yaw: HORIZON_YAW, pitch: HORIZON_PITCH, distance: HORIZON_WIDE };
+        }}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
         active={mode === "globe"}
         label={pick("पृथ्वी गोला", "Earth globe")}
         onPress={() => {
@@ -609,7 +626,11 @@ export function AakashGocharSky({
     >
       <SheetSection heading={pick("मार्गदर्शक", "Guides")}>
         {sheetChip("grid", pick("ग्रिड", "Grid"))}
-        {sheetChip("primeMeridian", pick("काठमाडौँ रेखा", "Kathmandu meridian"))}
+        {mode === "horizon" ? sheetChip("landscape", pick("भूभाग", "Landscape")) : null}
+        {/* The meridian is a line drawn on a globe seen from outside it —
+            अन्तरिक्ष and पृथ्वी गोला. Standing on the dome in क्षितिज, you are
+            on that line, so the scene never draws one there. */}
+        {mode === "horizon" ? null : sheetChip("primeMeridian", pick("काठमाडौँ रेखा", "Kathmandu meridian"))}
         {sheetChip("asterisms", pick("तारापुञ्ज", "Star groups"))}
         {mode !== "space" ? sheetChip("poleStars", pick("ध्रुव तारा", "Pole stars")) : null}
         {mode === "globe" ? sheetChip("tilt", pick("अक्ष झुकाव", "Tilt")) : null}
@@ -617,7 +638,7 @@ export function AakashGocharSky({
       <SheetSection heading={pick("वलय", "Belts")}>
         {sheetChip("rashiBelt", pick("राशि", "Rashi"))}
         {sheetChip("nakshatraBelt", pick("नक्षत्र", "Nakshatra"))}
-        {sheetChip("monthRing", pick("महिना", "Months"))}
+        {mode === "horizon" ? null : sheetChip("monthRing", pick("महिना", "Months"))}
       </SheetSection>
     </OverlaySheet>
   );
