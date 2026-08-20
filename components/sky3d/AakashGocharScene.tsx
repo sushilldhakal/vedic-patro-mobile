@@ -823,6 +823,7 @@ export function AakashGocharScene({
   toggles,
   onSelect,
   onSample,
+  skyAim,
 }: {
   sim: React.RefObject<SimState>;
   view: React.RefObject<ViewState>;
@@ -838,6 +839,13 @@ export function AakashGocharScene({
   toggles: SceneToggles;
   onSelect: (key: GrahaKey) => void;
   onSample: (sample: SkySample) => void;
+  /**
+   * A fixed sky point from the search box — an ecliptic longitude/latitude
+   * rather than a graha key, since stars and constellations do not move.
+   * `nonce` marks a fresh pick so the same coordinates can be re-aimed twice
+   * in a row; consumed once, the camera then orbits freely from there.
+   */
+  skyAim?: { lon: number; lat: number; nonce: number } | null;
 }) {
   const loaded = useLoader(THREE.TextureLoader, SKY_TEXTURE_SOURCES as string[]);
   const textures = useMemo(() => {
@@ -1147,6 +1155,9 @@ export function AakashGocharScene({
   const labels = useRef<ScreenLabel[]>([]);
   const scratch = useRef(new THREE.Vector3());
   const target = useRef(new THREE.Vector3());
+  /** Where a search pick landed, and the nonce already consumed. */
+  const aimAt = useRef(new THREE.Vector3());
+  const lastAim = useRef(0);
 
   // Re-derive the trail as soon as the graha or the calibration changes, and
   // re-anchor a locked sky to whatever date the nav has just jumped to.
@@ -1750,15 +1761,27 @@ export function AakashGocharScene({
     const v = view.current;
     const cam = state.camera as THREE.PerspectiveCamera;
     const trackKey = toggles.lockCenter && selectedKey ? selectedKey : null;
-    const trackGroup = trackKey ? bodyRefs.current[trackKey] : null;
+    const bodyGroup = trackKey ? bodyRefs.current[trackKey] : null;
+    let trackPosition: THREE.Vector3 | null = bodyGroup ? bodyGroup.position : null;
+    /* A star or constellation from the search box. Placed through the same
+       `place` every other fixed thing goes through, so it lands wherever the
+       view would have drawn it — and taken as the target for the one frame
+       the aim is fresh. After that frame `v.yaw`/`v.pitch` already hold the
+       new angle, so the camera keeps it without this ref being read again. */
+    if (skyAim && skyAim.nonce !== lastAim.current) {
+      lastAim.current = skyAim.nonce;
+      const at = place(skyAim.lon, skyAim.lat, DOME);
+      aimAt.current.set(at[0], at[1], at[2]);
+      trackPosition = aimAt.current;
+    }
     if (horizon) {
       /* Standing at the centre, the only thing zoom can do is change the lens:
          a 6° telescopic crop at one end, a 160° fisheye that swallows nearly
          the whole dome at the other. The sky itself never changes shape. */
       const cosP = Math.cos(v.pitch);
       cam.position.set(0, 0, 0);
-      if (trackGroup) {
-        target.current.copy(trackGroup.position);
+      if (trackPosition) {
+        target.current.copy(trackPosition);
       } else {
         target.current.set(
           DOME * cosP * Math.sin(v.yaw),
@@ -1785,8 +1808,8 @@ export function AakashGocharScene({
       const framed = 1.4 + Math.pow(t, 1.25) * (GLOBE_BAND_R * 2 - 1.4);
       const radius = GLOBE_CAM_R;
       const fov = (2 * Math.atan(framed / radius)) / DEG;
-      if (trackGroup) {
-        target.current.copy(trackGroup.position);
+      if (trackPosition) {
+        target.current.copy(trackPosition);
         scratch.current.copy(target.current);
         const bodyR = scratch.current.length();
         if (bodyR < 1e-5) {
@@ -1816,8 +1839,8 @@ export function AakashGocharScene({
       }
     } else {
       const cosP = Math.cos(v.pitch);
-      if (trackGroup) {
-        target.current.copy(trackGroup.position);
+      if (trackPosition) {
+        target.current.copy(trackPosition);
         scratch.current.copy(target.current);
         const bodyR = scratch.current.length();
         if (bodyR < 1e-5) {
