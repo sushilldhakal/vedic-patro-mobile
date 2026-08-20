@@ -20,9 +20,37 @@
  * start of मेष over the centuries.
  */
 
+/**
+ * Traditional Nepali names for stars that have one of their own — not the
+ * नक्षत्र they sit in. Overlay and search prefer these when the UI is Nepali.
+ */
+const STAR_NAME_NE: Record<string, string> = {
+  Pollux: "दिति",
+  Castor: "अदिति",
+};
+
+/**
+ * The name drawn on the sky: the proper / common name inside `(…)`, never the
+ * Bayer/Flamsteed/Messier tag. `β Gem (Pollux)` → Pollux; `σ Hya` → none.
+ */
+export function skyStarCommonName(catalogueName: string): string | null {
+  const paren = /\(([^)]+)\)\s*$/.exec(catalogueName);
+  if (paren?.[1]) return paren[1].trim();
+  if (/^M\d+\b/.test(catalogueName)) return null;
+  if (/[αβγδεζηθικλμνξοπρστυφχψω]/.test(catalogueName)) return null;
+  if (/^\d+\s+[A-Z]/.test(catalogueName)) return null;
+  if (/^[A-Za-z]{1,3}[¹²³]?\s+[A-Z]/.test(catalogueName)) return null;
+  return catalogueName;
+}
+
+export function skyStarNameNe(catalogueName: string): string | undefined {
+  const common = skyStarCommonName(catalogueName);
+  return common ? STAR_NAME_NE[common] : undefined;
+}
+
 /** One catalogued star. Magnitude only sets how big it is drawn. */
 export type SkyStar = {
-  /** Bayer/Flamsteed designation, or the proper name where there is one. */
+  /** Catalogue string — Bayer plus proper name in parentheses when there is one. */
   name: string;
   /** Right ascension, J2000, degrees. */
   ra: number;
@@ -171,7 +199,7 @@ export const NAKSHATRA_ASTERISMS: NakshatraAsterism[] = [
     stars: [
       { name: "ε Hya", ra: 133.847, dec: 6.419, mag: 3.38 },
       { name: "δ Hya", ra: 131.694, dec: 5.704, mag: 4.14 },
-      { name: "σ Hya", ra: 132.989, dec: 3.342, mag: 4.44 },
+      { name: "σ Hya (Minchir)", ra: 132.989, dec: 3.342, mag: 4.44 },
       { name: "η Hya", ra: 133.113, dec: 3.399, mag: 4.3 },
       { name: "ρ Hya", ra: 133.376, dec: 5.841, mag: 4.35 },
       { name: "ζ Hya", ra: 135.62, dec: 5.946, mag: 3.11 },

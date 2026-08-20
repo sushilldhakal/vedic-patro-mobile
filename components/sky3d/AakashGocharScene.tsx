@@ -802,7 +802,7 @@ function labelsMoved(prev: ScreenLabel[], next: ScreenLabel[]): boolean {
   for (let i = 0; i < next.length; i += 1) {
     const a = prev[i];
     const b = next[i];
-    if (a.id !== b.id || Math.abs(a.x - b.x) >= 1 || Math.abs(a.y - b.y) >= 1) return true;
+    if (a.id !== b.id || Math.abs(a.x - b.x) >= 0.5 || Math.abs(a.y - b.y) >= 0.5) return true;
   }
   return false;
 }
@@ -1249,7 +1249,7 @@ export function AakashGocharScene({
 
     const width = state.size.width;
     const height = state.size.height;
-    const collect = toggles.labels && frame.current % 6 === 0;
+    const collect = Boolean(toggles.labels);
     const collected: ScreenLabel[] = [];
     /**
      * Is the Earth between the camera and this point?
@@ -1881,10 +1881,11 @@ export function AakashGocharScene({
       flushLine(line);
     }
 
-    /* Keep the previous array whenever nothing has moved a pixel. The overlay
-       is fifty-odd Devanagari text nodes; handing React a new array re-renders
-       every one of them, on the same thread that is drawing the sky. */
-    if (collect && labelsMoved(labels.current, collected)) labels.current = collected;
+    let labelsChanged = false;
+    if (collect && labelsMoved(labels.current, collected)) {
+      labels.current = collected;
+      labelsChanged = true;
+    }
 
     /* ── ग्रहण ───────────────────────────────────────────────────────── */
     const ecl = eclipseOf(sky);
@@ -1923,7 +1924,7 @@ export function AakashGocharScene({
       solarUmbra.visible = false;
     }
 
-    if (state.clock.elapsedTime - lastSample.current > 0.2) {
+    if (labelsChanged || state.clock.elapsedTime - lastSample.current > 0.2) {
       lastSample.current = state.clock.elapsedTime;
       onSample({
         timeMs: s.timeMs,
