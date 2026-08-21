@@ -840,6 +840,7 @@ export function AakashGocharScene({
   onSelect,
   onSample,
   skyAim,
+  arBackground = false,
 }: {
   sim: React.RefObject<SimState>;
   view: React.RefObject<ViewState>;
@@ -862,6 +863,12 @@ export function AakashGocharScene({
    * in a row; consumed once, the camera then orbits freely from there.
    */
   skyAim?: { lon: number; lat: number; nonce: number } | null;
+  /**
+   * AR mode: the real world shows through a transparently-cleared canvas
+   * behind this, so the synthetic backdrop that normally stands in for it —
+   * the star sphere, the horizon hillside — has nothing left to do here.
+   */
+  arBackground?: boolean;
 }) {
   const loaded = useLoader(THREE.TextureLoader, SKY_TEXTURE_SOURCES as string[]);
   const textures = useMemo(() => {
@@ -1717,7 +1724,9 @@ export function AakashGocharScene({
     if (earthGroupRef.current) earthGroupRef.current.visible = space;
     // The globe replaces the ground: from out here you are looking at the whole
     // Earth, not standing on a patch of it.
-    if (groundRef.current) groundRef.current.visible = horizon && !globe && toggles.landscape;
+    if (groundRef.current) {
+      groundRef.current.visible = horizon && !globe && toggles.landscape && !arBackground;
+    }
     /* Light on the hills, following the Sun through the twilight. The geometry's
        own vertex colours hold the relief and the haze; this is only the colour
        they are shading — which is why the ground can go warm at sunrise without
@@ -2033,7 +2042,7 @@ export function AakashGocharScene({
       {/* A hint of fill so the night side is shape rather than a hole. */}
       <directionalLight position={[0, 12, 0]} intensity={0.1} />
 
-      <mesh ref={starsRef}>
+      <mesh ref={starsRef} visible={!arBackground}>
         <sphereGeometry args={[400, 48, 48]} />
         <meshBasicMaterial map={textures.background} side={THREE.BackSide} transparent />
       </mesh>
