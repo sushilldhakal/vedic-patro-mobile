@@ -21,6 +21,19 @@ const MODULES = {
   sun: require("@/assets/sky3d/sun.jpg"),
   moon: require("@/assets/sky3d/moon.jpg"),
   background: require("@/assets/sky3d/background.jpg"),
+  /**
+   * The other worlds the planet-preset chips can put in Earth's place.
+   *
+   * Bundler modules have to be `require`d statically — there is no runtime
+   * `TextureLoader().load(url)` on native the way the web swaps these in
+   * lazily — so every candidate body is loaded up front here instead, and
+   * the scene just points its material at whichever one is picked.
+   */
+  mars: require("@/assets/sky3d/mars.jpg"),
+  mercury: require("@/assets/sky3d/mercury.jpg"),
+  jupiter: require("@/assets/sky3d/jupiter.jpg"),
+  venus: require("@/assets/sky3d/venus.jpg"),
+  saturn: require("@/assets/sky3d/saturn.jpg"),
 } as const;
 
 export type PlaygroundTextureKey = keyof typeof MODULES;
