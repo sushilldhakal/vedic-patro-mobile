@@ -75,6 +75,7 @@ import {
   type PlaygroundLabel,
 } from "@/components/learn/playground/playground-labels";
 import { usePlaygroundTextures } from "@/components/learn/playground/playground-textures";
+import { makeEarthMaterial } from "@/lib/sky3d/earth-material";
 import {
   equationOfTime,
   euclideanModulo,
@@ -94,14 +95,6 @@ const PI2 = Math.PI * 2;
 /** Radius of the mean orbit. Everything else is scaled against this. */
 export const MEAN_DISTANCE = 10;
 const PLANET_R = 1;
-/**
- * How much of the map survives on the night side.
- *
- * Not zero: the far side of the planet is the thing a reader is trying to keep
- * track of while it turns, and a black cap hides which country is about to come
- * round. Dark enough that the lit side is unmistakably the lit side.
- */
-const EARTH_NIGHT = 0.34;
 /** काठमाडौँ's longitude in radians — the spin phase that puts it at noon. */
 const KATHMANDU_LON = KATHMANDU.lon * (Math.PI / 180);
 /** Where the mean sun sits. Read-only — never mutate it. */
@@ -361,71 +354,6 @@ function makeLine(geometry: THREE.BufferGeometry, color: number, opacity: number
       depthWrite: false,
     }),
   );
-}
-
-/**
- * The globe: the map, lit by the Sun, on an always-opaque surface.
- *
- * Its own shader rather than a lit material, for two reasons.
- *
- * **Opacity.** Every fragment writes alpha 1 with blending off, so no amount of
- * material state elsewhere can make the planet see-through, and it always
- * writes depth — which is what stops the belts and orbit lines behind it from
- * painting over its face.
- *
- * **The terminator.** Day and night come from `N·L` against the *true* Sun's
- * world position, so the lit cap is centred on the subsolar point: it rides
- * north through उत्तरायण and south through दक्षिणायन exactly as the Sun's
- * declination does, and the boundary is a curve on the sphere rather than a
- * straight cut. Night keeps the map at `ambient` — darker, never black.
- */
-function makeEarthMaterial(map: THREE.Texture) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      map: { value: map },
-      sunPosition: { value: new THREE.Vector3(MEAN_DISTANCE, 0, 0) },
-      ambient: { value: EARTH_NIGHT },
-      sunOn: { value: 1 },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vWorldPos;
-      varying vec3 vWorldNormal;
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        vec4 world = modelMatrix * vec4(position, 1.0);
-        vWorldPos = world.xyz;
-        vWorldNormal = normalize(mat3(modelMatrix) * normal);
-        gl_Position = projectionMatrix * viewMatrix * world;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform sampler2D map;
-      uniform vec3 sunPosition;
-      uniform float ambient;
-      uniform float sunOn;
-      varying vec3 vWorldPos;
-      varying vec3 vWorldNormal;
-      varying vec2 vUv;
-      void main() {
-        vec3 tex = texture2D(map, vUv).rgb;
-        vec3 n = normalize(vWorldNormal);
-        vec3 toSun = normalize(sunPosition - vWorldPos);
-        /* Widened either side of 0 so the terminator is a soft band, the way
-           dawn and dusk actually are, instead of a drawn line. */
-        float day = smoothstep(-0.22, 0.30, dot(n, toSun));
-        float lit = mix(ambient, 1.0, day);
-        gl_FragColor = vec4(tex * mix(1.0, lit, sunOn), 1.0);
-      }
-    `,
-    transparent: false,
-    depthWrite: true,
-    depthTest: true,
-    side: THREE.FrontSide,
-    blending: THREE.NoBlending,
-    toneMapped: false,
-    fog: false,
-  });
 }
 
 /**
