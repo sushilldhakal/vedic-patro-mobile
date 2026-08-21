@@ -1,6 +1,5 @@
 import Svg, {
   Circle,
-  Defs,
   G,
   LinearGradient,
   Mask,
@@ -9,6 +8,7 @@ import Svg, {
   Rect,
   Stop,
 } from "react-native-svg";
+import { Defs } from "@/lib/svg-defs";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import {
   AnimatedG,

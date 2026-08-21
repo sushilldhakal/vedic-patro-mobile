@@ -1051,7 +1051,9 @@ function DesktopPatroTable({
     <TableScrollShell stretch={false} className="w-full rounded-xl">
       <View style={{ width: DAINIK_TABLE_WIDTH }}>
         <TableHeader>
-          <TableHeaderCell width={DAINIK_COL_EXPAND} className={patroStickyHeadCell} />
+          <TableHeaderCell width={DAINIK_COL_EXPAND} className={patroStickyHeadCell}>
+            {null}
+          </TableHeaderCell>
           <TableHeaderCell width={DAINIK_COL_GATE} className={patroStickyHeadCell}>
             <Text className={th}>{pick("गते", "Day")}</Text>
           </TableHeaderCell>
