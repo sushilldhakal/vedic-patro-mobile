@@ -30,6 +30,8 @@ export type PatroYearBrowseNavProps = {
   mobileToolbar?: ReactNode;
   desktopAside?: ReactNode;
   className?: string;
+  /** Override the chip's "go to today"; default sets year via {@link getCurrentBs}. */
+  onToday?: () => void;
 };
 
 /**
@@ -49,6 +51,7 @@ export function PatroYearBrowseNav({
   mobileToolbar,
   desktopAside,
   className,
+  onToday,
 }: PatroYearBrowseNavProps) {
   const { lang } = useLocale();
   const { isCompact } = useBreakpoint();
@@ -70,9 +73,11 @@ export function PatroYearBrowseNav({
     return undefined;
   }, [crossEraSubtitleProp, gregorianRange, lang, digitFn]);
 
-  const jumpToToday = () => {
-    onYearChange(getCurrentBs().year);
-  };
+  const jumpToToday =
+    onToday ??
+    (() => {
+      onYearChange(getCurrentBs().year);
+    });
 
   const navProps = {
     mode: "year" as const,

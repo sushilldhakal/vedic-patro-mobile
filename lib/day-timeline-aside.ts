@@ -27,7 +27,11 @@ function parseTimeToMinutes(time?: string | null): number | null {
 
 export function getChoghadiyaSegments(p: PanchangaDay): ChoghadiyaSegment[] {
   const detail = getPanchangaDetail(p);
-  const segments = detail?.choghadiya;
+  // `getPanchangaDetail`'s return type is loosened to `Record<string, unknown>`
+  // on the web build (`panchanga-format.web.ts`) — this app's own tsconfig
+  // `moduleSuffixes` makes bare `tsc` resolve that variant even here, so the
+  // field this app actually cares about is named back to its real shape.
+  const segments = detail?.choghadiya as NonNullable<PanchangaDay["detail"]>["choghadiya"];
   if (!segments?.length) return [];
   return segments.map((c) => ({
     name: c.name_ne,

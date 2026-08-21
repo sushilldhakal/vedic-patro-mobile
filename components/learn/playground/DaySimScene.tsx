@@ -75,6 +75,7 @@ import {
   type PlaygroundLabel,
 } from "@/components/learn/playground/playground-labels";
 import { usePlaygroundTextures } from "@/components/learn/playground/playground-textures";
+import { makeEarthMaterial } from "@/lib/sky3d/earth-material";
 import {
   equationOfTime,
   euclideanModulo,
@@ -94,14 +95,6 @@ const PI2 = Math.PI * 2;
 /** Radius of the mean orbit. Everything else is scaled against this. */
 export const MEAN_DISTANCE = 10;
 const PLANET_R = 1;
-/**
- * How much of the map survives on the night side.
- *
- * Not zero: the far side of the planet is the thing a reader is trying to keep
- * track of while it turns, and a black cap hides which country is about to come
- * round. Dark enough that the lit side is unmistakably the lit side.
- */
-const EARTH_NIGHT = 0.34;
 /** काठमाडौँ's longitude in radians — the spin phase that puts it at noon. */
 const KATHMANDU_LON = KATHMANDU.lon * (Math.PI / 180);
 /** Where the mean sun sits. Read-only — never mutate it. */
@@ -364,71 +357,6 @@ function makeLine(geometry: THREE.BufferGeometry, color: number, opacity: number
 }
 
 /**
- * The globe: the map, lit by the Sun, on an always-opaque surface.
- *
- * Its own shader rather than a lit material, for two reasons.
- *
- * **Opacity.** Every fragment writes alpha 1 with blending off, so no amount of
- * material state elsewhere can make the planet see-through, and it always
- * writes depth — which is what stops the belts and orbit lines behind it from
- * painting over its face.
- *
- * **The terminator.** Day and night come from `N·L` against the *true* Sun's
- * world position, so the lit cap is centred on the subsolar point: it rides
- * north through उत्तरायण and south through दक्षिणायन exactly as the Sun's
- * declination does, and the boundary is a curve on the sphere rather than a
- * straight cut. Night keeps the map at `ambient` — darker, never black.
- */
-function makeEarthMaterial(map: THREE.Texture) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      map: { value: map },
-      sunPosition: { value: new THREE.Vector3(MEAN_DISTANCE, 0, 0) },
-      ambient: { value: EARTH_NIGHT },
-      sunOn: { value: 1 },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vWorldPos;
-      varying vec3 vWorldNormal;
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        vec4 world = modelMatrix * vec4(position, 1.0);
-        vWorldPos = world.xyz;
-        vWorldNormal = normalize(mat3(modelMatrix) * normal);
-        gl_Position = projectionMatrix * viewMatrix * world;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform sampler2D map;
-      uniform vec3 sunPosition;
-      uniform float ambient;
-      uniform float sunOn;
-      varying vec3 vWorldPos;
-      varying vec3 vWorldNormal;
-      varying vec2 vUv;
-      void main() {
-        vec3 tex = texture2D(map, vUv).rgb;
-        vec3 n = normalize(vWorldNormal);
-        vec3 toSun = normalize(sunPosition - vWorldPos);
-        /* Widened either side of 0 so the terminator is a soft band, the way
-           dawn and dusk actually are, instead of a drawn line. */
-        float day = smoothstep(-0.22, 0.30, dot(n, toSun));
-        float lit = mix(ambient, 1.0, day);
-        gl_FragColor = vec4(tex * mix(1.0, lit, sunOn), 1.0);
-      }
-    `,
-    transparent: false,
-    depthWrite: true,
-    depthTest: true,
-    side: THREE.FrontSide,
-    blending: THREE.NoBlending,
-    toneMapped: false,
-    fog: false,
-  });
-}
-
-/**
  * Tip the Moon's plane around a travelling node line.
  *
  * `rotY(Ω) · rotX(i) · rotY(-Ω)` leaves longitudes in the parent frame alone
@@ -531,7 +459,16 @@ export interface SceneProps {
   clockText: MutableRefObject<{ sidereal: string; solar: string; mean: string }>;
   onLabels: (labels: PlaygroundLabel[]) => void;
   onSample: (s: SceneSample) => void;
+  /**
+   * Which world the globe is. Earth keeps the cartoon map and the Moon; any
+   * other graha swaps the surface for that planet's texture and drops the
+   * Moon, राहु and केतु — those three belong to Earth.
+   */
+  planetBody?: PlaygroundGlobe;
 }
+
+/** Worlds the adjust drawer can put in Earth's place. */
+export type PlaygroundGlobe = "earth" | "mars" | "mercury" | "jupiter" | "venus" | "saturn";
 
 function DaySimScene({
   clock,
@@ -547,17 +484,35 @@ function DaySimScene({
   clockText,
   onLabels,
   onSample,
+  planetBody = "earth",
 }: SceneProps) {
   const cam = useThree((s) => s.camera);
   const labels = usePlaygroundLabels(onLabels);
 
-  /* ── native ── bundler modules, not URLs. See `playground-textures.ts`. */
+  /* ── native ── bundler modules, not URLs. See `playground-textures.ts`. All
+     six candidate globes are loaded up front rather than swapped in lazily —
+     a bundler module has to be `require`d statically, so there is no runtime
+     `TextureLoader().load(url)` to pick one on demand the way the web does. */
   const textures = usePlaygroundTextures();
   /* Raw texels: the globe's own shader writes final pixels and does no
-     colour-space conversion of its own. See `makeEarthMaterial`. */
-  textures.earth.colorSpace = THREE.NoColorSpace;
+     colour-space conversion of its own. See `makeEarthMaterial`. Every
+     candidate needs the same override — `usePlaygroundTextures` applies
+     sRGB uniformly, and only this shader's own un-corrected reading is right
+     for whichever one is on screen. */
+  for (const key of ["earth", "mars", "mercury", "jupiter", "venus", "saturn"] as const) {
+    if (textures[key]) textures[key].colorSpace = THREE.NoColorSpace;
+  }
   const earthMat = useMemo(() => makeEarthMaterial(textures.earth), [textures.earth]);
   useEffect(() => () => earthMat.dispose(), [earthMat]);
+
+  /* Only Earth carries a Moon (and therefore राहु/केतु). A borrowed graha is
+     just a spinning world with its own tilt and ellipse. */
+  const hasMoon = planetBody === "earth";
+
+  useEffect(() => {
+    const tex = textures[planetBody];
+    if (tex) earthMat.uniforms.map.value = tex;
+  }, [planetBody, textures, earthMat]);
 
   /* ── refs into the scene graph ───────────────────────────────────── */
 
@@ -1082,7 +1037,7 @@ function DaySimScene({
     );
     moonPlane.current.quaternion.copy(moonPlaneQ.current);
     nodeAxis.current.rotation.y = omegaRad.current;
-    if (toggles.moon || toggles.moonTrail || toggles.moonLap) {
+    if (hasMoon && (toggles.moon || toggles.moonTrail || toggles.moonLap)) {
       const moonLon = moonLonAt(day);
       atLonInto(moonMesh.current.position, moonLon, MOON_ORBIT);
       /* Tidally locked — the same face stays turned toward the planet. */
@@ -1159,7 +1114,7 @@ function DaySimScene({
       /* सूर्य ग्रहण — the Moon's shadow on the planet, under the Moon itself.
          Placed at the sub-lunar point rather than by intersecting the drawn
          ray, for the same reason the test is angular. */
-      const show = toggles.moon && solar > 0.02;
+      const show = hasMoon && toggles.moon && solar > 0.02;
       solarShadow.current.visible = show;
       if (show) {
         const hit = vShadow.current.copy(toMoon).multiplyScalar(PLANET_R).add(planetPos);
@@ -1238,8 +1193,8 @@ function DaySimScene({
     const moonNak =
       Math.floor((euclideanModulo(moonEclLon - beltZeroDeg, 360) * 27) / 360) % 27;
     moonNakHighlight.rotation.z = moonNak * (PI2 / 27);
-    moonNakHighlight.visible = toggles.nakshatraBelt && toggles.moonSightline && geocentric;
-    moonSightline.visible = toggles.moonSightline && geocentric;
+    moonNakHighlight.visible = hasMoon && toggles.nakshatraBelt && toggles.moonSightline && geocentric;
+    moonSightline.visible = hasMoon && toggles.moonSightline && geocentric;
 
     if (moonSightline.visible) {
       /* Rebuilt rather than read off the mesh: `getWorldPosition` would use a
@@ -1315,7 +1270,7 @@ function DaySimScene({
        tick rather than every frame — five times a second is smooth enough for
        a curve that takes a whole month to be drawn, and on a phone it is the
        difference between a 160-vertex upload every frame and one in twelve. */
-    if (sampling && toggles.moonTrail) {
+    if (hasMoon && sampling && toggles.moonTrail) {
       const synodicDays = daysPerYear / MOON_SYNODIC_PER_YEAR;
       const a = moonTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
       const w0 = vAnchor.current;
@@ -1385,7 +1340,7 @@ function DaySimScene({
       /* All the body anchors share one scratch: `push` projects immediately and
          never keeps the vector, so it is safe to overwrite between calls. */
       push("b-planet", "body", bodyNames.planet, anchor.copy(planetPos).setY(PLANET_R * 2.2), false);
-      if (toggles.moon) {
+      if (hasMoon && toggles.moon) {
         /* Built from the model rather than read back with `getWorldPosition`.
            A world matrix is only recomputed at render, so on the frame this
            runs it still holds the *previous* frame's frame-shift — and the
@@ -1602,9 +1557,10 @@ function DaySimScene({
           </mesh>
         </group>
 
-        {/* The Moon, on its own inclined plane, carried along with the planet */}
-        <primitive object={moonTrail} visible={toggles.moonTrail} />
-        <group ref={moonRoot}>
+        {/* The Moon, on its own inclined plane, carried along with the planet.
+            Earth's alone: a borrowed graha has no Moon, राहु or केतु to draw. */}
+        <primitive object={moonTrail} visible={hasMoon && toggles.moonTrail} />
+        <group ref={moonRoot} visible={hasMoon}>
           <group ref={moonPlane}>
             <primitive object={moonOrbitLine} visible={toggles.moon} />
             <primitive object={lapArc.first} visible={toggles.moonLap} />

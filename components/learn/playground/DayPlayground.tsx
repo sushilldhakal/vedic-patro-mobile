@@ -84,6 +84,7 @@ import {
 import Scene, {
   type CameraState,
   type CameraTarget,
+  type PlaygroundGlobe,
   type SceneSample,
   type SimClock,
   type SimToggles,
@@ -183,6 +184,12 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
 
   /** Which planet preset is showing; `""` is this topic's own. */
   const [preset, setPreset] = useState("");
+  /**
+   * The globe on screen. `""` (this topic's own settings) is Earth's —
+   * every other value is a `PLANET_PRESETS` key, and those are already this
+   * same union.
+   */
+  const planetBody = (preset || "earth") as PlaygroundGlobe;
 
   const [solarDaysPerYear, setSolarDaysPerYear] = useState(initial.params.daysPerYear - 1);
   const [eccentricity, setEccentricity] = useState(initial.params.eccentricity);
@@ -291,19 +298,29 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   );
 
   const setToggle = useCallback(
-    (k: keyof SimToggles) => setToggles((t) => ({ ...t, [k]: !t[k] })),
-    [],
+    (k: keyof SimToggles) => {
+      if (planetBody !== "earth" && (GROUPS.moon as readonly string[]).includes(k)) return;
+      setToggles((t) => ({ ...t, [k]: !t[k] }));
+    },
+    [planetBody],
   );
 
   const groupOn = useCallback((g: GroupKey) => GROUPS[g].every((k) => toggles[k]), [toggles]);
-  const pressGroup = useCallback((g: GroupKey) => {
-    setToggles((t) => {
-      const on = GROUPS[g].every((k) => t[k]);
-      const next = { ...t };
-      for (const k of GROUPS[g]) next[k] = !on;
-      return next;
-    });
-  }, []);
+  const pressGroup = useCallback(
+    (g: GroupKey) => {
+      // A borrowed graha has no Moon to switch on — the chip is disabled for
+      // this too, but a stray press (or a stale re-render) should still be a
+      // no-op rather than turning on toggles the scene is ignoring.
+      if (g === "moon" && planetBody !== "earth") return;
+      setToggles((t) => {
+        const on = GROUPS[g].every((k) => t[k]);
+        const next = { ...t };
+        for (const k of GROUPS[g]) next[k] = !on;
+        return next;
+      });
+    },
+    [planetBody],
+  );
 
   /** Empty key means this topic's own settings — the way back from a preset. */
   const applyPreset = useCallback(
@@ -320,6 +337,14 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
       setSolarDaysPerYear(Math.max(1, Math.min(365, Math.round(p.daysPerYear - 1))));
       setEccentricity(p.eccentricity);
       setTiltDeg(p.tilt);
+      /* A borrowed graha has no Moon, so the lunar layers go with it. */
+      if (key !== "earth") {
+        setToggles((t) => {
+          const next = { ...t };
+          for (const k of GROUPS.moon) next[k] = false;
+          return next;
+        });
+      }
     },
     [initial],
   );
@@ -407,15 +432,23 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
 
   /* ── pieces ───────────────────────────────────────────────────────── */
 
-  const chip = (active: boolean, label: string, onPress: () => void, key?: string) => (
+  const chip = (
+    active: boolean,
+    label: string,
+    onPress: () => void,
+    key?: string,
+    disabled?: boolean,
+  ) => (
     <Pressable
       key={key ?? label}
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled }}
       className={cn(
         "rounded-full border px-2.5 py-1",
         active ? "border-transparent bg-white/85" : "border-white/25 bg-transparent",
+        disabled && "opacity-40",
       )}
     >
       <Text
@@ -440,7 +473,15 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         {heading}
       </Text>
       <View className="flex-row flex-wrap gap-1.5">
-        {items.map(([k, label]) => chip(toggles[k], label, () => setToggle(k), k))}
+        {items.map(([k, label]) =>
+          chip(
+            toggles[k],
+            label,
+            () => setToggle(k),
+            k,
+            planetBody !== "earth" && (GROUPS.moon as readonly string[]).includes(k),
+          ),
+        )}
       </View>
     </View>
   );
@@ -503,7 +544,13 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         "t-nak",
       )}
       {chip(toggles.monthRing, pick("महिना", "Months"), () => setToggle("monthRing"), "t-month")}
-      {chip(groupOn("moon"), pick("चन्द्र", "Moon"), () => pressGroup("moon"), "t-moon")}
+      {chip(
+        groupOn("moon"),
+        pick("चन्द्र", "Moon"),
+        () => pressGroup("moon"),
+        "t-moon",
+        planetBody !== "earth",
+      )}
     </ScrollView>
   );
 
@@ -714,6 +761,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
               clockText={clockText}
               onLabels={setLabels}
               onSample={onSample}
+              planetBody={planetBody}
             />
             <SceneReady onReady={() => setReady(true)} />
             {/* Last in the tree on purpose: `useFrame` runs in mount order, so

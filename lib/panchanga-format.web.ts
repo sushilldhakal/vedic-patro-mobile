@@ -20,11 +20,11 @@ export function formatTimeShort(time?: string | null): string | undefined {
   return `${h}:${m}`;
 }
 
-/** Clock time with Nepali digits (e.g. ०७:३२). */
-export function formatClockNepali(time?: string | null): string | undefined {
+/** Clock time in the given locale's digits (e.g. ०७:३२, or 07:32 for English). */
+export function formatClockNepali(time?: string | null, lang?: string): string | undefined {
   if (!time) return undefined;
   const short = formatTimeShort(time) ?? time;
-  return toNepaliDigits(short);
+  return formatLocaleDigits(short, lang);
 }
 
 export function formatGhatiEnd(clock?: string | null): string | undefined {
@@ -1205,18 +1205,19 @@ export function getUdayaLagna(p: PanchangaDay) {
   return rows?.length ? rows : undefined;
 }
 
-export function formatShortClock(time?: string | null): string | undefined {
+export function formatShortClock(time?: string | null, lang?: string): string | undefined {
   if (!time) return undefined;
   const t = formatTimeShort(time) ?? time.slice(0, 5);
-  return toNepaliDigits(t);
+  return formatLocaleDigits(t, lang);
 }
 
 export function formatTimeRangeShort(
   start?: string | null,
-  end?: string | null
+  end?: string | null,
+  lang?: string
 ): string | undefined {
-  const a = formatShortClock(start);
-  const b = formatShortClock(end);
+  const a = formatShortClock(start, lang);
+  const b = formatShortClock(end, lang);
   if (!a || !b) return undefined;
   return `${a} → ${b}`;
 }

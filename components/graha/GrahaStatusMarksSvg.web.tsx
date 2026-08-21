@@ -8,6 +8,16 @@ type Props = {
   x: number;
   y: number;
   size?: number;
+  /**
+   * Unused here — this variant colors its marks with `stroke-secondary` /
+   * `stroke-destructive` classes, not props. Accepted anyway so the two
+   * variants share one call shape: `moduleSuffixes` in tsconfig makes bare
+   * `tsc` (no platform context) resolve every import of this module to
+   * whichever variant sorts first, including from callers meant for the
+   * other one.
+   */
+  vakriColor?: string;
+  astaColor?: string;
 };
 
 /** Web DOM SVG variant for D1Chart.web.tsx */

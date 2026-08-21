@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.vedicpatro.mobile",
       "infoPlist": {
+        "NSMotionUsageDescription": "Vedic Patro uses motion and compass sensors to point the sky view at whichever direction your phone is facing.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -94,6 +95,12 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Vedic Patro uses your location to show accurate panchanga for your area."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Vedic Patro uses your camera to overlay the sky over the real view when you point your phone at it."
         }
       ]
     ],

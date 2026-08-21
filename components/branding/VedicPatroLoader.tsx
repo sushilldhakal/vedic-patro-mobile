@@ -2,7 +2,6 @@ import { Text, View } from "react-native";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import Svg, {
   Circle,
-  Defs,
   G,
   LinearGradient,
   Path,
@@ -11,6 +10,7 @@ import Svg, {
   Stop,
 } from "react-native-svg";
 import { useLocale } from "@/lib/i18n";
+import { Defs } from "@/lib/svg-defs";
 import {
   AnimatedG,
   useOpacityOscillation,

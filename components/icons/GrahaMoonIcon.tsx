@@ -1,5 +1,8 @@
-import { useId } from "react";
-import { Circle, ClipPath, Defs, G, RadialGradient, Stop, Svg, type SvgProps } from "react-native-svg";
+import { useId, type ComponentProps } from "react";
+import { Circle, ClipPath, G, RadialGradient, Stop, Svg } from "react-native-svg";
+import { Defs } from "@/lib/svg-defs";
+
+type SvgProps = ComponentProps<typeof Svg>;
 
 /** Port of `assets/graha/moon.svg` — inline so Metro never has to resolve `.svg` imports. */
 export function GrahaMoonIcon({ width = 16, height = 16, ...props }: SvgProps) {

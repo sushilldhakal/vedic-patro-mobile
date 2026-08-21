@@ -120,6 +120,7 @@ export default function AakashGocharScreen() {
              the day on screen, not the view itself. */
           <AakashGocharSky
             gochar={query.data?.gochar}
+            vedicStars={query.data?.vedic_stars}
             ayanamsaDeg={query.data?.ayanamsa?.degrees}
             date={sceneDate}
             onDateChange={setDate}

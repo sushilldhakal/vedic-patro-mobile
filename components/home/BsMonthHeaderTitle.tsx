@@ -24,7 +24,7 @@ type Props = {
   location: PanchangaLocation;
   onLocationChange: (location: PanchangaLocation) => void;
   crossEraSubtitle?: string;
-  browseEra?: MonthBrowseEra;
+  browseEra: MonthBrowseEra;
   onBrowseEraChange?: (era: MonthBrowseEra) => void;
 };
 

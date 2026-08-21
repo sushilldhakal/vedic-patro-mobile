@@ -525,6 +525,8 @@ export interface PlanetInfo {
   dms_in_rashi?: string;
   retrograde?: boolean;
   is_retrograde?: boolean;
+  /** अस्त — combust (within the Sun's combustion orb). */
+  is_combust?: boolean;
   longitude?: number;
   speed?: number;
   motion?: string;
@@ -553,6 +555,7 @@ export interface CalendarDayDetail {
   surya_rashi_ne?: string;
   chandra_rashi?: string;
   chandra_rashi_ne?: string;
+  chandra_rashi_spans?: RashiSpan[];
   ritu_ne?: string;
   sun?: { sunrise?: string; sunset?: string; noon?: string };
   moon?: { rise?: string; set?: string };
@@ -567,9 +570,11 @@ export interface CalendarDayDetail {
     label_ne?: string;
     label_en?: string;
   };
+  jd_ut?: number;
   solar_corrections?: {
     belaantar?: PatroSolarCorrection;
     deshaantar?: PatroSolarCorrection;
+    akshamsha?: PatroSolarCorrection;
     ishtakaal_note_ne?: string;
     ishtakaal_note_en?: string;
     sunrise_includes_corrections?: boolean;
@@ -1260,6 +1265,8 @@ export interface GocharGraha {
   speed_deg_day?: number;
   motion?: string;
   is_retrograde?: boolean;
+  /** अस्त — combust (within the Sun's combustion orb). */
+  is_combust?: boolean;
   next_rashi_entry?: GocharNextEntry | null;
   next_nakshatra_entry?: GocharNextEntry | null;
   next_pada_entry?: GocharNextEntry | null;
@@ -1276,6 +1283,26 @@ export interface GocharGraha {
   is_exalted?: boolean;
 }
 
+/**
+ * One of the named वैदिक तारा — अगस्त्य, अभिजित्, सप्तर्षि and the rest —
+ * positioned server-side from the Swiss Ephemeris fixed-star catalogue
+ * (sefstars.txt). `lon`/`lat` are already sidereal ecliptic degrees for the
+ * date this response was computed for; the client plots them as-is; it does
+ * not re-derive or precess them.
+ */
+export interface VedicStarPosition {
+  ne: string;
+  en: string;
+  /** Bayer designation and catalogue number, for a hint line. */
+  designation: string;
+  /** Sidereal ecliptic longitude, degrees. */
+  lon: number;
+  /** Ecliptic latitude, degrees. */
+  lat: number;
+  /** Apparent visual magnitude. */
+  mag: number;
+}
+
 export interface GocharResponse {
   date_ad: string;
   date_bs?: string;
@@ -1286,6 +1313,8 @@ export interface GocharResponse {
    */
   ayanamsa?: { name: string; degrees: number };
   gochar: Record<string, GocharGraha>;
+  /** Optional: older cached responses predate the field. */
+  vedic_stars?: VedicStarPosition[];
 }
 
 export const gocharKeys = {
@@ -1364,8 +1393,12 @@ export const fetchBsToAd = (date: string) => get<ConvertBsToAd>(`/convert/bs-to-
 
 const GRAHA_CACHE_VERSION = "3";
 
-function buildEraQuery(era: "bs" | "ad" | "bbs" = "bs", year?: number): string {
-  const params = new URLSearchParams({ era, language: era === "ad" ? "en" : "ne" });
+function buildEraQuery(
+  era: import("@/lib/patro-era").PatroBrowseEra = "bs",
+  year?: number,
+): string {
+  const language = era === "ad" || era === "bc" ? "en" : "ne";
+  const params = new URLSearchParams({ era, language });
   if (year != null) params.set("year", String(year));
   return params.toString();
 }
@@ -1831,7 +1864,7 @@ export const fetchEclipseYear = (
   kind: "solar" | "lunar",
   year: number,
   location?: LocationParams,
-  era: "bs" | "ad" = "bs",
+  era: import("@/lib/patro-era").PatroBrowseEra = "bs",
 ) =>
   get<EclipseYearResponse>(
     appendLocation(

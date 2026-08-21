@@ -83,6 +83,8 @@ import {
   type SkyTextureKey,
 } from "@/lib/sky3d/sky-textures";
 import { buildHorizonTerrain, terrainSeed } from "@/lib/sky3d/terrain";
+import { makeEarthMaterial } from "@/lib/sky3d/earth-material";
+import { makeMoonMaterial, type MoonMaterial } from "@/lib/sky3d/moon-material";
 
 /** Belt radii in space view — the nakshatra ring sits just outside the rashi ring. */
 export const RASHI_INNER = 9.0;
@@ -304,6 +306,11 @@ export type SceneToggles = {
    */
   tilt: boolean;
   labels: boolean;
+  /**
+   * The hillside underfoot in the horizon view. Off elsewhere — there is no
+   * ground to switch when the camera is outside the sphere looking in.
+   */
+  landscape: boolean;
 };
 
 /* ── shared primitives ─────────────────────────────────────────────────── */
@@ -668,6 +675,8 @@ function GrahaBody({
   spinRef,
   retroRef,
   onSelect,
+  sunLit,
+  phaseMaterial,
 }: {
   graha: GrahaKey;
   textures: Record<SkyTextureKey, THREE.Texture>;
@@ -678,6 +687,14 @@ function GrahaBody({
   spinRef: (o: THREE.Mesh | null) => void;
   retroRef: (o: THREE.Group | null) => void;
   onSelect: () => void;
+  /**
+   * Space view: the Sun's own point light lands the terminator correctly at
+   * these near-true distances, so the Moon needs no help from the phase
+   * shader — see `lib/sky3d/moon-material.ts`.
+   */
+  sunLit?: boolean;
+  /** The Moon's face in the horizon and globe views. Only handed for "moon". */
+  phaseMaterial?: MoonMaterial;
 }) {
   const texKey = BODY_TEXTURE[graha];
   const radius = BODY_RADIUS[graha];
@@ -690,6 +707,10 @@ function GrahaBody({
           <sphereGeometry args={[radius, 40, 40]} />
           {graha === "sun" ? (
             <meshBasicMaterial map={textures.sun} />
+          ) : graha === "moon" && sunLit ? (
+            <meshStandardMaterial map={textures.moon} roughness={1} metalness={0} />
+          ) : graha === "moon" && phaseMaterial ? (
+            <primitive object={phaseMaterial} attach="material" />
           ) : (
             <meshStandardMaterial
               map={textures[texKey]}
@@ -818,6 +839,8 @@ export function AakashGocharScene({
   toggles,
   onSelect,
   onSample,
+  skyAim,
+  arBackground = false,
 }: {
   sim: React.RefObject<SimState>;
   view: React.RefObject<ViewState>;
@@ -833,6 +856,19 @@ export function AakashGocharScene({
   toggles: SceneToggles;
   onSelect: (key: GrahaKey) => void;
   onSample: (sample: SkySample) => void;
+  /**
+   * A fixed sky point from the search box — an ecliptic longitude/latitude
+   * rather than a graha key, since stars and constellations do not move.
+   * `nonce` marks a fresh pick so the same coordinates can be re-aimed twice
+   * in a row; consumed once, the camera then orbits freely from there.
+   */
+  skyAim?: { lon: number; lat: number; nonce: number } | null;
+  /**
+   * AR mode: the real world shows through a transparently-cleared canvas
+   * behind this, so the synthetic backdrop that normally stands in for it —
+   * the star sphere, the horizon hillside — has nothing left to do here.
+   */
+  arBackground?: boolean;
 }) {
   const loaded = useLoader(THREE.TextureLoader, SKY_TEXTURE_SOURCES as string[]);
   const textures = useMemo(() => {
@@ -844,6 +880,41 @@ export function AakashGocharScene({
     });
     return map;
   }, [loaded]);
+
+  /**
+   * अन्तरिक्ष's Earth, shaded by its own terminator shader rather than lit —
+   * see `makeEarthMaterial`. Raw texels: the shader writes final pixels
+   * itself, and `textures.earth` has no other consumer in this scene to keep
+   * sRGB for.
+   */
+  const spaceEarthMat = useMemo(() => {
+    textures.earth.colorSpace = THREE.NoColorSpace;
+    return makeEarthMaterial(textures.earth);
+  }, [textures]);
+  useEffect(() => () => spaceEarthMat.dispose(), [spaceEarthMat]);
+
+  /**
+   * The Moon's own face for the dome and the globe — see `makeMoonMaterial`
+   * for why those two cannot simply be lit the way अन्तरिक्ष's Moon is.
+   *
+   * Its own copy of the map, because the shader writes final pixels and so
+   * wants raw texels, while अन्तरिक्ष's `meshStandardMaterial` wants the same
+   * image tagged sRGB. One `Texture` cannot answer both, and the clone shares
+   * the decoded image either way.
+   */
+  const moonPhaseMat = useMemo(() => {
+    const map = textures.moon.clone();
+    map.colorSpace = THREE.NoColorSpace;
+    map.needsUpdate = true;
+    return makeMoonMaterial(map);
+  }, [textures]);
+  useEffect(
+    () => () => {
+      moonPhaseMat.uniforms.map.value.dispose();
+      moonPhaseMat.dispose();
+    },
+    [moonPhaseMat],
+  );
 
   const bodyRefs = useRef<Partial<Record<GrahaKey, THREE.Group>>>({});
   const spinRefs = useRef<Partial<Record<GrahaKey, THREE.Mesh>>>({});
@@ -1142,6 +1213,9 @@ export function AakashGocharScene({
   const labels = useRef<ScreenLabel[]>([]);
   const scratch = useRef(new THREE.Vector3());
   const target = useRef(new THREE.Vector3());
+  /** Where a search pick landed, and the nonce already consumed. */
+  const aimAt = useRef(new THREE.Vector3());
+  const lastAim = useRef(0);
 
   // Re-derive the trail as soon as the graha or the calibration changes, and
   // re-anchor a locked sky to whatever date the nav has just jumped to.
@@ -1650,7 +1724,9 @@ export function AakashGocharScene({
     if (earthGroupRef.current) earthGroupRef.current.visible = space;
     // The globe replaces the ground: from out here you are looking at the whole
     // Earth, not standing on a patch of it.
-    if (groundRef.current) groundRef.current.visible = horizon && !globe;
+    if (groundRef.current) {
+      groundRef.current.visible = horizon && !globe && toggles.landscape && !arBackground;
+    }
     /* Light on the hills, following the Sun through the twilight. The geometry's
        own vertex colours hold the relief and the haze; this is only the colour
        they are shading — which is why the ground can go warm at sunrise without
@@ -1739,21 +1815,43 @@ export function AakashGocharScene({
       const sunGroup = bodyRefs.current.sun;
       if (sunGroup) sunLightRef.current.position.copy(sunGroup.position);
       sunLightRef.current.intensity = horizon ? 1400 : globe ? 700 : 90;
+      /* अन्तरिक्ष's Earth reads day/night off this same light's world position,
+         rather than off a second copy of `sunGroup.position` — so a future
+         light rig change cannot let the two drift apart. */
+      sunLightRef.current.getWorldPosition(spaceEarthMat.uniforms.sunPosition.value);
+      /* The Moon's phase runs off the Sun's *direction* from the centre — the
+         observer on the dome, the Earth on the globe — which is the one thing
+         a fixed-radius projection keeps true. */
+      if (sunGroup) {
+        moonPhaseMat.uniforms.sunDirection.value.copy(sunGroup.position).normalize();
+      }
     }
 
     /* ── camera ─────────────────────────────────────────────────────── */
     const v = view.current;
     const cam = state.camera as THREE.PerspectiveCamera;
     const trackKey = toggles.lockCenter && selectedKey ? selectedKey : null;
-    const trackGroup = trackKey ? bodyRefs.current[trackKey] : null;
+    const bodyGroup = trackKey ? bodyRefs.current[trackKey] : null;
+    let trackPosition: THREE.Vector3 | null = bodyGroup ? bodyGroup.position : null;
+    /* A star or constellation from the search box. Placed through the same
+       `place` every other fixed thing goes through, so it lands wherever the
+       view would have drawn it — and taken as the target for the one frame
+       the aim is fresh. After that frame `v.yaw`/`v.pitch` already hold the
+       new angle, so the camera keeps it without this ref being read again. */
+    if (skyAim && skyAim.nonce !== lastAim.current) {
+      lastAim.current = skyAim.nonce;
+      const at = place(skyAim.lon, skyAim.lat, DOME);
+      aimAt.current.set(at[0], at[1], at[2]);
+      trackPosition = aimAt.current;
+    }
     if (horizon) {
       /* Standing at the centre, the only thing zoom can do is change the lens:
          a 6° telescopic crop at one end, a 160° fisheye that swallows nearly
          the whole dome at the other. The sky itself never changes shape. */
       const cosP = Math.cos(v.pitch);
       cam.position.set(0, 0, 0);
-      if (trackGroup) {
-        target.current.copy(trackGroup.position);
+      if (trackPosition) {
+        target.current.copy(trackPosition);
       } else {
         target.current.set(
           DOME * cosP * Math.sin(v.yaw),
@@ -1780,8 +1878,8 @@ export function AakashGocharScene({
       const framed = 1.4 + Math.pow(t, 1.25) * (GLOBE_BAND_R * 2 - 1.4);
       const radius = GLOBE_CAM_R;
       const fov = (2 * Math.atan(framed / radius)) / DEG;
-      if (trackGroup) {
-        target.current.copy(trackGroup.position);
+      if (trackPosition) {
+        target.current.copy(trackPosition);
         scratch.current.copy(target.current);
         const bodyR = scratch.current.length();
         if (bodyR < 1e-5) {
@@ -1811,8 +1909,8 @@ export function AakashGocharScene({
       }
     } else {
       const cosP = Math.cos(v.pitch);
-      if (trackGroup) {
-        target.current.copy(trackGroup.position);
+      if (trackPosition) {
+        target.current.copy(trackPosition);
         scratch.current.copy(target.current);
         const bodyR = scratch.current.length();
         if (bodyR < 1e-5) {
@@ -1944,23 +2042,15 @@ export function AakashGocharScene({
       {/* A hint of fill so the night side is shape rather than a hole. */}
       <directionalLight position={[0, 12, 0]} intensity={0.1} />
 
-      <mesh ref={starsRef}>
+      <mesh ref={starsRef} visible={!arBackground}>
         <sphereGeometry args={[400, 48, 48]} />
         <meshBasicMaterial map={textures.background} side={THREE.BackSide} transparent />
       </mesh>
 
       {/* Space view: the Earth itself, tilted by the obliquity of the ecliptic. */}
       <group ref={earthGroupRef} rotation={[0, 0, 23.44 * DEG]}>
-        <mesh ref={earthRef}>
+        <mesh ref={earthRef} material={spaceEarthMat}>
           <sphereGeometry args={[EARTH_RADIUS, 64, 64]} />
-          <meshStandardMaterial
-            map={textures.earth}
-            emissive="#ffffff"
-            emissiveMap={textures.earth}
-            emissiveIntensity={0.1}
-            roughness={0.85}
-            metalness={0.02}
-          />
         </mesh>
         <primitive object={spaceMeridian} />
         <mesh ref={cloudRef}>
@@ -2127,6 +2217,8 @@ export function AakashGocharScene({
           spinRef={handles[key].spin}
           retroRef={handles[key].retro}
           onSelect={() => onSelect(key)}
+          sunLit={mode === "space"}
+          phaseMaterial={key === "moon" ? moonPhaseMat : undefined}
         />
       ))}
 

@@ -9,13 +9,22 @@
  */
 
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Modal, PanResponder, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import {
+  Modal,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@/components/sky3d/GeocentricSkyCanvas";
 import { OverlaySheet, SheetSection } from "@/components/ui/OverlaySheet";
 import { Text } from "@/components/ui/Text";
-import type { GocharGraha } from "@/lib/api";
+import type { GocharGraha, VedicStarPosition } from "@/lib/api";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import {
   adToBS,
@@ -49,6 +58,22 @@ import { getZonedTimeParts } from "@/lib/zoned-time";
 import { SOLAR_STATIONS } from "@/lib/sky3d/sky-geometry";
 import { POLE_STARS } from "@/lib/sky3d/pole-stars";
 import {
+  SKY_BY_ID,
+  SKY_KINDS,
+  searchSky,
+  skyTargetsOfKind,
+  vedicStarTargets,
+  type SkyTarget,
+  type SkyTargetKind,
+} from "@/lib/sky3d/sky-catalogue";
+import {
+  localFavourites,
+  pushRecent,
+  putFavourites,
+  recents as readRecents,
+  syncFavourites,
+} from "@/lib/sky3d/sky-bookmarks";
+import {
   AakashGocharScene,
   type SceneToggles,
   type ScreenLabel,
@@ -57,10 +82,15 @@ import {
   type SkySample,
   type ViewState,
 } from "@/components/sky3d/AakashGocharScene";
+import { CompassControl } from "@/components/sky3d/CompassControl";
+import { useDeviceOrientation } from "@/lib/sky3d/device-orientation";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 const Scene = memo(AakashGocharScene);
 
 const CANVAS_BG = "#04090c";
+/** Degrees → radians, for the compass heading / device pitch → camera yaw / pitch. */
+const DEG_TO_RAD = Math.PI / 180;
 
 /**
  * Overlay label colours, applied inline.
@@ -132,10 +162,20 @@ const SYSTEM_DISTANCE = 26;
 const HORIZON_WIDE = 45;
 /** Default zoom in the Earth-globe view — frames the globe and its ring. */
 const GLOBE_VIEW = 78;
+/** Camera angles the horizon view opens on — behind you, low to the ground. */
+const HORIZON_YAW = Math.PI;
+const HORIZON_PITCH = 0.12;
 
 export type AakashGocharSkyProps = {
   /** Gochar rows for {@link date} — the API longitudes the model is pinned to. */
   gochar?: Record<string, GocharGraha>;
+  /**
+   * The named वैदिक तारा for {@link date} — server-computed sidereal positions,
+   * plotted as-is. Optional: older cached responses predate the field, and the
+   * search box degrades gracefully to just planets, nakshatra stars and
+   * asterisms without it.
+   */
+  vedicStars?: VedicStarPosition[];
   /**
    * The server's Lahiri ayanamsa for {@link date}, degrees — where the sidereal
    * zero stands against the equinox. The scene pins its own fit to it.
@@ -161,6 +201,7 @@ export type AakashGocharSkyProps = {
 
 export function AakashGocharSky({
   gochar,
+  vedicStars,
   ayanamsaDeg,
   date,
   onDateChange,
@@ -198,6 +239,11 @@ export function AakashGocharSky({
   /* Opens on the globe, so these have to match the framing the पृथ्वी गोला chip
      sets — otherwise the first frame is the space camera on a globe scene. */
   const view = useRef<ViewState>({ yaw: 0.6, pitch: 0.42, distance: GLOBE_VIEW });
+  /** Captured once at Canvas creation, so AR mode can clear to transparent
+      instead of {@link CANVAS_BG} and let the camera behind it show through. */
+  const glRef = useRef<{ setClearColor: (color: number | string, alpha?: number) => void } | null>(
+    null,
+  );
 
   const [mode, setMode] = useState<SkyMode>("globe");
   const [playing, setPlaying] = useState(true);
@@ -217,11 +263,156 @@ export function AakashGocharSky({
     poleStars: true,
     tilt: true,
     labels: true,
+    landscape: true,
   });
   /* Which overlay panel is open, if any. One at a time: both are anchored to
      the bottom of the canvas and would otherwise sit on top of each other. */
-  const [sheet, setSheet] = useState<"layers" | "focus" | null>(null);
+  const [sheet, setSheet] = useState<"layers" | "focus" | "search" | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+
+  /**
+   * The compass dial's own heading, degrees — 0 north, clockwise, same frame
+   * as the scene's az. Mirrors `view.current.yaw` in state only so the dial
+   * has something to re-render from; the ref stays the one the frame loop
+   * reads.
+   */
+  const [compassHeading, setCompassHeading] = useState(0);
+  const [arMode, setArMode] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const deviceOrientation = useDeviceOrientation(arMode);
+
+  const onCompassHeadingChange = useCallback((heading: number) => {
+    setCompassHeading(heading);
+    view.current.yaw = heading * DEG_TO_RAD;
+  }, []);
+
+  const toggleArMode = useCallback(() => {
+    setArMode((was) => {
+      const next = !was;
+      if (next) {
+        setMode("horizon");
+        if (!cameraPermission?.granted) void requestCameraPermission();
+      }
+      return next;
+    });
+  }, [cameraPermission, requestCameraPermission]);
+
+  // AR mode without the lens showing anything is just a worse manual dial —
+  // if the permission comes back denied, drop back out of it rather than
+  // leave the sky sensor-driven with a black rectangle where the camera
+  // should be.
+  useEffect(() => {
+    if (arMode && cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain) {
+      setArMode(false);
+    }
+  }, [arMode, cameraPermission]);
+
+  // The phone's own compass and tilt take the wheel while AR mode is on —
+  // the same `view.current` the manual drag gesture writes to the rest of
+  // the time, so the scene's camera code never has to know which one is
+  // live. `onSample` below picks the new yaw back up for the dial.
+  useEffect(() => {
+    if (!arMode) return;
+    if (deviceOrientation.headingDeg != null) {
+      view.current.yaw = deviceOrientation.headingDeg * DEG_TO_RAD;
+    }
+    if (deviceOrientation.pitchDeg != null) {
+      // Same clamp the manual drag gesture uses in this view — short of
+      // true vertical, where the yaw axis degenerates.
+      view.current.pitch = Math.min(1.45, Math.max(-1.45, deviceOrientation.pitchDeg * DEG_TO_RAD));
+    }
+  }, [arMode, deviceOrientation.headingDeg, deviceOrientation.pitchDeg]);
+
+  /** Camera passthrough only once the permission is actually granted — AR mode
+      alone would otherwise leave a black rectangle where the lens should be. */
+  const showCamera = arMode && Boolean(cameraPermission?.granted);
+
+  // Transparent clear so the camera behind the Canvas shows through; opaque
+  // otherwise. Toggled here rather than in `onCreated`, which only fires once.
+  useEffect(() => {
+    glRef.current?.setClearColor(CANVAS_BG, showCamera ? 0 : 1);
+  }, [showCamera]);
+  const [favourites, setFavourites] = useState<string[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  /**
+   * Where the camera has been asked to look, for anything that is not a graha.
+   *
+   * A graha already has a way to be centred — select it and turn on पछ्याउनुहोस्
+   * — but a star has no object in the scene to select. So a fixed target is
+   * passed down as a position and a nonce, and the scene aims at it the same
+   * way it aims at a followed graha, for one frame.
+   */
+  const [skyAim, setSkyAim] = useState<{ lon: number; lat: number; nonce: number } | null>(null);
+  /** What the reticle names, for the few seconds after a search pick lands. */
+  const [aimed, setAimed] = useState<SkyTarget | null>(null);
+  const { user } = useAuth();
+  const signedIn = !!user;
+
+  /* Load the on-device lists once, then pull the account's favourites down and
+     fold this device's in — same order the web signs in and merges. */
+  useEffect(() => {
+    let alive = true;
+    void readRecents().then((ids) => {
+      if (alive) setRecentIds(ids);
+    });
+    void syncFavourites(signedIn).then((ids) => {
+      if (alive) setFavourites(ids);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [signedIn]);
+
+  const toggleFavourite = useCallback(
+    (id: string) => {
+      setFavourites((current) => {
+        const next = current.includes(id)
+          ? current.filter((v) => v !== id)
+          : [...current, id];
+        void putFavourites(next, signedIn);
+        return next;
+      });
+    },
+    [signedIn],
+  );
+
+  const namedStars = useMemo(() => vedicStarTargets(vedicStars ?? []), [vedicStars]);
+  const [searchQuery, setSearchQuery] = useState("");
+  type SearchPane =
+    | { view: "home" }
+    | { view: "favourites" }
+    | { view: "recents" }
+    | { view: "browse" }
+    | { view: "kind"; kind: SkyTargetKind };
+  const [searchPane, setSearchPane] = useState<SearchPane>({ view: "home" });
+
+  /**
+   * A search result was chosen: put it in the middle and mark it.
+   *
+   * Grahas go through the path that already exists — select it and turn on
+   * पछ्याउनुहोस् — so the focus sheet and the graha's own card agree with what
+   * the camera is doing. Anything fixed is handed to the scene as a position
+   * instead. Either way it lands under the reticle.
+   */
+  const pickTarget = useCallback((target: SkyTarget) => {
+    setAimed(target);
+    void pushRecent(target.id).then(setRecentIds);
+    if (target.at === "graha") {
+      setSelectedKey(target.graha);
+      setToggles((t) => ({ ...t, lockCenter: true }));
+    } else {
+      setSkyAim({ lon: target.lon, lat: target.lat, nonce: Date.now() });
+    }
+    setSheet(null);
+  }, []);
+
+  // The reticle is a momentary confirmation, not a standing label — it clears
+  // itself so it never reads as a persistent lock indicator.
+  useEffect(() => {
+    if (!aimed) return;
+    const t = setTimeout(() => setAimed(null), 3000);
+    return () => clearTimeout(t);
+  }, [aimed]);
   /* Fullscreen only: the whole control row folds away to a single chevron, so
      the sky can have the entire screen when you just want to watch it. */
   const [controlsOpen, setControlsOpen] = useState(true);
@@ -272,17 +463,23 @@ export function AakashGocharSky({
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+  /** Same reasoning: the phone's own sensors own the camera in AR mode. */
+  const arModeRef = useRef(arMode);
+  useEffect(() => {
+    arModeRef.current = arMode;
+  }, [arMode]);
 
   const gestureStart = useRef({ yaw: 0, pitch: 0, distance: 0, pinch: 0 });
   const responder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_e, g) => Math.hypot(g.dx, g.dy) > 2,
+        onStartShouldSetPanResponder: () => !arModeRef.current,
+        onMoveShouldSetPanResponder: (_e, g) => !arModeRef.current && Math.hypot(g.dx, g.dy) > 2,
         onPanResponderGrant: () => {
           gestureStart.current = { ...view.current, pinch: 0 };
         },
         onPanResponderMove: (e, g) => {
+          if (arModeRef.current) return;
           const touches = e.nativeEvent.touches;
           if (touches.length >= 2) {
             const [a, b] = touches;
@@ -313,7 +510,15 @@ export function AakashGocharSky({
     [],
   );
 
-  const onSample = useCallback((next: SkySample) => setSample(next), []);
+  const onSample = useCallback((next: SkySample) => {
+    setSample(next);
+    // `view.current.yaw` is the one place camera facing actually lives —
+    // written by the canvas drag, the view chips, a search pick's one-shot
+    // aim, or (in AR mode) the device's own sensors. The dial just mirrors
+    // whichever of those moved it most recently, sampled at the same ~5/s
+    // cadence everything else reads the scene at.
+    setCompassHeading(normalizeDeg(view.current.yaw / DEG_TO_RAD));
+  }, []);
   /**
    * Tapping a graha in the sky toggles it; the focus sheet names one outright.
    *
@@ -533,6 +738,19 @@ export function AakashGocharSky({
         compact={fullscreen}
       />
       <Chip
+        active={mode === "horizon"}
+        label={pick("क्षितिज", "Horizon")}
+        onPress={() => {
+          setMode("horizon");
+          /* Standing at your own place here, so a graha-follow left over from
+             another view means nothing until you pick one again. */
+          setToggles((t) => (t.lockCenter && !selectedKey ? { ...t, lockCenter: false } : t));
+          view.current = { yaw: HORIZON_YAW, pitch: HORIZON_PITCH, distance: HORIZON_WIDE };
+        }}
+        overlay={fullscreen}
+        compact={fullscreen}
+      />
+      <Chip
         active={mode === "globe"}
         label={pick("पृथ्वी गोला", "Earth globe")}
         onPress={() => {
@@ -580,6 +798,21 @@ export function AakashGocharSky({
         compact={fullscreen}
       />
       <IconButton
+        name="search"
+        label={pick("आकाशमा खोज्नुहोस्", "Search the sky")}
+        active={sheet === "search"}
+        overlay={fullscreen}
+        compact={fullscreen}
+        onPress={() =>
+          setSheet((v) => {
+            if (v === "search") return null;
+            setSearchQuery("");
+            setSearchPane({ view: "home" });
+            return "search";
+          })
+        }
+      />
+      <IconButton
         name="layers"
         label={pick("तह", "Layers")}
         active={sheet === "layers"}
@@ -609,7 +842,11 @@ export function AakashGocharSky({
     >
       <SheetSection heading={pick("मार्गदर्शक", "Guides")}>
         {sheetChip("grid", pick("ग्रिड", "Grid"))}
-        {sheetChip("primeMeridian", pick("काठमाडौँ रेखा", "Kathmandu meridian"))}
+        {mode === "horizon" ? sheetChip("landscape", pick("भूभाग", "Landscape")) : null}
+        {/* The meridian is a line drawn on a globe seen from outside it —
+            अन्तरिक्ष and पृथ्वी गोला. Standing on the dome in क्षितिज, you are
+            on that line, so the scene never draws one there. */}
+        {mode === "horizon" ? null : sheetChip("primeMeridian", pick("काठमाडौँ रेखा", "Kathmandu meridian"))}
         {sheetChip("asterisms", pick("तारापुञ्ज", "Star groups"))}
         {mode !== "space" ? sheetChip("poleStars", pick("ध्रुव तारा", "Pole stars")) : null}
         {mode === "globe" ? sheetChip("tilt", pick("अक्ष झुकाव", "Tilt")) : null}
@@ -617,7 +854,7 @@ export function AakashGocharSky({
       <SheetSection heading={pick("वलय", "Belts")}>
         {sheetChip("rashiBelt", pick("राशि", "Rashi"))}
         {sheetChip("nakshatraBelt", pick("नक्षत्र", "Nakshatra"))}
-        {sheetChip("monthRing", pick("महिना", "Months"))}
+        {mode === "horizon" ? null : sheetChip("monthRing", pick("महिना", "Months"))}
       </SheetSection>
     </OverlaySheet>
   );
@@ -674,13 +911,224 @@ export function AakashGocharSky({
     </OverlaySheet>
   );
 
+  /**
+   * The sky search: a box that finds anything nameable and puts it in the
+   * middle of the screen.
+   *
+   * Ported from the web's `SkySearch.tsx`, as a sheet rather than a floating
+   * panel — same three shortcuts and browse tree when nothing is typed, same
+   * prefix-then-contains match once it is. `namedStars` widens both once the
+   * server sends `vedic_stars`; until then the catalogue's planets, nakshatra
+   * stars and asterisms already cover most of what a reader types.
+   */
+  const searchResults = useMemo(
+    () => searchSky(searchQuery, 40, namedStars),
+    [searchQuery, namedStars],
+  );
+  const favouritedSet = useMemo(() => new Set(favourites), [favourites]);
+  const searchById = useMemo(() => {
+    const map = new Map(SKY_BY_ID);
+    for (const t of namedStars) map.set(t.id, t);
+    return map;
+  }, [namedStars]);
+  const searchName = (t: SkyTarget) => pick(t.ne, t.en);
+  const searchHint = (t: SkyTarget) =>
+    t.hintNe || t.hintEn ? pick(t.hintNe ?? "", t.hintEn ?? "") : "";
+
+  const searchRow = (t: SkyTarget) => (
+    <View key={t.id} className="flex-row items-center gap-1">
+      <Pressable
+        onPress={() => pickTarget(t)}
+        className="min-w-0 flex-1 flex-row items-baseline gap-2 rounded-lg px-2.5 py-2 active:bg-white/10"
+      >
+        <Text
+          numberOfLines={1}
+          className="shrink text-sm font-semibold text-white/90"
+          style={nepaliTextStyle(13)}
+        >
+          {searchName(t)}
+        </Text>
+        {searchHint(t) ? (
+          <Text numberOfLines={1} className="shrink text-[11px] text-white/45">
+            {searchHint(t)}
+          </Text>
+        ) : null}
+      </Pressable>
+      <Pressable
+        onPress={() => toggleFavourite(t.id)}
+        accessibilityLabel={pick("पसन्दमा राख्नुहोस्", "Favourite")}
+        className="h-7 w-7 items-center justify-center rounded-lg active:bg-white/10"
+      >
+        <Ionicons
+          name={favouritedSet.has(t.id) ? "star" : "star-outline"}
+          size={15}
+          color={favouritedSet.has(t.id) ? "#fcd34d" : "rgba(255,255,255,0.35)"}
+        />
+      </Pressable>
+    </View>
+  );
+
+  const searchShortcut = (
+    key: string,
+    icon: keyof typeof Ionicons.glyphMap,
+    label: string,
+    count: number | null,
+    onPress: () => void,
+  ) => (
+    <Pressable
+      key={key}
+      onPress={onPress}
+      className="flex-row items-center gap-2.5 rounded-lg px-2.5 py-2 active:bg-white/10"
+    >
+      <Ionicons name={icon} size={16} color="rgba(255,255,255,0.6)" />
+      <Text className="flex-1 text-sm font-semibold text-white/80" style={nepaliTextStyle(13)}>
+        {label}
+      </Text>
+      {count !== null ? (
+        <Text className="text-xs text-white/45">{digits(String(count))}</Text>
+      ) : null}
+      <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.4)" />
+    </Pressable>
+  );
+
+  const searchBack = (label: string, to: SearchPane) => (
+    <Pressable
+      onPress={() => setSearchPane(to)}
+      className="mb-1 flex-row items-center gap-1 self-start px-1 py-1"
+    >
+      <Ionicons name="chevron-back" size={13} color="rgba(255,255,255,0.45)" />
+      <Text
+        className="text-[10px] font-bold uppercase tracking-wide"
+        style={[nepaliTextStyle(10), { color: "rgba(255,255,255,0.45)" }]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+
+  const searchPaneRows = (): { rows: SkyTarget[]; empty: string } => {
+    switch (searchPane.view) {
+      case "favourites":
+        return {
+          rows: favourites.map((id) => searchById.get(id)).filter((t): t is SkyTarget => !!t),
+          empty: pick("अझै कुनै मनपर्ने छैन", "No favourites yet"),
+        };
+      case "recents":
+        return {
+          rows: recentIds.map((id) => searchById.get(id)).filter((t): t is SkyTarget => !!t),
+          empty: pick("अझै केही हेरिएको छैन", "Nothing looked at yet"),
+        };
+      case "kind":
+        return { rows: skyTargetsOfKind(searchPane.kind, namedStars), empty: "" };
+      default:
+        return { rows: [], empty: "" };
+    }
+  };
+
+  const searchSheet = (
+    <OverlaySheet
+      title={pick("आकाशमा खोज्नुहोस्", "Search the sky")}
+      onClose={() => setSheet(null)}
+      maxHeight={canvasHeight * 0.85}
+    >
+      <View className="flex-row items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1">
+        <Ionicons name="search" size={15} color="rgba(255,255,255,0.5)" />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={pick("ग्रह, तारा, नक्षत्र…", "Planet, star, constellation…")}
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          autoFocus
+          className="min-w-0 flex-1 py-1.5 text-sm font-semibold text-white"
+          style={nepaliTextStyle(13)}
+        />
+        {searchQuery ? (
+          <Pressable
+            onPress={() => setSearchQuery("")}
+            accessibilityLabel={pick("खाली गर्नुहोस्", "Clear")}
+            className="h-5 w-5 items-center justify-center"
+          >
+            <Ionicons name="close" size={14} color="rgba(255,255,255,0.45)" />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {searchQuery.trim() ? (
+        searchResults.length ? (
+          <View>{searchResults.map(searchRow)}</View>
+        ) : (
+          <Text className="px-2.5 py-3 text-center text-xs text-white/45">
+            {pick("केही भेटिएन", "Nothing found")}
+          </Text>
+        )
+      ) : searchPane.view === "home" ? (
+        <View>
+          {searchShortcut(
+            "favourites",
+            "star-outline",
+            pick("मनपर्ने", "Favourites"),
+            favourites.length,
+            () => setSearchPane({ view: "favourites" }),
+          )}
+          {searchShortcut(
+            "recents",
+            "time-outline",
+            pick("हालैको", "Recents"),
+            recentIds.length,
+            () => setSearchPane({ view: "recents" }),
+          )}
+          {searchShortcut("browse", "list-outline", pick("सूची", "Browse"), null, () =>
+            setSearchPane({ view: "browse" }),
+          )}
+        </View>
+      ) : searchPane.view === "browse" ? (
+        <View>
+          {searchBack(pick("पछाडि", "Back"), { view: "home" })}
+          {SKY_KINDS.map((k) =>
+            searchShortcut(
+              k.kind,
+              "list-outline",
+              pick(k.ne, k.en),
+              skyTargetsOfKind(k.kind, namedStars).length,
+              () => setSearchPane({ view: "kind", kind: k.kind }),
+            ),
+          )}
+        </View>
+      ) : (
+        <View>
+          {searchBack(
+            pick("पछाडि", "Back"),
+            searchPane.view === "kind" ? { view: "browse" } : { view: "home" },
+          )}
+          {(() => {
+            const { rows, empty } = searchPaneRows();
+            return rows.length ? (
+              rows.map(searchRow)
+            ) : (
+              <Text className="px-2.5 py-3 text-center text-xs text-white/45">{empty}</Text>
+            );
+          })()}
+        </View>
+      )}
+    </OverlaySheet>
+  );
+
   const body = (
     <View className={fullscreen ? "flex-1 bg-background" : "overflow-hidden rounded-2xl border border-border"}>
       <View style={{ height: canvasHeight, backgroundColor: CANVAS_BG }} {...responder.panHandlers}>
+        {/* AR mode's backdrop: the real world, behind a transparently-cleared
+            Canvas. Absolute rather than a sibling, so the GL surface layers
+            directly on top of it rather than the two competing for the same
+            box in a row. */}
+        {showCamera ? (
+          <CameraView style={{ position: "absolute", inset: 0 }} facing="back" />
+        ) : null}
         <Canvas
           camera={{ position: [0, 14, 22], fov: 50, near: 0.05, far: 1200 }}
-          gl={{ antialias: true }}
-          onCreated={({ gl }) => gl.setClearColor(CANVAS_BG)}
+          gl={{ antialias: true, alpha: true }}
+          onCreated={({ gl }) => {
+            glRef.current = gl;
+          }}
         >
           <Suspense fallback={null}>
             <Scene
@@ -694,9 +1142,21 @@ export function AakashGocharSky({
               toggles={toggles}
               onSelect={onSelect}
               onSample={onSample}
+              skyAim={skyAim}
+              arBackground={showCamera}
             />
           </Suspense>
         </Canvas>
+
+        {/* Bottom-centre, over the canvas: drag it to turn the sky, double-tap
+            for AR. See {@link CompassControl}. */}
+        <CompassControl
+          heading={compassHeading}
+          onHeadingChange={onCompassHeadingChange}
+          arMode={arMode}
+          onToggleArMode={toggleArMode}
+          visible={mode === "horizon"}
+        />
 
         {/* Labels ride over the canvas rather than in it — real Devanagari type,
             positioned from the scene's own projection of each anchor. */}
@@ -805,6 +1265,34 @@ export function AakashGocharSky({
 
         {sheet === "layers" ? layersSheet : null}
         {sheet === "focus" ? focusSheet : null}
+        {sheet === "search" ? searchSheet : null}
+
+        {/* The reticle: what the camera has just been aimed at, named for the
+            few seconds after a search pick lands. Four ticks with the middle
+            left open, so the mark never covers the thing it names. */}
+        {aimed ? (
+          <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
+            <View
+              className="items-center justify-center rounded-full border"
+              style={{ width: 48, height: 48, borderColor: "rgba(252,211,77,0.5)" }}
+            >
+              <Text
+                className="absolute whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold"
+                style={[
+                  nepaliTextStyle(11),
+                  {
+                    top: 56,
+                    color: "#fef3c7",
+                    borderColor: "rgba(252,211,77,0.4)",
+                    backgroundColor: "rgba(0,0,0,0.7)",
+                  },
+                ]}
+              >
+                {lang === "en" ? aimed.en : aimed.ne}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {/* Floating over the canvas, this panel is always dark glass — so it runs
