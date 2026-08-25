@@ -21,17 +21,22 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, "svg"],
 };
 
-// ── Dev-only API proxy (web) ──────────────────────────────────────────────
-// The production API returns no CORS headers, so the mobile *web* build (served
-// from localhost) can't read it cross-origin. Forward same-origin `/api/*` from
-// the Metro dev server to production — the same trick the web app's Vite dev
-// server uses. Native apps ignore CORS and hit the real host directly, so they
+// ── Dev-only API/asset proxy (web) ────────────────────────────────────────
+// The production host returns no CORS headers, so the mobile *web* build
+// (served from localhost) can't read it cross-origin — true for the JSON API
+// and, the same way, for the static HiPS sky tiles under `/sky3d/`, which
+// three.js's TextureLoader uploads to WebGL and the browser refuses to do
+// cross-origin without an Access-Control-Allow-Origin header. Forward both
+// same-origin from the Metro dev server to production — the same trick the
+// web app's Vite dev server uses. Native apps ignore CORS and hit the real
+// host directly (see `lib/sky3d/hips.ts`'s own `HIPS_BASE_URL`), so they
 // never touch this.
 const API_PROXY_HOST = "www.vedicpatro.com";
+const PROXIED_PATH_PREFIXES = ["/api/", "/sky3d/"];
 config.server = {
   ...config.server,
   enhanceMiddleware: (middleware) => (req, res, next) => {
-    if (req.url && req.url.startsWith("/api/")) {
+    if (req.url && PROXIED_PATH_PREFIXES.some((p) => req.url.startsWith(p))) {
       const headers = { ...req.headers, host: API_PROXY_HOST };
       // Strip localhost origin/referer so the upstream/edge doesn't reject them.
       delete headers.origin;

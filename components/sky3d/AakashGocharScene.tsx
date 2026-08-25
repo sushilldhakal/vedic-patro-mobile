@@ -85,6 +85,22 @@ import {
 import { buildHorizonTerrain, terrainSeed } from "@/lib/sky3d/terrain";
 import { makeEarthMaterial } from "@/lib/sky3d/earth-material";
 import { makeMoonMaterial, type MoonMaterial } from "@/lib/sky3d/moon-material";
+import {
+  ensureHipsTile,
+  evictHipsTiles,
+  findReadyHipsAncestor,
+  ensureHipsFallbackTexture,
+  getHipsSiblings,
+  hipsTileCount,
+  hipsTileKey,
+  hipsTileNeedsLoad,
+  hipsTilePriority,
+  loadHipsTileTexture,
+  nextHipsFrame,
+  HIPS_MAX_LOCAL_ORDER,
+  type HipsTileEntry,
+} from "@/lib/sky3d/hips";
+import { evaluateHipsTiles, type HipsLodFrame, type HipsLodLeaf } from "@/lib/sky3d/hips-lod";
 
 /** Belt radii in space view — the nakshatra ring sits just outside the rashi ring. */
 export const RASHI_INNER = 9.0;
@@ -828,6 +844,182 @@ function labelsMoved(prev: ScreenLabel[], next: ScreenLabel[]): boolean {
   return false;
 }
 
+/**
+ * The Milky Way panorama's own geometry, built straight from real J2000
+ * equatorial coordinates rather than THREE's generic sphere UVs — a
+ * line-for-line port of the web app's own `makeMilkyWayGeometry`
+ * (`src/components/sky3d/AakashGocharScene.tsx`). See that file's doc
+ * comment for the derivation: `longitudeDeg = 90 - ra` computed straight
+ * from `ra` avoids `atan2`'s forced (-π, π] wrap landing mid-mesh and
+ * smearing a column of the texture, and the missing "+ 0.5" is deliberate —
+ * checked against `milkyway.png` itself, not guessed.
+ */
+function makeMilkyWayGeometry(radius: number, widthSeg = 96, heightSeg = 48) {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let iy = 0; iy <= heightSeg; iy += 1) {
+    const dec = 90 - (iy / heightSeg) * 180;
+    const decRad = dec * DEG;
+    for (let ix = 0; ix <= widthSeg; ix += 1) {
+      const ra = (ix / widthSeg) * 360;
+      const raRad = ra * DEG;
+      const x = Math.cos(decRad) * Math.cos(raRad);
+      const y = Math.cos(decRad) * Math.sin(raRad);
+      const z = Math.sin(decRad);
+      positions.push(x * radius, y * radius, z * radius);
+      const zenithAngle = Math.acos(-z);
+      const longitudeDeg = 90 - ra;
+      uvs.push(longitudeDeg / 360, zenithAngle / Math.PI);
+    }
+  }
+  for (let iy = 0; iy < heightSeg; iy += 1) {
+    for (let ix = 0; ix < widthSeg; ix += 1) {
+      const a = iy * (widthSeg + 1) + ix;
+      const b = a + widthSeg + 1;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  return geometry;
+}
+
+/**
+ * Equatorial J2000 → the current alt-az scene frame, as a rotation — the
+ * same hour-angle-then-latitude composition `horizon.ts`'s own
+ * `equatorialToAltAz` already does one point at a time, derived here as a
+ * single matrix so the whole Milky Way sphere (and the HiPS tile group
+ * riding the same rotation) turns by it at once. Byte-identical port of the
+ * web app's own function of the same name.
+ */
+function equatorialToHorizonMatrix(lstDegrees: number, latDeg: number): THREE.Matrix4 {
+  const lst = lstDegrees * DEG;
+  const lat = latDeg * DEG;
+  const sinLst = Math.sin(lst);
+  const cosLst = Math.cos(lst);
+  const sinLat = Math.sin(lat);
+  const cosLat = Math.cos(lat);
+  const m = new THREE.Matrix4();
+  // prettier-ignore
+  m.set(
+    -sinLst,          cosLst,          0,       0,
+    cosLst * cosLat,  sinLst * cosLat, sinLat,  0,
+    cosLst * sinLat,  sinLst * sinLat, -cosLat, 0,
+    0,                0,               0,       1,
+  );
+  return m;
+}
+
+/**
+ * Real MilkyWay.cpp's own light-pollution correction is `1.1 -
+ * bortleIntensity * 0.1`; `HIPS_BORTLE = 2` is a fixed stand-in for the dark
+ * rural site this feature is framed around (this app has no live sky-glow
+ * model), same value and same reasoning as the web app's own constant.
+ */
+const HIPS_BORTLE = 2;
+const HIPS_BORTLE_FACTOR = 1.1 - HIPS_BORTLE * 0.1;
+
+/**
+ * Dims the panorama toward the horizon the way real atmospheric extinction
+ * does — Young (1994)'s fit, mirrored around the horizon (`abs(cosZ)`) so a
+ * dome with no ground at a wide field doesn't clip the "underground"
+ * direction into a sign-flipped brighten. Byte-identical port of the web
+ * app's own `injectMilkyWayExtinction`; see that function's doc comment for
+ * the full derivation of both the mirroring and the fixed Bortle stand-in.
+ */
+function injectMilkyWayExtinction(material: THREE.MeshBasicMaterial): void {
+  if (material.userData.extinction) return;
+  material.userData.extinction = true;
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    prev?.(shader, renderer);
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vSinAlt;")
+      .replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvSinAlt = normalize(mat3(modelMatrix) * position).y;",
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+varying float vSinAlt;
+float milkyWayAirmass(float cosZ) {
+  float z = abs(cosZ);
+  float nom = (1.002432 * z + 0.148386) * z + 0.0096467;
+  float denom = ((z + 0.149864) * z + 0.0102963) * z + 0.000303978;
+  return nom / denom;
+}`,
+      )
+      .replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+{
+  float mag = milkyWayAirmass(vSinAlt) * 0.2;
+  diffuseColor.rgb *= pow(0.3, mag) * ${HIPS_BORTLE_FACTOR};
+}`,
+      );
+  };
+  const prevKey = material.customProgramCacheKey;
+  material.customProgramCacheKey = () => `${prevKey.call(material)}|milkyway-extinction-v1`;
+  material.needsUpdate = true;
+}
+
+/**
+ * The HiPS Milky Way tile sphere's own radius — just inside the panorama
+ * sphere's 400, so the real DSS2 tiles draw in front of the low-resolution
+ * panorama without z-fighting (both have `depthTest` off, so draw order —
+ * {@link HIPS_RENDER_ORDER} — is what actually decides the front/back
+ * relationship, not this number).
+ */
+const HIPS_RADIUS = 398;
+/** Grid density each tile's geometry is subdivided to — see `hips.ts`'s own `buildHipsTileGeometry` doc comment for why a flat quad is not enough. */
+const HIPS_TILE_SUBDIVISIONS = 16;
+/** Draws just behind the panorama's own `renderOrder={-1}` skybox pass. */
+const HIPS_RENDER_ORDER = -0.55;
+/** How many tile meshes (any state) the cache keeps resident before the LRU pass starts reclaiming — see `hips.ts`'s own `evictHipsTiles`. */
+const HIPS_CACHE_MAX_RESIDENT = 400;
+/** How long a freshly-arrived tile takes to ramp from {@link HIPS_FADE_IN_START} to full opacity. */
+const HIPS_FADE_IN_MS = 220;
+const HIPS_FADE_IN_START = 0.55;
+
+/** `smoothstep(edge0, edge1, x)` — GLSL's own, for the same two-layer cross-fade the web app's `AakashGocharScene.tsx` uses between the panorama and the real HiPS tiles. */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * The two-layer cross-fade's own field-of-view band — same values as the
+ * web app: `START(80) > END(30)`, so `smoothstep(START, END, fov)` falls
+ * from 1 to 0 as `fov` *grows*, landing HiPS at full strength once the
+ * field has narrowed past {@link HIPS_BLEND_END_FOV} and handing back to
+ * the panorama entirely above {@link HIPS_BLEND_START_FOV}. This app's own
+ * क्षितिज camera tops out at 160° rather than the web dome's 235°, but both
+ * numbers sit well inside that range either way, so nothing here needed
+ * rescaling for the port.
+ */
+const HIPS_BLEND_START_FOV = 80;
+const HIPS_BLEND_END_FOV = 30;
+
+const hipsForwardWorld = new THREE.Vector3();
+const hipsInvQuat = new THREE.Quaternion();
+const hipsDirEquatorial = new THREE.Vector3();
+const hipsLodLeaves: HipsLodLeaf[] = [];
+const hipsLoadCandidates: { entry: HipsTileEntry; priority: number }[] = [];
+const hipsTouchedKeys = new Set<string>();
+const hipsLodFrame: HipsLodFrame = {
+  camera: null as unknown as THREE.Camera,
+  groupQuaternion: new THREE.Quaternion(),
+  groupPosition: new THREE.Vector3(),
+  radius: 0,
+  width: 0,
+  height: 0,
+};
+
 export function AakashGocharScene({
   sim,
   view,
@@ -880,6 +1072,47 @@ export function AakashGocharScene({
     });
     return map;
   }, [loaded]);
+
+  /**
+   * The panorama's own texture, configured the same way the web app's
+   * `milkyWayRaw`/`milkyWay` pair is: `wrapS` repeats so
+   * {@link makeMilkyWayGeometry}'s own U can run smoothly past 0 and 1
+   * without smearing the seam, `wrapT` clamps so the poles don't stack
+   * repeated copies of the band. Anisotropic filtering is skipped —
+   * `gl.capabilities.getMaxAnisotropy` needs `useThree()`'s renderer handle,
+   * which nothing else in this scene reaches for, and mipmapped linear
+   * filtering alone is close enough at the sizes this sphere is ever seen.
+   */
+  const milkyWay = useMemo(() => {
+    const tex = textures.milkyway;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.repeat.set(1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }, [textures]);
+  const milkyWayGeometry = useMemo(() => makeMilkyWayGeometry(400), []);
+  const milkyWayMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  useEffect(() => {
+    if (milkyWayMatRef.current) injectMilkyWayExtinction(milkyWayMatRef.current);
+  }, []);
+  /** A flat lift over the panorama's own exposure — same value and reasoning as the web app's own `skyBoost`. */
+  const skyBoost = useMemo(() => new THREE.Color(0.9, 0.9, 0.9), []);
+
+  /**
+   * The HiPS Milky Way — real DSS2 tiles standing in for the panorama once
+   * the field has narrowed past {@link HIPS_BLEND_START_FOV}. `hipsCache`
+   * holds every tile mesh ever created for the life of the component,
+   * reclaimed by `hips.ts`'s own LRU eviction once it exceeds {@link
+   * HIPS_CACHE_MAX_RESIDENT} — see that module's own doc comments; this is
+   * the same design as the web app's own `hipsGroupRef`/`hipsCache`.
+   */
+  const hipsGroupRef = useRef<THREE.Group | null>(null);
+  const hipsCache = useRef(new Map<string, HipsTileEntry>());
 
   /**
    * अन्तरिक्ष's Earth, shaded by its own terminator shader rather than lit —
@@ -1945,6 +2178,161 @@ export function AakashGocharScene({
 
     frame.current += 1;
 
+    /* ── milky way panorama + HiPS tiles ───────────────────────────────
+       Port of the web app's own panorama-recentre / HiPS block. `cam.fov`
+       already holds this frame's field — every branch of the camera
+       section above sets it — so it stands in directly for the web
+       version's separately-computed `fovForZoom(mode, …)`/`closeField`. */
+    if (starsRef.current) {
+      /* Re-centred on the camera every frame, same reasoning as the web
+         app's own copy of this mesh: every point of the sky stays
+         equidistant regardless of where inside the dome/globe/space camera
+         happens to sit. */
+      starsRef.current.position.copy(state.camera.position);
+      starsRef.current.visible = !arBackground;
+      if (horizon) {
+        starsRef.current.quaternion.setFromRotationMatrix(equatorialToHorizonMatrix(lst, observer.lat));
+      } else {
+        starsRef.current.quaternion.identity();
+      }
+    }
+    const hipsFov = cam.fov;
+    const hipsVisibility = smoothstep(HIPS_BLEND_START_FOV, HIPS_BLEND_END_FOV, hipsFov);
+    const hipsOn = horizon && !arBackground && hipsFov <= HIPS_BLEND_START_FOV;
+    if (hipsGroupRef.current) {
+      if (horizon) {
+        hipsGroupRef.current.quaternion.setFromRotationMatrix(equatorialToHorizonMatrix(lst, observer.lat));
+      } else {
+        hipsGroupRef.current.quaternion.identity();
+      }
+      hipsGroupRef.current.position.copy(state.camera.position);
+      hipsGroupRef.current.visible = hipsOn;
+    }
+
+    if (hipsOn && hipsGroupRef.current) {
+      const group = hipsGroupRef.current;
+      const width = state.size.width;
+      const height = state.size.height;
+
+      /* Half-angle from view centre to the frame's own corner — this
+         camera's real `PerspectiveCamera.fov`/aspect stand in for the web
+         dome's own `horizonViewWindow().cone`, which had to derive the
+         same number by hand for its custom stereographic map. */
+      const vFovHalfRad = (cam.fov * DEG) / 2;
+      const aspect = width / Math.max(height, 1);
+      const halfH = Math.tan(vFovHalfRad);
+      const halfW = halfH * aspect;
+      const coneDeg = Math.min(179, (Math.atan(Math.hypot(halfW, halfH)) * 180) / Math.PI);
+
+      hipsForwardWorld.set(0, 0, -1).applyQuaternion(state.camera.quaternion);
+      hipsInvQuat.copy(group.quaternion).invert();
+      hipsDirEquatorial.copy(hipsForwardWorld).applyQuaternion(hipsInvQuat);
+
+      const hFrame = nextHipsFrame();
+      hipsLoadCandidates.length = 0;
+      hipsTouchedKeys.clear();
+
+      const queueLoad = (entry: HipsTileEntry, order: number, pix: number) => {
+        hipsTouchedKeys.add(hipsTileKey(order, pix));
+        if (hipsTileNeedsLoad(entry)) {
+          hipsLoadCandidates.push({ entry, priority: hipsTilePriority(order, pix, hipsDirEquatorial) });
+        }
+      };
+
+      /* Order 0 is the whole sky in 12 tiles — cheap enough to always have
+         requested as a guaranteed fallback floor, rather than only reaching
+         for it once a multi-level gap actually happens. */
+      for (let pix0 = 0; pix0 < hipsTileCount(0); pix0 += 1) {
+        const entry0 = ensureHipsTile(hipsCache.current, 0, pix0, HIPS_RADIUS, HIPS_TILE_SUBDIVISIONS, hFrame);
+        queueLoad(entry0, 0, pix0);
+      }
+
+      hipsLodFrame.camera = state.camera;
+      hipsLodFrame.groupQuaternion = group.quaternion;
+      hipsLodFrame.groupPosition = group.position;
+      hipsLodFrame.radius = HIPS_RADIUS;
+      hipsLodFrame.width = width;
+      hipsLodFrame.height = height;
+
+      const onVisit = (order: number, pix: number) => {
+        const entry = ensureHipsTile(hipsCache.current, order, pix, HIPS_RADIUS, HIPS_TILE_SUBDIVISIONS, hFrame);
+        queueLoad(entry, order, pix);
+      };
+
+      evaluateHipsTiles(hipsLodFrame, hipsDirEquatorial, coneDeg, HIPS_MAX_LOCAL_ORDER, onVisit, hipsLodLeaves);
+
+      /* Highest priority — closest to view centre — claims the
+         concurrency-capped load slots first; `loadHipsTileTexture` no-ops
+         past the cap on its own. */
+      hipsLoadCandidates.sort((a, b) => b.priority - a.priority);
+      for (const { entry } of hipsLoadCandidates) loadHipsTileTexture(entry);
+
+      /* Low-priority prefetch: every current leaf's own siblings, only
+         after every real candidate above has already had first claim on
+         this frame's load slots. */
+      for (const { order, pix } of hipsLodLeaves) {
+        for (const [so, sp] of getHipsSiblings(order, pix)) {
+          const sibling = ensureHipsTile(hipsCache.current, so, sp, HIPS_RADIUS, HIPS_TILE_SUBDIVISIONS, hFrame);
+          hipsTouchedKeys.add(hipsTileKey(so, sp));
+          if (hipsTileNeedsLoad(sibling)) loadHipsTileTexture(sibling);
+        }
+      }
+
+      const neededLeaves = new Set<string>();
+      for (const { order, pix } of hipsLodLeaves) {
+        neededLeaves.add(hipsTileKey(order, pix));
+        const entry = ensureHipsTile(hipsCache.current, order, pix, HIPS_RADIUS, HIPS_TILE_SUBDIVISIONS, hFrame);
+        if (entry.mesh.parent !== group) group.add(entry.mesh);
+        entry.mesh.renderOrder = HIPS_RENDER_ORDER;
+        if (entry.state === "ready") {
+          entry.mesh.visible = true;
+          /* Ramp opacity up from HIPS_FADE_IN_START over HIPS_FADE_IN_MS
+             after this tile's own real texture arrived, instead of an
+             instant swap from whatever ancestor quarter was standing in. */
+          const fadeT =
+            entry.readyAt !== null ? Math.min(1, (performance.now() - entry.readyAt) / HIPS_FADE_IN_MS) : 1;
+          entry.material.opacity = hipsVisibility * (HIPS_FADE_IN_START + (1 - HIPS_FADE_IN_START) * fadeT);
+        } else {
+          /* Parent fallback: show this tile's own (correctly HEALPix-
+             curved) geometry with the nearest already-loaded ancestor's
+             texture, cropped to the right quadrant, rather than leaving a
+             hole while its own tile is still in flight. */
+          const ancestor = findReadyHipsAncestor(hipsCache.current, order, pix);
+          if (ancestor?.material.map) {
+            const fallbackTex = ensureHipsFallbackTexture(entry, ancestor.material.map, ancestor.order);
+            if (entry.material.map !== fallbackTex) {
+              entry.material.map = fallbackTex;
+              entry.material.needsUpdate = true;
+            }
+            entry.mesh.visible = true;
+            entry.material.opacity = hipsVisibility;
+          } else {
+            entry.mesh.visible = false;
+          }
+        }
+      }
+
+      // Hide every cached tile that isn't one of this frame's leaves.
+      for (const entry of hipsCache.current.values()) {
+        if (!neededLeaves.has(hipsTileKey(entry.order, entry.pix))) entry.mesh.visible = false;
+      }
+
+      evictHipsTiles(hipsCache.current, hipsTouchedKeys, HIPS_CACHE_MAX_RESIDENT);
+    }
+
+    /* Concept A: the near-zoom blur fade, unrelated to HiPS — even with the
+       real tiles never in the picture this panorama still wants to fade
+       out once a press has pulled in far enough that its own 2048×1024
+       texels are showing.
+       Concept B: the panorama's own half of the two-layer cross-fade, the
+       complement of `hipsVisibility` — kept as its own separate multiplier
+       since the two fade the panorama out for entirely different reasons,
+       and only one of them exists outside क्षितिज. */
+    const [fadeLo, fadeHi] = globe ? [1.5, 4] : [1, 4];
+    const panoramaHipsFade = horizon && !arBackground ? 1 - hipsVisibility : 1;
+    const skyFade = Math.max(0, Math.min(1, (hipsFov - fadeLo) / (fadeHi - fadeLo)));
+    if (milkyWayMatRef.current) milkyWayMatRef.current.opacity = skyFade * panoramaHipsFade;
+
     /* ── trails ─────────────────────────────────────────────────────── */
     /* Nine paths of ninety points is far too much orbital arithmetic for one
        frame — done together it drops a frame every time the epoch turns over,
@@ -2042,10 +2430,37 @@ export function AakashGocharScene({
       {/* A hint of fill so the night side is shape rather than a hole. */}
       <directionalLight position={[0, 12, 0]} intensity={0.1} />
 
-      <mesh ref={starsRef} visible={!arBackground}>
-        <sphereGeometry args={[400, 48, 48]} />
-        <meshBasicMaterial map={textures.background} side={THREE.BackSide} transparent />
+      {/* The painterly Milky Way panorama — real J2000 geometry so it turns
+          with the sky (see `equatorialToHorizonMatrix` in the per-frame
+          block) rather than sitting glued to the camera. `renderOrder={-1}`
+          plus `depthTest={false}` is the standard skybox recipe: drawn
+          first, behind everything, without needing the far plane's own
+          precision. Additive blending lets the star points sitting in
+          front of it glow through the band, the same reasoning the web
+          app's own copy of this mesh documents. */}
+      <mesh ref={starsRef} visible={!arBackground} renderOrder={-1}>
+        <primitive object={milkyWayGeometry} attach="geometry" />
+        <meshBasicMaterial
+          ref={milkyWayMatRef}
+          map={milkyWay}
+          side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          transparent
+          depthWrite={false}
+          depthTest={false}
+          color={skyBoost}
+          toneMapped={false}
+        />
       </mesh>
+
+      {/* HiPS Milky Way tile layer — an independent group of real DSS2 tile
+          patches, riding the same equatorial→horizon rotation the panorama
+          sphere above uses. Tiles are not JSX children: the visible set
+          changes every frame as the camera moves, so they are added/removed
+          imperatively from the `hipsCache` Map in the per-frame block,
+          keyed by `order/pix` so a tile already downloaded is never
+          re-fetched — same design as the web app's own `hipsGroupRef`. */}
+      <group ref={hipsGroupRef} />
 
       {/* Space view: the Earth itself, tilted by the obliquity of the ecliptic. */}
       <group ref={earthGroupRef} rotation={[0, 0, 23.44 * DEG]}>

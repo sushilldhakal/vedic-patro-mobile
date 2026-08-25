@@ -21,7 +21,7 @@ const MODULES = {
   jupiter: require("@/assets/sky3d/jupiter.jpg"),
   saturn: require("@/assets/sky3d/saturn.jpg"),
   saturnring: require("@/assets/sky3d/saturnring.jpg"),
-  background: require("@/assets/sky3d/background.jpg"),
+  milkyway: require("@/assets/sky3d/milkyway.png"),
 } as const;
 
 export type SkyTextureKey = keyof typeof MODULES;
