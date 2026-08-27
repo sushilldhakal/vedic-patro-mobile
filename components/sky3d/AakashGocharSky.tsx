@@ -2625,7 +2625,7 @@ const SkyLabels = memo(function SkyLabels({
             <Text
               key={label.id}
               style={[
-                { position: "absolute", left: label.x - 65, top: label.y + 8, width: 130, textAlign: "center", color: LABEL_COLOR.vedicStar },
+                { position: "absolute", left: label.x - 65, top: label.y + (label.clear ?? 8), width: 130, textAlign: "center", color: LABEL_COLOR.vedicStar },
                 nepaliTextStyle(11),
               ]}
               className="text-[11px] font-semibold"
@@ -2658,7 +2658,7 @@ const SkyLabels = memo(function SkyLabels({
             <Text
               key={label.id}
               style={[
-                { position: "absolute", left: label.x - 65, top: label.y + 8, width: 130, textAlign: "center", color: LABEL_COLOR.asterism },
+                { position: "absolute", left: label.x - 65, top: label.y + (label.clear ?? 8), width: 130, textAlign: "center", color: LABEL_COLOR.asterism },
                 nepaliTextStyle(9),
               ]}
               className="text-[9px] font-semibold"
@@ -2673,7 +2673,7 @@ const SkyLabels = memo(function SkyLabels({
             <Text
               key={label.id}
               style={[
-                { position: "absolute", left: label.x - 75, top: label.y + 6, width: 150, textAlign: "center", color: LABEL_COLOR.nebula },
+                { position: "absolute", left: label.x - 75, top: label.y + (label.clear ?? 6), width: 150, textAlign: "center", color: LABEL_COLOR.nebula },
                 nepaliTextStyle(9),
               ]}
               className="text-[9px] font-semibold"
