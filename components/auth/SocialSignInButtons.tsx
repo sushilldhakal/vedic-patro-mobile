@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as Facebook from "expo-auth-session/providers/facebook";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import {
@@ -23,14 +24,16 @@ WebBrowser.maybeCompleteAuthSession();
 type Props = {
   onGoogle: (idToken: string) => void;
   onFacebook: (accessToken: string) => void;
+  onApple?: (identityToken: string, email?: string | null) => void;
   onError?: (message: string) => void;
   disabled?: boolean;
 };
 
-export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }: Props) {
+export function SocialSignInButtons({ onGoogle, onFacebook, onApple, onError, disabled }: Props) {
   const colors = useThemeColors();
   const { pick } = useLocale();
-  const [busy, setBusy] = useState<"google" | "facebook" | null>(null);
+  const [busy, setBusy] = useState<"google" | "facebook" | "apple" | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const googleClientIds = getGoogleClientIds();
   const googleConfigured = isGoogleSignInConfiguredForPlatform();
@@ -43,6 +46,11 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
     clientId: facebookAppId ?? "",
     scopes: ["public_profile", "email"],
   });
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    void AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
 
   useEffect(() => {
     if (!__DEV__ || !googleSignInEnabled) return;
@@ -85,8 +93,34 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
 
   const showGoogle = googleSignInEnabled && googleConfigured;
   const showGoogleSetupHint = googleSignInEnabled && !googleConfigured;
+  const showApple = appleAvailable && Boolean(onApple);
 
-  if (!showGoogle && !showGoogleSetupHint && !facebookSignInEnabled) return null;
+  async function onApplePress() {
+    if (!onApple) return;
+    setBusy("apple");
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        onError?.(pick("एपल लग-इन असफल", "Apple sign-in failed"));
+        return;
+      }
+      onApple(credential.identityToken, credential.email);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== "ERR_REQUEST_CANCELED") {
+        onError?.(pick("एपल लग-इन असफल", "Apple sign-in failed"));
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!showGoogle && !showGoogleSetupHint && !facebookSignInEnabled && !showApple) return null;
 
   return (
     <View className="gap-3">
@@ -94,6 +128,19 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
         <Text className="text-xs leading-relaxed text-muted-foreground">
           {googleSignInSetupMessage()}
         </Text>
+      ) : null}
+
+      {showApple ? (
+        <AppleAuthentication.AppleAuthenticationButton
+          buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+          cornerRadius={22}
+          style={{ width: "100%", height: 48 }}
+          onPress={() => {
+            if (disabled || busy !== null) return;
+            void onApplePress();
+          }}
+        />
       ) : null}
 
       {showGoogle ? (
@@ -144,7 +191,7 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onError, disabled }:
         </Pressable>
       ) : null}
 
-      {showGoogle || facebookSignInEnabled ? (
+      {showGoogle || facebookSignInEnabled || showApple ? (
         <View className="flex-row items-center gap-3 py-0.5">
           <View className="h-px flex-1" style={{ backgroundColor: colors.border }} />
           <Text className="text-xs text-muted-foreground">{pick("वा", "or")}</Text>

@@ -10,7 +10,7 @@
 import { NAKSHATRA_ARC, RASHI_ARC } from "@/lib/sky3d/geocentric-model";
 
 /** A point on the celestial sphere in ecliptic coordinates, degrees. */
-export type EclipticPoint = { lon: number; lat: number };
+export type eclipticPoint = { lon: number; lat: number };
 /** A point in the observer's horizon frame, degrees. */
 export type HorizonPoint = { alt: number; az: number };
 
@@ -30,7 +30,7 @@ export const NAK_LABEL_LAT = -6.4;
 /** Points per full circle for the smooth band edges. */
 const EDGE_STEPS = 180;
 
-function edge(lat: number): EclipticPoint[] {
+function edge(lat: number): eclipticPoint[] {
   return Array.from({ length: EDGE_STEPS + 1 }, (_, i) => ({
     lon: (i / EDGE_STEPS) * 360,
     lat,
@@ -47,7 +47,7 @@ export const BAND_EDGES = {
 };
 
 /** Line-segment pairs, flattened: [a0, b0, a1, b1, …]. */
-export type SegmentPairs = EclipticPoint[];
+export type SegmentPairs = eclipticPoint[];
 
 function dividers(count: number, halfLat: number): SegmentPairs {
   const out: SegmentPairs = [];
@@ -92,17 +92,294 @@ export const DEGREE_TICKS: SegmentPairs = (() => {
 })();
 
 /**
- * Alt-az grid: almucantars every 15° of altitude and verticals every 15° of
- * azimuth — the blue cage a planetarium draws over the local sky.
+ * The alt-az cage, one resolution on screen at a time.
+ *
+ * The cage is never off — pulled all the way out to the 240° fisheye you still
+ * get the full web, verticals running pole to pole through the zenith and the
+ * nadir and almucantars ringing them. What changes with zoom is only how fine
+ * it is, because the whole web cannot be on screen at once.
+ *
+ * Only one tier is ever drawn. Stellarium's own grid (GridLinesMgr.cpp's
+ * `getClosestResolutionDMS`) picks a single step that keeps the on-screen
+ * spacing roughly constant and draws exactly that — never a coarse cage with
+ * a finer one layered on top of it. Stacking tiers (an earlier version of
+ * this file did) reads as a muddy crosshatch the moment two or three
+ * thresholds are satisfied at once; a single resolution is what actually
+ * looks like a grid at every zoom.
+ *
+ * Spacing is in **arcminutes**, not degrees. Once the lens reaches a 1° crop
+ * the interesting steps are 30′, 10′, 5′, and stepping a loop by 1/6 of a
+ * degree walks off the line it is drawing by the far side of the sphere —
+ * integer arcminutes cannot drift.
+ *
+ * `local` marks the tiers too fine to bake as whole spheres: a 5′ cage over
+ * the entire sky is millions of vertices for a window that shows one degree of
+ * it. Those are rebuilt each frame over the patch actually in view, which at
+ * that zoom is a few hundred points.
+ *
+ * `maxFov` is exclusive: the tier is on while the vertical field is *below*
+ * it, and `Infinity` is the tier that is never off. Ordered coarse to fine.
+ */
+export type GridTier = {
+  /** Spacing in arcminutes. */
+  step: number;
+  /** Shown while the vertical field of view is under this, degrees. */
+  maxFov: number;
+  /** Rebuilt per frame over the visible patch instead of baked whole. */
+  local?: boolean;
+};
+
+/** One arcminute, in degrees. */
+export const ARCMIN = 1 / 60;
+
+/** The one line opacity the active tier draws at — Stellarium's grid is a flat grey at any zoom, not fainter the finer it gets. */
+export const GRID_OPACITY = 0.8;
+
+/**
+ * The exact spacing table from stellarium-web-engine's `src/modules/lines.c`
+ * (`STEPS_AZ`) — 15°, 5°, 1°, 20′, 10′, 5′, 1′, 20″, 10″, 5″, 1″ — in
+ * arcminutes. Not a round-number ladder of our own choosing: this is the
+ * literal list the reference implementation snaps to.
+ */
+const STEPS_AZ_ARCMIN = [900, 300, 60, 20, 10, 5, 1, 1 / 3, 1 / 6, 1 / 12, 1 / 60];
+
+/**
+ * `get_steps()` in `lines.c` targets `fov / 6` (so the frame carries roughly
+ * six lines along that axis) and `steps_lookup()` snaps that target to a step
+ * from `STEPS_AZ`. Only one entry is ever selected — zooming *replaces* the
+ * active step, it never layers a finer grid on top of a coarser one still on
+ * screen, which this table already does by construction (see
+ * {@link gridStepForFov}).
+ *
+ * A step S stays the right choice for as long as it's no finer than the
+ * target, i.e. while `S >= fov/6` — the moment `fov/6` grows past S, S would
+ * be drawing *more* than six lines and the next coarser entry takes over.
+ * So the field of view at which a step stops being valid is `fov = 6 * S`
+ * (in arcmin, `S/10`, since target-in-arcmin is `fov * 10`). That's what
+ * `maxFov` below is for each entry, worked out from {@link STEPS_AZ_ARCMIN}
+ * rather than picked by eye.
+ *
+ * This is a ceiling, not a nearest-match: {@link STEPS_AZ_ARCMIN} has real
+ * gaps in it (5° to 1° is a 5× jump, with nothing at 2° or 3°), and snapping
+ * to whichever entry is numerically *closest* to the target lets the step
+ * undershoot badly in the middle of a gap — at fov=15° the nearest entry to
+ * a 2.5° target is 1°, which draws fifteen lines instead of six. Snapping up
+ * to the smallest entry still `>= target` instead caps the line count at
+ * six everywhere, at the cost of sometimes drawing fewer than six right
+ * before the next finer step kicks in — sparse reads better than crowded.
+ *
+ * This app's field of view only ever runs 1°–235°, so the sub-arcminute
+ * entries (20″ and finer) never actually get selected — they're kept in the
+ * table anyway for fidelity to the reference, as harmless dead entries
+ * rather than a truncated copy of it.
+ */
+export const GRID_TIERS: readonly GridTier[] = [
+  { step: 900, maxFov: Infinity }, // 15° — also the floor: nothing coarser exists above fov=90
+  { step: 300, maxFov: 30 }, // 5°
+  { step: 60, maxFov: 6 }, // 1°
+  { step: 20, maxFov: 2, local: true }, // 20′
+  { step: 10, maxFov: 1, local: true }, // 10′
+  { step: 5, maxFov: 0.5, local: true }, // 5′
+  { step: 1, maxFov: 0.1, local: true }, // 1′
+  { step: 1 / 3, maxFov: 1 / 30, local: true }, // 20″
+  { step: 1 / 6, maxFov: 1 / 60, local: true }, // 10″
+  { step: 1 / 12, maxFov: 1 / 120, local: true }, // 5″
+  { step: 1 / 60, maxFov: 1 / 600, local: true }, // 1″
+];
+
+/** The finest spacing the cage is drawing at this field of view, arcminutes. */
+export function gridStepForFov(fovDeg: number): number {
+  let step = GRID_TIERS[0].step;
+  for (const tier of GRID_TIERS) {
+    if (fovDeg < tier.maxFov) step = tier.step;
+  }
+  return step;
+}
+
+/* Sanity check the table was built consistently with STEPS_AZ_ARCMIN, since
+   the boundary values above are hand-derived from it. */
+if (GRID_TIERS.length !== STEPS_AZ_ARCMIN.length) {
+  throw new Error("GRID_TIERS must mirror STEPS_AZ_ARCMIN one-for-one");
+}
+
+/**
+ * 90° of azimuth, in arcminutes — the spacing of उ / पू / द / प.
+ *
+ * Every tier leaves these four verticals out and {@link CARDINAL_VERTICALS}
+ * draws them instead, at full length and full strength, so N–E–S–W read as the
+ * ribs of the dome at any zoom rather than dissolving into whatever spacing
+ * the lens happens to be showing.
+ */
+const CARDINAL_AZ_MIN = 5400;
+
+/** True for azimuth 0° / 90° / 180° / 270°, wrapped, in arcminutes. */
+function isCardinalAz(azMin: number): boolean {
+  return ((azMin % CARDINAL_AZ_MIN) + CARDINAL_AZ_MIN) % CARDINAL_AZ_MIN === 0;
+}
+
+/** Segments along a meridian of constant azimuth, nadir to zenith. */
+function verticalArc(az: number, steps: number): HorizonPoint[] {
+  const out: HorizonPoint[] = [];
+  for (let i = 0; i < steps; i += 1) {
+    out.push(
+      { alt: -90 + (i / steps) * 180, az },
+      { alt: -90 + ((i + 1) / steps) * 180, az },
+    );
+  }
+  return out;
+}
+
+/**
+ * The four cardinal verticals — great-circle arcs at azimuth 0° (उत्तर), 90°
+ * (पूर्व), 180° (दक्षिण) and 270° (पश्चिम), each running from the nadir up
+ * through the horizon to the zenith.
+ *
+ * Their own always-on layer rather than part of a tier: they are the frame you
+ * take a bearing against, and at a 260° field the tier they would belong to is
+ * thirty-six equally faint lines with no way to tell which one is north.
+ */
+export const CARDINAL_VERTICALS: HorizonPoint[] = [0, 90, 180, 270].flatMap((az) =>
+  verticalArc(az, 120),
+);
+
+/**
+ * A small diagonal cross on the zenith, and its twin on the nadir.
+ *
+ * Altitude 90° is a *point*, not a ring — every vertical ends there — so it
+ * gets a mark instead of a circle. Laid along the intercardinals so it never
+ * sits on top of {@link CARDINAL_VERTICALS}, and stopped short of the pole
+ * itself so the four strokes read as a cross rather than a blot.
+ */
+export const POLE_MARKS: HorizonPoint[] = (() => {
+  const out: HorizonPoint[] = [];
+  for (const pole of [1, -1]) {
+    for (const az of [45, 135, 225, 315]) {
+      out.push({ alt: pole * 86, az }, { alt: pole * 89.4, az });
+    }
+  }
+  return out;
+})();
+
+/**
+ * Disconnected segment pairs for the whole-sky azimuth cage, spacing in
+ * arcminutes. Only one tier is ever on screen (see {@link GRID_TIERS}), so
+ * this draws every line at its own step rather than leaving the round
+ * numbers to a coarser layer underneath.
+ */
+export function buildAzimuthGridPairs(stepMin: number): HorizonPoint[] {
+  const circleSteps = stepMin <= 60 ? 240 : 180;
+  const verticalSteps = stepMin <= 60 ? 180 : 72;
+  const pairs: HorizonPoint[] = [];
+  for (let altMin = -5400 + stepMin; altMin <= 5400 - stepMin; altMin += stepMin) {
+    const alt = altMin * ARCMIN;
+    for (let i = 0; i < circleSteps; i += 1) {
+      pairs.push(
+        { alt, az: (i / circleSteps) * 360 },
+        { alt, az: ((i + 1) / circleSteps) * 360 },
+      );
+    }
+  }
+  for (let azMin = 0; azMin < 21600; azMin += stepMin) {
+    if (isCardinalAz(azMin)) continue;
+    const az = azMin * ARCMIN;
+    for (let i = 0; i < verticalSteps; i += 1) {
+      pairs.push(
+        { alt: -90 + (i / verticalSteps) * 180, az },
+        { alt: -90 + ((i + 1) / verticalSteps) * 180, az },
+      );
+    }
+  }
+  return pairs;
+}
+
+/** The patch of sky a local tier is drawn over — degrees. */
+export type GridWindow = {
+  altLo: number;
+  altHi: number;
+  azLo: number;
+  azHi: number;
+};
+
+/** Segments along one line of a local patch. The window is small; this is ample. */
+const LOCAL_SEGMENTS = 48;
+/** Lines per axis a local patch will draw before it gives up and thins out.
+ *  ½° around the zenith is ~360 extra meridians (the 1° set is already baked). */
+const LOCAL_MAX_LINES = 400;
+
+/**
+ * The same cage, but only over `window` — for the tiers whose whole-sky form
+ * would be millions of vertices. Written into `out` and the count returned, so
+ * the caller can keep one buffer and refill it per frame. Only one tier is
+ * ever on screen (see {@link GRID_TIERS}), so — like {@link
+ * buildAzimuthGridPairs} — this draws every line at its own step.
+ */
+export function buildLocalGridPairs(
+  stepMin: number,
+  window: GridWindow,
+  out: HorizonPoint[],
+): number {
+  let n = 0;
+  const push = (alt: number, az: number) => {
+    const p = out[n];
+    if (p) {
+      p.alt = alt;
+      p.az = az;
+    } else {
+      out[n] = { alt, az };
+    }
+    n += 1;
+  };
+
+  const altFrom = Math.ceil((window.altLo * 60) / stepMin) * stepMin;
+  let lines = 0;
+  for (let altMin = altFrom; altMin <= window.altHi * 60; altMin += stepMin) {
+    if (lines >= LOCAL_MAX_LINES) break;
+    if (Math.abs(altMin) >= 5400) continue;
+    lines += 1;
+    const alt = altMin * ARCMIN;
+    for (let i = 0; i < LOCAL_SEGMENTS; i += 1) {
+      const a = window.azLo + ((window.azHi - window.azLo) * i) / LOCAL_SEGMENTS;
+      const b = window.azLo + ((window.azHi - window.azLo) * (i + 1)) / LOCAL_SEGMENTS;
+      push(alt, a);
+      push(alt, b);
+    }
+  }
+
+  const azFrom = Math.ceil((window.azLo * 60) / stepMin) * stepMin;
+  lines = 0;
+  for (let azMin = azFrom; azMin <= window.azHi * 60; azMin += stepMin) {
+    if (lines >= LOCAL_MAX_LINES) break;
+    if (isCardinalAz(azMin)) continue;
+    lines += 1;
+    const az = azMin * ARCMIN;
+    for (let i = 0; i < LOCAL_SEGMENTS; i += 1) {
+      const a = window.altLo + ((window.altHi - window.altLo) * i) / LOCAL_SEGMENTS;
+      const b = window.altLo + ((window.altHi - window.altLo) * (i + 1)) / LOCAL_SEGMENTS;
+      push(a, az);
+      push(b, az);
+    }
+  }
+  return n;
+}
+
+/** Upper bound on the points {@link buildLocalGridPairs} can write. */
+export const LOCAL_GRID_CAPACITY = LOCAL_MAX_LINES * LOCAL_SEGMENTS * 2 * 2;
+
+/**
+ * Azimuth grid: almucantars every 10° of altitude and verticals every 10° of
+ * azimuth — the green cage Stellarium draws over the local sky.
+ *
+ * Verticals run zenith to nadir so they really do meet at one point when you
+ * look up; almucantars skip the poles (a circle of radius zero) and include
+ * the horizon. Both hemispheres, so क्षितिजमुनि off still has a cage underfoot.
  */
 export const GRID_LINES: HorizonPoint[][] = (() => {
   const lines: HorizonPoint[][] = [];
-  // Both hemispheres: from outside the sphere the cage has to close underneath,
-  // or the lower half reads as a hole rather than the sky under your feet.
-  for (let alt = -75; alt <= 75; alt += 15) {
-    lines.push(Array.from({ length: 145 }, (_, i) => ({ alt, az: (i / 144) * 360 })));
+  for (let alt = -80; alt <= 80; alt += 10) {
+    const steps = alt === 0 ? 180 : 144;
+    lines.push(Array.from({ length: steps + 1 }, (_, i) => ({ alt, az: (i / steps) * 360 })));
   }
-  for (let az = 0; az < 360; az += 15) {
+  for (let az = 0; az < 360; az += 10) {
     lines.push(
       Array.from({ length: 73 }, (_, i) => ({ alt: -90 + (i / 72) * 180, az })),
     );
@@ -115,7 +392,12 @@ export const GRID_LINES: HorizonPoint[][] = (() => {
 /** A point on the Earth's surface, degrees. */
 export type GeoPoint = { lat: number; lon: number };
 
-/** Obliquity to draw the tropics at. The live value moves by arcseconds a century. */
+/**
+ * The obliquity the tropics are *built* at — near enough for any sky within a
+ * lifetime of now. The scene rewrites the two circles to the live value when
+ * the clock travels far enough for the difference to show, which on this axis
+ * is most of a degree.
+ */
 export const TROPIC_LAT = 23.44;
 
 function parallel(lat: number, steps = 120): GeoPoint[] {
@@ -171,7 +453,7 @@ export const SOLAR_STATIONS: {
 ];
 
 /** Azimuth readings that get a degree label on the horizon. */
-export const GRID_AZIMUTH_LABELS = Array.from({ length: 24 }, (_, i) => i * 15);
+export const GRID_AZIMUTH_LABELS = Array.from({ length: 36 }, (_, i) => i * 10);
 
 /** The eight compass points, with the four cardinals called out. */
 export const COMPASS_POINTS: { az: number; en: string; ne: string; major: boolean }[] = [

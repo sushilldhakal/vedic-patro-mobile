@@ -27,7 +27,7 @@ export default function AccountScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, loading: authLoading, refreshUser } = useAuth();
+  const { user, loading: authLoading, refreshUser, deleteAccount } = useAuth();
   const [editing, setEditing] = useState<Profile | "new" | null>(null);
   const [resent, setResent] = useState(false);
 
@@ -233,6 +233,52 @@ export default function AccountScreen() {
           ))}
         </View>
       )}
+
+      <View className="mt-10 border-t border-border pt-6">
+        <Text className="text-base font-semibold text-destructive" style={nepaliTextStyle(16)}>
+          {pick("खाता मेटाउनुहोस्", "Delete account")}
+        </Text>
+        <Text className="mt-1 text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
+          {pick(
+            "खाता र सबै कुण्डली प्रोफाइल स्थायी रूपमा मेटिनेछन्। यो फिर्ता हुँदैन।",
+            "Your account and all kundali profiles will be permanently deleted. This cannot be undone.",
+          )}
+        </Text>
+        <Pressable
+          onPress={() => {
+            Alert.alert(
+              pick("खाता मेटाउने?", "Delete account?"),
+              pick(
+                "खाता र सबै कुण्डली प्रोफाइल स्थायी रूपमा मेटिनेछन्। यो फिर्ता हुँदैन।",
+                "Your account and all kundali profiles will be permanently deleted. This cannot be undone.",
+              ),
+              [
+                { text: pick("रद्द", "Cancel"), style: "cancel" },
+                {
+                  text: pick("मेट्नुहोस्", "Delete"),
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await deleteAccount();
+                      router.replace("/" as never);
+                    } catch {
+                      Alert.alert(
+                        pick("खाता मेटाउन सकिएन", "Could not delete account"),
+                        pick("पुनः प्रयास गर्नुहोस्।", "Please try again."),
+                      );
+                    }
+                  },
+                },
+              ],
+            );
+          }}
+          className="mt-3 self-start rounded-lg border border-destructive px-4 py-2.5 active:opacity-80"
+        >
+          <Text className="text-sm font-semibold text-destructive" style={nepaliTextStyle(14)}>
+            {pick("खाता मेटाउनुहोस्", "Delete account")}
+          </Text>
+        </Pressable>
+      </View>
     </AppShell>
   );
 }

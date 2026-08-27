@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Easing, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -109,8 +109,11 @@ function NavDrawer({
   const { pick } = useLocale();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const [mounted, setMounted] = useState(open);
   const slide = useRef(new Animated.Value(0)).current;
+  /* Match web drawer: `w-[min(85vw,400px)]`. */
+  const drawerWidth = Math.min(windowWidth * 0.85, 400);
 
   useEffect(() => {
     if (open) {
@@ -135,7 +138,7 @@ function NavDrawer({
 
   if (!mounted) return null;
 
-  const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-340, 0] });
+  const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-drawerWidth, 0] });
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
@@ -148,7 +151,7 @@ function NavDrawer({
           top: 0,
           bottom: 0,
           left: 0,
-          width: Math.min(340, 320),
+          width: drawerWidth,
           paddingTop: insets.top,
           paddingBottom: insets.bottom,
           transform: [{ translateX }],

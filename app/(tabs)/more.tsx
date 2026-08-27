@@ -1,10 +1,11 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { AppShell, LangToggle } from "@/components/AppShell";
+import { AppNavIcon } from "@/components/icons/AppNavIcon";
 import { useBreakpoint } from "@/lib/responsive";
 import { Card } from "@/components/ui/Card";
 import { API_BASE } from "@/lib/api";
+import { APP_VERSION, SUPPORT_EMAIL } from "@/lib/store-links";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 import {
@@ -16,7 +17,12 @@ import {
 } from "@/lib/sitemap-routes";
 import { CEREMONY_META, ELEMENT_BY_ID } from "@/lib/panchanga-elements";
 import { LEARN_TOPIC_METAS } from "@/lib/learn/learn-topics-meta";
-import type { MobileNavIcon } from "@/lib/mobile-nav";
+import {
+  learnTopicDrawerIcon,
+  resolveDrawerIcon,
+  resolveElementDrawerIcon,
+  type DrawerIconName,
+} from "@/lib/drawer-icons";
 
 function RouteRow({
   path,
@@ -25,7 +31,7 @@ function RouteRow({
 }: {
   path: string;
   label: string;
-  icon: MobileNavIcon;
+  icon: DrawerIconName;
 }) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -34,9 +40,9 @@ function RouteRow({
       onPress={() => router.push(path as never)}
       className="flex-row items-center gap-3 border-b border-border/40 py-3 active:opacity-80"
     >
-      <Ionicons name={icon} size={20} color={colors.secondary} />
+      <AppNavIcon name={icon} size={20} color={colors.secondary} />
       <Text className="flex-1 text-sm font-medium text-foreground">{label}</Text>
-      <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+      <AppNavIcon name="chevron-right" size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }
@@ -63,7 +69,7 @@ export default function MoreScreen() {
     return {
       path: `/learn/${slug}`,
       label: meta ? pick(meta.titleNe, meta.titleEn) : slug,
-      icon: (meta?.icon ?? "book-outline") as MobileNavIcon,
+      icon: learnTopicDrawerIcon(meta?.icon),
     };
   });
 
@@ -72,7 +78,7 @@ export default function MoreScreen() {
     return {
       path: `/panchanga/element/${id}`,
       label: meta ? pick(meta.titleNe, meta.titleEn) : id,
-      icon: "grid-outline" as MobileNavIcon,
+      icon: resolveElementDrawerIcon(id),
     };
   });
 
@@ -82,7 +88,7 @@ export default function MoreScreen() {
     return {
       path,
       label: meta ? pick(meta.titleNe, meta.titleEn) : id,
-      icon: "heart-outline" as MobileNavIcon,
+      icon: resolveDrawerIcon("sait", id),
     };
   });
 
@@ -109,7 +115,7 @@ export default function MoreScreen() {
                 <RouteRow key={r.path} path={r.path} label={pick(r.ne, r.en)} icon={r.icon} />
               ))}
               {group === "tools" ? (
-                <RouteRow path="/account" label={pick("खाता", "Account")} icon="person-outline" />
+                <RouteRow path="/account" label={pick("खाता", "Account")} icon="user" />
               ) : null}
             </Card>
           );
@@ -131,7 +137,7 @@ export default function MoreScreen() {
           <RouteRow
             path="/learn/history"
             label={pick("इतिहास", "History")}
-            icon="time-outline"
+            icon="calendar-clock"
           />
           {learnExtra.map((r) => (
             <RouteRow key={r.path} path={r.path} label={r.label} icon={r.icon} />
@@ -148,11 +154,19 @@ export default function MoreScreen() {
         </Card>
 
         <Card>
-          <Text className="mb-1 text-sm font-semibold text-foreground">API</Text>
-          <Text className="font-mono text-xs text-muted-foreground">{API_BASE}</Text>
-          <Text className="mt-2 text-xs text-muted-foreground">
-            {pick("संस्करण 1.1.0 · Android & iOS (Expo)", "Version 1.1.0 · Android & iOS (Expo)")}
+          <Text className="mb-2 text-base font-semibold text-foreground">
+            {pick("कानुनी", "Legal")}
           </Text>
+          <RouteRow path="/privacy" label={pick("गोपनीयता नीति", "Privacy Policy")} icon="shield" />
+          <RouteRow path="/terms" label={pick("प्रयोगका सर्त", "Terms of Use")} icon="file-text" />
+        </Card>
+
+        <Card>
+          <Text className="mb-1 text-sm font-semibold text-foreground">
+            {pick("संस्करण", "Version")} {APP_VERSION}
+          </Text>
+          <Text className="font-mono text-xs text-muted-foreground">{API_BASE}</Text>
+          <Text className="mt-2 text-xs text-muted-foreground">{SUPPORT_EMAIL}</Text>
         </Card>
       </View>
     </AppShell>

@@ -23,6 +23,17 @@ React Native (Expo) app for **Vedic Patro** — calendar, panchanga, holidays, a
 | tablet | 768–1023px | sidebar + 2-column content |
 | desktop | ≥ 1024px | wider sidebar, split panes |
 
+## App Store / Play Store
+
+Production config, listing copy, privacy answers, and the submit checklist live in [`store/README.md`](store/README.md).
+
+```bash
+npx eas-cli build --profile production --platform all
+npx eas-cli submit --profile production --platform all
+```
+
+Privacy policy (required by both stores): https://www.vedicpatro.com/privacy
+
 ## Run locally
 
 ```bash

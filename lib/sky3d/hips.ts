@@ -607,3 +607,81 @@ export function evictHipsTiles(
   }
   return toEvict.length;
 }
+
+/**
+ * Step-14 debug HUD data — the scene lives inside the Canvas and this app
+ * has no DOM-overlay bridge into it (no `Html` from drei anywhere in this
+ * codebase's sky3d tree), while the HUD itself is plain DOM markup drawn by
+ * the parent page outside the Canvas. A mutable module singleton is the
+ * simplest bridge: the scene overwrites it in place once per frame (only
+ * while debug is on), and the HUD polls it on an interval. Deliberately not
+ * React state on the write side — this runs inside `useFrame` and must never
+ * trigger a re-render of the 3D scene.
+ */
+/** One rendered leaf, for the per-tile debug listing (Step 12). */
+export interface HipsDebugTile {
+  order: number;
+  pix: number;
+  state: HipsTileState | "fallback";
+  screenPx: number;
+}
+
+export interface HipsDebugSnapshot {
+  on: boolean;
+  fovDeg: number;
+  /** The lowest and highest order actually present among this frame's leaves — `-1` for both when nothing is on screen. Two different numbers here is the direct proof the recursive traversal (Phase 2/3) is choosing different resolutions in different parts of the frame, not one order for everything. */
+  minOrderPresent: number;
+  maxOrderPresent: number;
+  maxOrder: number;
+  refinePixels: number;
+  leafCount: number;
+  readyCount: number;
+  loadingCount: number;
+  fallbackCount: number;
+  cachedCount: number;
+  inFlight: number;
+  /** Capped list of the actual leaves this frame, for the "O3 P451 READY 184px" style per-tile readout. */
+  tiles: HipsDebugTile[];
+}
+
+const HIPS_DEBUG_TILE_LIST_CAP = 60;
+
+const hipsDebugSnapshot: HipsDebugSnapshot = {
+  on: false,
+  fovDeg: 0,
+  minOrderPresent: -1,
+  maxOrderPresent: -1,
+  maxOrder: HIPS_MAX_LOCAL_ORDER,
+  refinePixels: 0,
+  leafCount: 0,
+  readyCount: 0,
+  loadingCount: 0,
+  fallbackCount: 0,
+  cachedCount: 0,
+  inFlight: 0,
+  tiles: [],
+};
+
+export function writeHipsDebugSnapshot(next: Omit<HipsDebugSnapshot, "on" | "maxOrder">): void {
+  hipsDebugSnapshot.on = true;
+  hipsDebugSnapshot.fovDeg = next.fovDeg;
+  hipsDebugSnapshot.minOrderPresent = next.minOrderPresent;
+  hipsDebugSnapshot.maxOrderPresent = next.maxOrderPresent;
+  hipsDebugSnapshot.refinePixels = next.refinePixels;
+  hipsDebugSnapshot.leafCount = next.leafCount;
+  hipsDebugSnapshot.readyCount = next.readyCount;
+  hipsDebugSnapshot.loadingCount = next.loadingCount;
+  hipsDebugSnapshot.fallbackCount = next.fallbackCount;
+  hipsDebugSnapshot.cachedCount = next.cachedCount;
+  hipsDebugSnapshot.inFlight = next.inFlight;
+  hipsDebugSnapshot.tiles = next.tiles.slice(0, HIPS_DEBUG_TILE_LIST_CAP);
+}
+
+export function clearHipsDebugSnapshot(): void {
+  hipsDebugSnapshot.on = false;
+}
+
+export function readHipsDebugSnapshot(): HipsDebugSnapshot {
+  return hipsDebugSnapshot;
+}
+

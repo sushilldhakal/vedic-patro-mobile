@@ -1174,7 +1174,9 @@ export function fetchRashifal(
   period: RashifalPeriod,
   location?: LocationParams,
 ) {
-  const params = new URLSearchParams({ date: dateAd, period });
+  // `date` is an AD civil date. Without an explicit era the API reads it as BS
+  // (era defaults to bs), which silently returns a rashifal ~57 years off.
+  const params = new URLSearchParams({ date: dateAd, era: "ad", period });
   return get<RashifalBlock>(
     appendLocation(withCache(`/panchanga/rashifal?${params.toString()}`), location),
   );
@@ -1188,6 +1190,7 @@ export function fetchPersonalRashifal(
 ) {
   const params = new URLSearchParams({
     date: dateAd,
+    era: "ad",
     period,
     birth_lat: String(birth.birthLat),
     birth_lon: String(birth.birthLon),

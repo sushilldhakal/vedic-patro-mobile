@@ -1,12 +1,12 @@
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { AppNavIcon } from "@/components/icons/AppNavIcon";
 import { Text } from "@/components/ui/Text";
 import { LEARN_TOPIC_METAS, type LearnTopicMeta } from "@/lib/learn/learn-topics-meta";
 import { hrefForLearnSlug } from "@/lib/learn/learn-href";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import type { MobileNavIcon } from "@/lib/mobile-nav";
+import { learnTopicDrawerIcon } from "@/lib/drawer-icons";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ export function LearnMoreCard({
       className={cn("rounded-2xl border bg-card/40 p-4 sm:p-5", className)}
     >
       <View className="mb-3 flex-row items-center gap-2">
-        <Ionicons name="book-outline" size={16} color={colors.secondary} />
+        <AppNavIcon name="book-open" size={16} color={colors.secondary} />
         <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
           {resolvedHeading}
         </Text>
@@ -56,7 +56,7 @@ export function LearnMoreCard({
               style={{ backgroundColor: `${colors.secondary}1a` }}
               className="h-7 w-7 shrink-0 items-center justify-center rounded-lg"
             >
-              <Ionicons name={topic.icon as MobileNavIcon} size={16} color={colors.secondary} />
+              <AppNavIcon name={learnTopicDrawerIcon(topic.icon)} size={16} color={colors.secondary} />
             </View>
             <Text
               numberOfLines={1}
@@ -65,7 +65,7 @@ export function LearnMoreCard({
             >
               {pick(topic.titleNe, topic.titleEn)}
             </Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} />
+            <AppNavIcon name="chevron-right" size={14} color={colors.mutedForeground} />
           </Pressable>
         ))}
       </View>

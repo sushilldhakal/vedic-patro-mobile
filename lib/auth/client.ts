@@ -159,6 +159,21 @@ export async function apiFacebook(accessToken: string): Promise<TokenPair> {
   return res.json();
 }
 
+/** Exchange a Sign in with Apple identity token for our session tokens. */
+export async function apiApple(identityToken: string, email?: string | null): Promise<TokenPair> {
+  const res = await raw("/auth/apple", {
+    method: "POST",
+    body: JSON.stringify({ identity_token: identityToken, email: email || undefined }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  return res.json();
+}
+
+export async function apiDeleteAccount(): Promise<void> {
+  await authFetch<void>("/auth/me", { method: "DELETE" });
+  tokenStore.clear();
+}
+
 export async function apiLogout(): Promise<void> {
   const token = refreshToken;
   // Clear locally first so the UI and in-flight requests see a signed-out session.

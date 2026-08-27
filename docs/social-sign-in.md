@@ -69,6 +69,22 @@ shows this explanation instead of a button that would fail.
    `app.json`, and the Meta *app secret* is only ever used server-side, never in
    the app bundle.
 
+## Sign in with Apple (required on the App Store)
+
+Apple Guideline 4.8: if Google or Facebook sign-in is offered on iOS, **Sign in
+with Apple** must be offered with equal or greater prominence. The iOS button
+is the official `AppleAuthenticationButton` and is listed first.
+
+1. Apple Developer → Identifiers → `com.vedicpatro.mobile` → enable **Sign In
+   with Apple**.
+2. Rebuild (`eas build --profile production --platform ios` or a local
+   `npx expo run:ios`). The `ios.usesAppleSignIn` entitlement is already in
+   `app.json`.
+3. The API verifies the identity token at `POST /auth/apple` (audience
+   `com.vedicpatro.mobile`). Deploy that API before review.
+
+Apple is iOS-only. Android keeps Google / Facebook / email.
+
 ## How it is wired
 
 - `lib/auth/oauth-config.ts` reads the public IDs out of `expo.extra`; a button
@@ -77,7 +93,7 @@ shows this explanation instead of a button that would fail.
   `expo-auth-session` (`useIdTokenAuthRequest` for Google, `useAuthRequest` for
   Facebook) and hands the resulting token up.
 - `lib/auth/AuthContext.tsx` exchanges that token with the API
-  (`POST /auth/google`, `POST /auth/facebook`), stores the token pair in
+  (`POST /auth/google`, `POST /auth/facebook`, `POST /auth/apple`), stores the token pair in
   `expo-secure-store` and loads `/auth/me`.
 
 So the API contract is identical to the web app's; only the token *acquisition*

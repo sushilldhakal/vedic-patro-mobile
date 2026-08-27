@@ -27,6 +27,11 @@
 const STAR_NAME_NE: Record<string, string> = {
   Pollux: "दिति",
   Castor: "अदिति",
+  // हस्त नक्षत्रका पाँच तारा — योगतारा (Algorab) आफैं हस्त हो; बाँकी चार साथी तारा।
+  Gienah: "सवितृ",
+  Minkar: "अर्थवा",
+  Kraz: "प्रभा",
+  Alchiba: "साध्य",
 };
 
 /**
@@ -259,7 +264,7 @@ export const NAKSHATRA_ASTERISMS: NakshatraAsterism[] = [
     stars: [
       { name: "δ Crv (Algorab)", ra: 187.466, dec: -16.516, mag: 2.95 },
       { name: "γ Crv (Gienah)", ra: 183.952, dec: -17.542, mag: 2.59 },
-      { name: "ε Crv", ra: 182.532, dec: -22.62, mag: 3.02 },
+      { name: "ε Crv (Minkar)", ra: 182.532, dec: -22.62, mag: 3.02 },
       { name: "β Crv (Kraz)", ra: 188.597, dec: -23.397, mag: 2.65 },
       { name: "α Crv (Alchiba)", ra: 182.103, dec: -24.729, mag: 4.02 },
     ],
@@ -512,7 +517,7 @@ const DEG = Math.PI / 180;
 const EPS_J2000 = 23.4392911;
 
 /** Equatorial J2000 → ecliptic J2000, both in degrees. */
-export function equatorialToEclipticJ2000(ra: number, dec: number): { lon: number; lat: number } {
+export function equatorialToeclipticJ2000(ra: number, dec: number): { lon: number; lat: number } {
   const a = ra * DEG;
   const d = dec * DEG;
   const e = EPS_J2000 * DEG;
@@ -536,15 +541,21 @@ export function precessionSinceJ2000(daysSinceJ2000: number): number {
 
 /** One star, flattened out of the asterism list and pre-converted. */
 export type FlatStar = {
-  /** Ecliptic longitude at J2000, degrees. */
+  /** ecliptic longitude at J2000, degrees. */
   lon: number;
-  /** Ecliptic latitude, degrees — treated as fixed. */
+  /** ecliptic latitude, degrees — treated as fixed. */
   lat: number;
   mag: number;
   /** 1–27: which nakshatra it belongs to. */
   nakshatra: number;
   /** True for the योगतारा, which is drawn larger. */
   junction: boolean;
+  /** Catalogue string — kept stable for search/favourite ids. */
+  name: string;
+  /** Common / proper name for the overlay. Null when the catalogue has only a Bayer tag. */
+  nameEn: string | null;
+  /** Traditional Nepali name when the star has one of its own. */
+  nameNe: string | null;
 };
 
 /** Every catalogued star in one array, with the link pairs re-indexed onto it. */
@@ -555,10 +566,34 @@ export function flattenAsterisms(): { stars: FlatStar[]; links: [number, number]
     const base = stars.length;
     for (let i = 0; i < nak.stars.length; i += 1) {
       const s = nak.stars[i];
-      const { lon, lat } = equatorialToEclipticJ2000(s.ra, s.dec);
-      stars.push({ lon, lat, mag: s.mag, nakshatra: nak.index, junction: i === 0 });
+      const { lon, lat } = equatorialToeclipticJ2000(s.ra, s.dec);
+      stars.push({
+        lon,
+        lat,
+        mag: s.mag,
+        nakshatra: nak.index,
+        junction: i === 0,
+        name: s.name,
+        nameEn: skyStarCommonName(s.name),
+        nameNe: skyStarNameNe(s.name) ?? null,
+      });
     }
     for (const [a, b] of nak.links) links.push([base + a, base + b]);
   }
   return { stars, links };
+}
+
+/** Overlay copy for one नक्षत्र member. Companions without a common name stay unlabeled. */
+export function starOverlayNames(
+  star: Pick<FlatStar, "junction" | "nameEn" | "nameNe">,
+  nak: Pick<NakshatraAsterism, "ne" | "en">,
+): { en: string; ne: string } | null {
+  /* Never put an English proper name in `ne`. Acrab / Aldulfin have no
+     traditional Nepali name — they stay unlabeled when the UI is Nepali,
+     rather than leaking Latin onto the sky. योगतारा without its own name
+     still takes the नक्षत्र's. */
+  const en = star.nameEn ?? (star.junction ? nak.en : null);
+  const ne = star.nameNe ?? (star.junction ? nak.ne : null);
+  if (!en && !ne) return null;
+  return { en: en ?? "", ne: ne ?? "" };
 }

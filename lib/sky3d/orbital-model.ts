@@ -63,8 +63,78 @@ export const PLANET_ELEMENTS = {
 
 export type PlanetKey = keyof typeof PLANET_ELEMENTS;
 
+/**
+ * Uranus, Neptune, Pluto — J2000 mean elements, same table and same
+ * precision as {@link PLANET_ELEMENTS}. Deliberately *not* part of
+ * {@link GrahaKey}: the navagraha are exactly the nine the API computes
+ * dignities, relations and DMS for, and these three have none of that —
+ * they exist only so the sky scene has somewhere honest to draw them.
+ */
+export const OUTER_PLANET_ELEMENTS = {
+  uranus: {
+    a: 19.18916464,
+    e: 0.04725744,
+    i: 0.77263783,
+    node: 74.01692503,
+    peri: 170.9542763,
+    /* JPL's mean longitude at J2000, which is what {@link heliocentric} wants
+       (it forms M = L0 − ϖ itself). The two numbers that stood here before
+       were already JPL's L − ϖ, so the perihelion came off twice and अरुण
+       drew ~195° from where it is — it was reading as a plausible dot in
+       plainly the wrong राशि. वरुण was out the same way; यम was always
+       right, which is why the error never looked systematic. */
+    L0: 313.23810451,
+    periodDays: 30685,
+  },
+  neptune: {
+    a: 30.06992276,
+    e: 0.00859048,
+    i: 1.77004347,
+    node: 131.78422574,
+    peri: 44.96476227,
+    L0: 304.87997031,
+    periodDays: 60190,
+  },
+  pluto: {
+    a: 39.48211675,
+    e: 0.2488273,
+    i: 17.14001206,
+    node: 110.30393684,
+    peri: 224.06891629,
+    L0: 238.92903833,
+    periodDays: 90560,
+  },
+} satisfies Record<string, OrbitalElements>;
+
+export type OuterPlanetKey = keyof typeof OUTER_PLANET_ELEMENTS;
+
+/**
+ * Sidereal ecliptic longitude/latitude/distance for a decorative outer
+ * planet — {@link geocentricPointAt}'s counterpart for a body outside the
+ * navagraha the API knows about. No calibration, no speed/retrograde: these
+ * three are never selected, followed, or read as a chart value, only drawn.
+ */
+export function outerPlanetAt(
+  key: OuterPlanetKey,
+  dt: number,
+): { longitude: number; latitude: number; distanceAu: number } {
+  const earth = heliocentric(PLANET_ELEMENTS.earth, dt);
+  const body = heliocentric(OUTER_PLANET_ELEMENTS[key], dt);
+  const dx = body.x - earth.x;
+  const dy = body.y - earth.y;
+  const dz = body.z - earth.z;
+  const r = Math.hypot(dx, dy, dz);
+  const lon = normalizeDeg(Math.atan2(dy, dx) / RAD);
+  const lat = (r === 0 ? 0 : Math.asin(dz / r)) / RAD;
+  return {
+    longitude: normalizeDeg(lon - ayanamsa(dt)),
+    latitude: lat,
+    distanceAu: r,
+  };
+}
+
 /** Rectangular ecliptic coordinates, AU. */
-export type EclipticXYZ = { x: number; y: number; z: number };
+export type eclipticXYZ = { x: number; y: number; z: number };
 
 /** Newton–Raphson on Kepler's equation, M = E − e·sin E (radians). */
 function solveKepler(M: number, e: number): number {
@@ -76,7 +146,7 @@ function solveKepler(M: number, e: number): number {
 }
 
 /** Heliocentric ecliptic position, AU, `dt` days after J2000. */
-export function heliocentric(el: OrbitalElements, dt: number): EclipticXYZ {
+export function heliocentric(el: OrbitalElements, dt: number): eclipticXYZ {
   const n = 360 / el.periodDays;
   const M = normalizeDeg(el.L0 - el.peri + n * dt) * RAD;
   const E = solveKepler(M, el.e);
@@ -113,7 +183,7 @@ export function heliocentric(el: OrbitalElements, dt: number): EclipticXYZ {
  * Good to roughly 0.3° in longitude, which is invisible at scene scale and is
  * corrected outright by {@link calibrate} for the date on screen.
  */
-export function moonGeocentric(dt: number): EclipticXYZ {
+export function moonGeocentric(dt: number): eclipticXYZ {
   const Lp = 218.316 + 13.176396 * dt; // mean longitude
   const M = (134.963 + 13.064993 * dt) * RAD; // Moon's mean anomaly
   const Ms = (357.529 + 0.98560028 * dt) * RAD; // Sun's mean anomaly
@@ -172,7 +242,7 @@ export type GeoBody = {
   key: GrahaKey;
   /** Sidereal (Lahiri) ecliptic longitude, deg 0–360. */
   longitude: number;
-  /** Ecliptic latitude — the shara, deg. */
+  /** ecliptic latitude — the shara, deg. */
   latitude: number;
   /** Geocentric distance, AU. Nodes carry the Moon's distance. */
   distanceAu: number;
@@ -181,7 +251,7 @@ export type GeoBody = {
   retrograde: boolean;
 };
 
-function toSpherical(v: EclipticXYZ) {
+function toSpherical(v: eclipticXYZ) {
   const r = Math.hypot(v.x, v.y, v.z);
   return {
     lon: normalizeDeg(Math.atan2(v.y, v.x) / RAD),
@@ -190,7 +260,7 @@ function toSpherical(v: EclipticXYZ) {
   };
 }
 
-function sub(a: EclipticXYZ, b: EclipticXYZ): EclipticXYZ {
+function sub(a: eclipticXYZ, b: eclipticXYZ): eclipticXYZ {
   return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
 }
 

@@ -1,38 +1,18 @@
 /**
- * The ground the क्षितिज view stands on — a 360° skyline, generated rather than drawn.
+ * The ground the क्षितिज view stands on — a 360° valley of hills, generated
+ * rather than drawn.
  *
  * The horizon view puts the reader at the centre of a dome with the camera at
- * the origin, so "the ground" is whatever fills the lower half of every
- * direction at once. A flat disc does that, but it says only *down*: no skyline,
+ * the origin, so "the ground" is whatever fills every direction below the
+ * skyline at once. A flat disc does that, but it says only *down*: no skyline,
  * so the compass points sit on a drawn circle and nothing tells you that the
  * Sun is about to clear a ridge rather than the mathematical horizon.
  *
- * This builds a radial fan instead — hills all the way round, densest in
- * azimuth because the silhouette is the whole point.
- *
- * ## Why the height field is shaped the way it is
- *
- * The ground is drawn as a blended veil with **no depth write**, so the reader
- * can still make out the alt-az cage and the far half of the zodiac beneath it
- * (see `AakashGocharScene`'s ground group). That buys the transparency but
- * gives up depth sorting: two overlapping terrain triangles would blend with
- * each other in index order and the hills would come out as a lattice of bright
- * seams.
- *
- * So the height field is built to be *provably single-valued from the origin*.
- * Along any one azimuth, height only ever increases with radius:
- *
- * - every radial profile below is monotonically non-decreasing in `t`, and
- * - every ridge term is non-negative,
- *
- * and a sum of non-decreasing functions is non-decreasing. The farthest point
- * along a ray is therefore always its highest, no nearer ground can rise in
- * front of ground behind it, and the fan covers each screen direction exactly
- * once. Overlap is impossible, so the veil composites cleanly.
- *
- * That is also why relief is carried by the *azimuth* noise and only scaled by
- * radius: a bump that rose and fell with distance would break the property
- * immediately.
+ * This builds a radial mesh instead — a ring of overlapping hills all the way
+ * round, the same idea as standing in a valley and turning on the spot. Relief
+ * is real 3D (hills rise and fall with distance, and can occlude each other)
+ * because the mesh is drawn opaque with depth, so a later triangle is allowed
+ * to hide an earlier one.
  *
  * ## Why it is seeded
  *
@@ -61,7 +41,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Hermite smoothstep, clamped — the ramp every profile below is built from. */
+/** Hermite smoothstep, clamped. */
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
@@ -72,10 +52,9 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * turn — `waves` control values round the circle, smoothstepped between.
  *
  * Interpolated with smoothstep rather than a spline on purpose: a Catmull-Rom
- * through random controls overshoots its endpoints, which would put negative
- * values into a term the no-overlap argument above needs to keep non-negative.
- * Smoothstep never leaves the interval between the two controls it sits on, so
- * the result is bounded by [0, 1) for free.
+ * through random controls overshoots its endpoints. Smoothstep never leaves
+ * the interval between the two controls it sits on, so the result stays in
+ * [0, 1) for free.
  *
  * @param turn Position round the circle, in turns. Any real number; wrapped.
  */
@@ -95,14 +74,6 @@ function periodicNoise(waves: number, rand: () => number): (turn: number) => num
  * Sum of {@link periodicNoise} octaves, stretched to use the whole of [0, 1]
  * and then gamma-shaped so it spends more of its time low: broad valleys with
  * distinct ridges, rather than the even swell a plain noise sum gives.
- *
- * The stretch is the part that matters. Independent octaves practically never
- * reach their extremes together, so a plain sum of four of them wanders around
- * the middle of its nominal range and never comes near zero. Left like that the
- * skyline is a ring of hills with no gap anywhere in it — the true horizon, and
- * with it every rising and setting point, is buried the whole way round. Fixing
- * the ends against the profile's own measured range is what puts passes back in
- * the ridge.
  */
 function ridgeProfile(
   rand: () => number,
@@ -117,10 +88,6 @@ function ridgeProfile(
     return v / total;
   };
 
-  /* Sampled well past the finest octave, so the measured range is the real one.
-     Anything the grid still misses lands just outside [0, 1] and is clamped —
-     which it has to be, because `Math.pow` of a negative base is NaN and
-     because the no-overlap argument needs this to stay non-negative. */
   const steps = Math.max(512, 8 * Math.max(...octaves.map((o) => o.waves)));
   let lo = Infinity;
   let hi = -Infinity;
@@ -138,10 +105,14 @@ function ridgeProfile(
 }
 
 /**
- * The far skyline: a handful of big masses with finer ridges riding on them.
- * This is the edge read against the stars, so it carries most of the detail.
+ * Shortest distance along the circle, in turns, in [0, 0.5].
  */
-const FAR_OCTAVES = [
+function turnDelta(a: number, b: number): number {
+  const d = Math.abs((((a - b) % 1) + 1) % 1);
+  return Math.min(d, 1 - d);
+}
+
+const RING_OCTAVES = [
   { waves: 5, amp: 1 },
   { waves: 11, amp: 0.52 },
   { waves: 23, amp: 0.26 },
@@ -149,55 +120,55 @@ const FAR_OCTAVES = [
 ] as const;
 
 /**
- * The shoulder each mass sits on — a second, coarser rise that comes up closer
- * in, so a ridge has foothills leading to it instead of being a single slope.
- *
- * Applied as a *multiplier* on the far ridge rather than added beside it, which
- * is what keeps the passes open: where the far ridge is zero this is zero too,
- * so those azimuths stay flat ground all the way to the rim and the true horizon
- * shows through. Added independently, its own non-zero minimum would lift the
- * whole skyline off the horizon again — the very thing the stretch above fixes.
- */
-const NEAR_OCTAVES = [
-  { waves: 3, amp: 1 },
-  { waves: 7, amp: 0.45 },
-] as const;
-
-/** Where the far ridges start lifting off the valley floor, as a radius fraction. */
-const FAR_ONSET = 0.34;
-/** Where the near shelf rises, and where it levels out. Must both precede the rim. */
-const NEAR_ONSET = 0.06;
-const NEAR_CREST = 0.62;
-/** How much of the total relief the near shelf is allowed. */
-const NEAR_SHARE = 0.26;
-
-/**
- * Radius spacing bias. Below 1 pushes rings outward, which is where they are
- * needed: standing 0.6 units above the floor, everything past a few units of
- * radius is squeezed into the last degree or so under the horizon, and that
- * sliver is the entire skyline.
- */
-const RADIAL_BIAS = 0.62;
-
-/**
- * How sharply the floor lets go of `baseY` and comes up to eye level at the rim.
- *
- * A real plane never reaches eye level — its *angle* goes to zero instead — but
- * a disc of finite radius leaves a hairline of sky between its edge and the
- * horizon. Bringing the last ring to y = 0 closes that seam. The high power
- * keeps the lift inside the outermost rings, where it is well under a pixel.
+ * How sharply the floor lets go of `baseY` and comes up to eye level at the
+ * rim. A finite disc leaves a hairline of sky between its edge and the
+ * mathematical horizon; bringing the last ring to y = 0 closes that seam.
  */
 const FLOOR_LIFT_POWER = 5;
 
-/** Fraction of the radius over which the rim fades out into haze. */
-const RIM_FADE = 0.1;
+/**
+ * Radius spacing bias. Below 1 pushes rings outward, which is where they are
+ * needed: standing a fraction of a unit above the floor, everything past a
+ * few units of radius is squeezed into the last degrees under the horizon,
+ * and that sliver is the entire skyline.
+ */
+const RADIAL_BIAS = 0.72;
 
-/** How dark the rim gets — a silhouette, so the skyline reads against the stars. */
-const RIM_SHADE = 0.1;
-/** How light the ground underfoot is, so it reads as ground and not as a hole. */
-const FOOT_SHADE = 0.6;
-/** How much a ridge's own height brightens it, keeping the skyline from going flat. */
-const RELIEF_SHADE = 0.34;
+type Hill = {
+  turn: number;
+  t: number;
+  h: number;
+  sigT: number;
+  sigTurn: number;
+};
+
+function placeHills(rand: () => number, count: number, t0: number, t1: number, h0: number, h1: number): Hill[] {
+  const hills: Hill[] = [];
+  for (let i = 0; i < count; i += 1) {
+    /* Evenly around the circle, then jittered, so no quarter is left empty. */
+    const turn = (((i + 0.22 * (rand() * 2 - 1)) / count) % 1 + 1) % 1;
+    const t = t0 + (t1 - t0) * Math.pow(rand(), 0.65);
+    hills.push({
+      turn,
+      t,
+      h: h0 + (h1 - h0) * rand(),
+      sigT: 0.07 + 0.11 * rand(),
+      sigTurn: 0.035 + 0.055 * rand(),
+    });
+  }
+  return hills;
+}
+
+function hillLift(hills: readonly Hill[], turn: number, t: number): number {
+  let sum = 0;
+  for (let i = 0; i < hills.length; i += 1) {
+    const hill = hills[i];
+    const dTurn = turnDelta(turn, hill.turn) / hill.sigTurn;
+    const dT = (t - hill.t) / hill.sigT;
+    sum += hill.h * Math.exp(-0.5 * (dTurn * dTurn + dT * dT));
+  }
+  return sum;
+}
 
 export type HorizonTerrainOptions = {
   /** Outer radius. Put it at or a little past the dome the sky is drawn on. */
@@ -220,7 +191,7 @@ export type HorizonTerrainOptions = {
    * sector count turns every ridge into a staircase.
    */
   sectors?: number;
-  /** Steps out from the observer. Carries the shading gradient, little else. */
+  /** Steps out from the observer. Carries the slope of each hill. */
   rings?: number;
   seed?: number;
 };
@@ -234,12 +205,11 @@ export type HorizonTerrain = {
 /**
  * Build the ground for one place.
  *
- * The returned geometry carries `position` and a four-component `color`
- * (`vertexColors`, with alpha — three.js reads itemSize 4 as `USE_COLOR_ALPHA`).
- * Colour is a neutral shading ramp meant to be *multiplied* by whatever land
- * colour the caller sets on the material, so the same geometry can be tinted
- * from night slate to daylit earth without being rebuilt. Alpha is the rim
- * fade only; the caller's `material.opacity` scales it for the क्षितिजमुनि veil.
+ * The returned geometry carries `position` and a three-component `color`
+ * (`vertexColors`). Colour is a neutral shading ramp meant to be *multiplied*
+ * by whatever land colour the caller sets on the material, so the same
+ * geometry can be tinted from night slate to daylit earth without being
+ * rebuilt. Lighting (normals) does the rest of the modelling.
  *
  * Scene frame matches `horizon.ts`: +Y is the zenith, +X east, −Z north, so
  * azimuth 0 points at the north compass mark and the hills stay put against it.
@@ -250,64 +220,66 @@ export function buildHorizonTerrain({
   radius,
   baseY,
   relief,
-  sectors = 256,
-  rings = 56,
+  sectors = 288,
+  rings = 72,
   seed = 1,
 }: HorizonTerrainOptions): HorizonTerrain {
   const rand = mulberry32(seed);
-  const far = ridgeProfile(rand, FAR_OCTAVES, 1.6);
-  const near = ridgeProfile(rand, NEAR_OCTAVES, 1.2);
+  const ring = ridgeProfile(rand, RING_OCTAVES, 1.45);
+  /* Far range all the way round, then a second, closer set of foothills —
+     same trick the eclipses valley uses, so turning on the spot always has a
+     ridge in front of you. */
+  const range = placeHills(rand, 16, 0.42, 0.9, 0.45, 1);
+  const foot = placeHills(rand, 11, 0.18, 0.5, 0.18, 0.45);
 
   const cols = sectors + 1; // the seam is duplicated so the shading wraps cleanly
   const count = (rings + 1) * cols;
   const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 4);
+  const colors = new Float32Array(count * 3);
 
   let skylineDeg = 0;
 
-  for (let ring = 0; ring <= rings; ring += 1) {
-    const t = Math.pow(ring / rings, RADIAL_BIAS);
+  for (let ri = 0; ri <= rings; ri += 1) {
+    const t = Math.pow(ri / rings, RADIAL_BIAS);
     const r = radius * t;
-    /* Both ramps are non-decreasing in t and both ridge values are ≥ 0 — this
-       is the monotonicity the no-overlap argument in the file header rests on.
-       Split so the two together come to exactly `relief` at the highest point
-       on the rim, which is what makes `relief` mean what it says. */
-    const farRamp = smoothstep(FAR_ONSET, 1, t) * relief * (1 - NEAR_SHARE);
-    const nearRamp = smoothstep(NEAR_ONSET, NEAR_CREST, t) * relief * NEAR_SHARE;
+    /* Keep a bowl underfoot so a nearby hill cannot swallow the camera, then
+       let the range carry the skyline. */
+    const envelope = smoothstep(0.1, 0.34, t);
     const floorY = baseY * (1 - Math.pow(t, FLOOR_LIFT_POWER));
-    const fade = 1 - smoothstep(1 - RIM_FADE, 1, t);
-    const shade = RIM_SHADE + (FOOT_SHADE - RIM_SHADE) * Math.pow(1 - t, 1.7);
 
     for (let sector = 0; sector <= sectors; sector += 1) {
       const turn = sector / sectors;
       const az = turn * Math.PI * 2;
-      const ridge = far(turn);
-      const lift = ridge * (farRamp + near(turn) * nearRamp);
-      const y = floorY + lift;
+      const ridges = ring(turn);
+      const mountains =
+        0.38 * ridges * smoothstep(0.36, 0.82, t) +
+        0.72 * hillLift(range, turn, t) +
+        0.55 * hillLift(foot, turn, t);
+      const lift = envelope * mountains;
+      const y = floorY + relief * lift;
 
-      const i = ring * cols + sector;
+      const i = ri * cols + sector;
       positions[i * 3] = r * Math.sin(az);
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = -r * Math.cos(az);
 
-      const c = shade * (1 - RELIEF_SHADE + RELIEF_SHADE * 2 * ridge);
-      colors[i * 4] = c;
-      colors[i * 4 + 1] = c;
-      colors[i * 4 + 2] = c;
-      colors[i * 4 + 3] = fade;
+      /* Ridges a little lighter, valleys a little darker — the lambert term
+         models the sun, this is only the dirt's own variation. */
+      const c = 0.52 + 0.48 * Math.min(1, lift);
+      colors[i * 3] = c;
+      colors[i * 3 + 1] = c;
+      colors[i * 3 + 2] = c;
 
       if (r > 0) skylineDeg = Math.max(skylineDeg, (Math.atan2(y, r) * 180) / Math.PI);
     }
   }
 
-  /* Two triangles per quad, skipping the degenerate innermost band where every
-     sector collapses onto the centre point. */
   const indices: number[] = [];
-  for (let ring = 1; ring <= rings; ring += 1) {
+  for (let ri = 1; ri <= rings; ri += 1) {
     for (let sector = 0; sector < sectors; sector += 1) {
-      const a = (ring - 1) * cols + sector;
+      const a = (ri - 1) * cols + sector;
       const b = a + 1;
-      const c = ring * cols + sector;
+      const c = ri * cols + sector;
       const d = c + 1;
       indices.push(a, c, b, b, c, d);
     }
@@ -315,8 +287,9 @@ export function buildHorizonTerrain({
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 4));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
 
   return { geometry, skylineDeg };
@@ -333,4 +306,169 @@ export function terrainSeed(lat: number, lon: number): number {
   const a = Math.round(lat * 100);
   const b = Math.round(lon * 100);
   return (Math.imul(a, 73856093) ^ Math.imul(b, 19349663)) >>> 0;
+}
+
+/**
+ * Equirectangular landscape for the inner sky sphere — grass and rolling
+ * hills below the horizon, nothing above it.
+ *
+ * Mapped onto a BackSide sphere around the observer, this is the Stellarium
+ * trick: a 360° photo-style ground that fills the whole lower hemisphere, not
+ * a thin ridge sitting on the mathematical horizon. The skyline is the same
+ * seeded ridge as {@link buildHorizonTerrain}, so one place keeps one set of
+ * hills. Alpha is 0 above the skyline so the stars pass through, and solid
+ * below so they do not.
+ *
+ * DataTexture rather than canvas: the page prerenders, and `document` is not
+ * there on the server pass.
+ *
+ * UV matches three.js `SphereGeometry`: v = 0 at −Y (nadir), v = 1 at +Y
+ * (zenith); u = 0 at −X (west), increasing toward +Z (south). Azimuth 0
+ * (north, −Z) therefore sits at u = 0.75.
+ */
+export function buildHorizonLandscapeTexture(
+  seed: number,
+  width = 2048,
+  height = 1024,
+): THREE.DataTexture {
+  const rand = mulberry32(seed);
+  const far = ridgeProfile(rand, RING_OCTAVES, 1.45);
+  const near = ridgeProfile(rand, [
+    { waves: 3, amp: 1 },
+    { waves: 7, amp: 0.45 },
+  ], 1.2);
+  const blotch = ridgeProfile(rand, [
+    { waves: 9, amp: 1 },
+    { waves: 19, amp: 0.5 },
+    { waves: 41, amp: 0.25 },
+  ], 1);
+
+  const data = new Uint8Array(width * height * 4);
+  const maxHill = 11;
+
+  for (let y = 0; y < height; y += 1) {
+    /* v = 0 at nadir, 1 at zenith — matches SphereGeometry with flipY false. */
+    const v = y / (height - 1);
+    const alt = (v - 0.5) * 180;
+    for (let x = 0; x < width; x += 1) {
+      const u = x / width;
+      const az = ((270 - u * 360) % 360 + 360) % 360;
+      const turn = az / 360;
+      const skyline = maxHill * (0.22 + 0.78 * far(turn) * (0.55 + 0.45 * near(turn)));
+      const i = (y * width + x) * 4;
+
+      if (alt > skyline + 0.8) {
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+        data[i + 3] = 0;
+        continue;
+      }
+
+      const below = Math.min(1, Math.max(0, (skyline - alt) / 55));
+      const field = blotch(turn + v * 0.15);
+      const grass = 0.55 + 0.45 * field;
+      /* Haze at the skyline, darker grass toward nadir, a little brown earth
+         in the low patches — a dry-season valley, not a cartoon. */
+      const haze = smoothstep(skyline - 4, skyline + 0.8, alt);
+      const r = (42 + 38 * grass + 70 * haze) * (0.55 + 0.45 * (1 - below * 0.5));
+      const g = (62 + 48 * grass + 40 * haze) * (0.6 + 0.4 * (1 - below * 0.45));
+      const b = (28 + 22 * grass + 55 * haze) * (0.55 + 0.45 * (1 - below * 0.4));
+      const edge = 1 - smoothstep(skyline - 0.6, skyline + 0.8, alt);
+
+      data[i] = Math.min(255, r);
+      data[i + 1] = Math.min(255, g);
+      data[i + 2] = Math.min(255, b);
+      data[i + 3] = Math.min(255, 255 * edge);
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = false;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+/**
+ * `kathmandu.jpeg` is a *little planet*: stereographic from the nadir, city in
+ * the middle, hills in a ring, pale sky around the rim. It is not an
+ * equirectangular panorama — slapping it on a sphere as-is stretches Kathmandu
+ * into a belt. These helpers put the photo on the inner sky sphere the way
+ * Stellarium maps a ground panorama: down is the city, the mathematical
+ * horizon is the green hills, the blue sky is cut so the राशि belt shows.
+ */
+
+/** Angle from nadir that lands on the outer edge of the disc. ~110° puts the
+ *  hills on the skyline and the photo's sky just above it (where alpha is 0). */
+export const KATHMANDU_THETA_MAX = (110 * Math.PI) / 180;
+
+/**
+ * How sky-like a pixel is, 0–1. Grass stays (G leads); pale blue / white-blue
+ * at the rim is the photo's sky and has to go.
+ */
+function skyLikeness(r: number, g: number, b: number): number {
+  if (g > b + 18 && g > r + 8) return 0;
+  if (b < 145) return 0;
+  const pale = Math.min(r, g, b) / 255;
+  const blueLead = (b - r) / 255;
+  if (pale > 0.52 && blueLead > 0.015 && b >= g - 8) {
+    return Math.min(1, 0.35 + pale * 0.9);
+  }
+  if (pale > 0.72 && Math.abs(r - g) < 28 && b >= r - 4) return 0.9;
+  return 0;
+}
+
+/**
+ * Configure the pre-baked little-planet ground texture.
+ *
+ * The web app punches the sky and the corners out of `kathmandu.jpeg` here at
+ * runtime with a 2D canvas. React Native has neither a 2D canvas nor
+ * `getImageData`, so that exact computation — the same `skyLikeness`
+ * thresholds and the same smoothstep ramps — runs at build time instead, in
+ * `scripts/bake-kathmandu-ground.mjs`, and ships as a PNG that already carries
+ * the alpha. What is left for runtime is the texture setup the web version
+ * also does, so `alphaTest` on the ground material lets the dome through.
+ *
+ * If the thresholds in the web copy of this file ever move, re-run that
+ * script — it reads them from there by hand, not by import.
+ */
+export function prepareKathmanduGround(source: THREE.Texture): THREE.Texture {
+  const tex = source;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/**
+ * Rewrite a sphere's UVs so each vertex samples {@link prepareKathmanduGround}
+ * stereographically from the nadir (−Y). North (−Z) is up in the photo.
+ */
+export function applyNadirStereographicUVs(
+  geometry: THREE.BufferGeometry,
+  thetaMax = KATHMANDU_THETA_MAX,
+): void {
+  const pos = geometry.getAttribute("position");
+  const uv = geometry.getAttribute("uv");
+  const tanHalf = Math.tan(thetaMax * 0.5);
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const len = Math.hypot(x, y, z) || 1;
+    const theta = Math.acos(Math.min(1, Math.max(-1, -y / len)));
+    const az = Math.atan2(x / len, -z / len);
+    const r = Math.tan(theta * 0.5) / tanHalf;
+    uv.setXY(i, 0.5 + 0.5 * r * Math.sin(az), 0.5 - 0.5 * r * Math.cos(az));
+  }
+  uv.needsUpdate = true;
 }

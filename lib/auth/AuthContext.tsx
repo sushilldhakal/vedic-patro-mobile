@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import {
+  apiApple,
+  apiDeleteAccount,
   apiFacebook,
   apiGoogle,
   apiLogin,
@@ -27,7 +29,9 @@ interface AuthContextValue {
   signup: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   loginWithFacebook: (accessToken: string) => Promise<void>;
+  loginWithApple: (identityToken: string, email?: string | null) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -107,10 +111,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(me);
   }, []);
 
+  const loginWithApple = useCallback(async (identityToken: string, email?: string | null) => {
+    authEpoch.current += 1;
+    const epoch = authEpoch.current;
+    tokenStore.set(await apiApple(identityToken, email));
+    const me = await apiMe();
+    if (epoch !== authEpoch.current) return;
+    setUser(me);
+  }, []);
+
   const logout = useCallback(async () => {
     authEpoch.current += 1;
     setUser(null);
     await apiLogout();
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    authEpoch.current += 1;
+    try {
+      await apiDeleteAccount();
+    } finally {
+      setUser(null);
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -122,10 +144,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       loginWithGoogle,
       loginWithFacebook,
+      loginWithApple,
       logout,
+      deleteAccount,
       refreshUser,
     }),
-    [user, loading, login, signup, loginWithGoogle, loginWithFacebook, logout, refreshUser],
+    [
+      user,
+      loading,
+      login,
+      signup,
+      loginWithGoogle,
+      loginWithFacebook,
+      loginWithApple,
+      logout,
+      deleteAccount,
+      refreshUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

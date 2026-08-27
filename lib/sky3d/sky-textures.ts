@@ -33,3 +33,20 @@ export const SKY_TEXTURE_KEYS = Object.keys(MODULES) as SkyTextureKey[];
 export const SKY_TEXTURE_SOURCES: unknown[] = SKY_TEXTURE_KEYS.map((key) =>
   Platform.OS === "web" ? Asset.fromModule(MODULES[key]).uri : MODULES[key],
 );
+
+/**
+ * The three plates the scene loads on their own rather than through
+ * {@link SKY_TEXTURE_SOURCES} — the web app imports these as bare URLs, which
+ * a bundler gives it for free and Metro does not. Same platform split as
+ * above: a module ref on native, an `expo-asset` URI on web.
+ *
+ * `kathmandu-ground.png` is the pre-alpha'd build of the web app's
+ * `kathmandu.jpeg` — see `scripts/bake-kathmandu-ground.mjs`.
+ */
+function source(mod: number): unknown {
+  return Platform.OS === "web" ? Asset.fromModule(mod).uri : mod;
+}
+
+export const EARTH_TOON_SOURCE = source(require("@/assets/graha/earth-orig.png"));
+export const MILKY_WAY_SOURCE = source(require("@/assets/sky3d/milkyway.png"));
+export const KATHMANDU_GROUND_SOURCE = source(require("@/assets/sky3d/kathmandu-ground.png"));

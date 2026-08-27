@@ -1,12 +1,12 @@
-import type { MobileNavIcon } from "@/lib/mobile-nav";
 import { CEREMONY_META, ELEMENT_META } from "@/lib/panchanga-elements";
+import { resolveDrawerIcon, type DrawerIconName } from "@/lib/drawer-icons";
 
 export type DrawerNavItem = {
   id: string;
   href: string;
   labelNe: string;
   labelEn: string;
-  icon: MobileNavIcon;
+  icon: DrawerIconName;
 };
 
 export type DrawerNavSection = {
@@ -17,40 +17,41 @@ export type DrawerNavSection = {
 };
 
 const patroItems: DrawerNavItem[] = [
-  { id: "holidays", href: "/holidays", labelNe: "बिदा तथा पर्व", labelEn: "Holidays", icon: "flag-outline" },
-  { id: "converter", href: "/converter", labelNe: "रूपान्तरण", labelEn: "Converter", icon: "swap-horizontal-outline" },
-  { id: "suryakranti", href: "/suryakranti", labelNe: "सूर्यक्रान्ति", labelEn: "Sun times", icon: "sunny-outline" },
-  { id: "panchanga-year", href: "/panchanga/year", labelNe: "वार्षिक पञ्चाङ्ग", labelEn: "Year wheel", icon: "disc-outline" },
-  { id: "dainikkranti", href: "/dainikkranti", labelNe: "दैनिक क्रान्ति", labelEn: "Daily transit", icon: "moon-outline" },
-  { id: "panchak-patro", href: "/panchak-patro", labelNe: "पञ्चक पात्रो", labelEn: "Panchak", icon: "warning-outline" },
-  { id: "ritu", href: "/ritu", labelNe: "ऋतु", labelEn: "Seasons", icon: "leaf-outline" },
+  { id: "holidays", href: "/holidays", labelNe: "बिदा तथा पर्व", labelEn: "Holidays", icon: resolveDrawerIcon("patro", "holidays") },
+  { id: "converter", href: "/converter", labelNe: "रूपान्तरण", labelEn: "Converter", icon: resolveDrawerIcon("patro", "converter") },
+  { id: "suryakranti", href: "/suryakranti", labelNe: "सूर्यक्रान्ति", labelEn: "Sun times", icon: resolveDrawerIcon("patro", "suryakranti") },
+  { id: "panchanga-year", href: "/panchanga/year", labelNe: "वार्षिक पञ्चाङ्ग", labelEn: "Year wheel", icon: resolveDrawerIcon("patro", "panchanga-year") },
+  { id: "dainikkranti", href: "/dainikkranti", labelNe: "दैनिक क्रान्ति", labelEn: "Daily transit", icon: resolveDrawerIcon("patro", "dainikkranti") },
+  { id: "panchak-patro", href: "/panchak-patro", labelNe: "पञ्चक पात्रो", labelEn: "Panchak", icon: resolveDrawerIcon("patro", "panchak-patro") },
+  { id: "ritu", href: "/ritu", labelNe: "ऋतु", labelEn: "Seasons", icon: resolveDrawerIcon("patro", "ritu") },
 ];
 
 const jyotishItems: DrawerNavItem[] = [
-  { id: "rashifal", href: "/rashifal", labelNe: "राशिफल", labelEn: "Rashifal", icon: "star-outline" },
-  { id: "avakahada", href: "/panchanga/avakahada-chakra", labelNe: "अवकहडा चक्र", labelEn: "Avakahada", icon: "aperture-outline" },
-  { id: "abhijit", href: "/abhijit-muhurta", labelNe: "अभिजित् मुहूर्त", labelEn: "Abhijit", icon: "flash-outline" },
-  { id: "kundali", href: "/kundali", labelNe: "जन्मकुण्डली", labelEn: "Birth chart", icon: "sparkles-outline" },
-  { id: "kundali-milan", href: "/jyotish/kundali-milan", labelNe: "कुण्डली मिलान", labelEn: "Chart matching", icon: "heart-outline" },
+  { id: "rashifal", href: "/rashifal", labelNe: "राशिफल", labelEn: "Rashifal", icon: resolveDrawerIcon("jyotish", "rashifal") },
+  { id: "avakahada", href: "/panchanga/avakahada-chakra", labelNe: "अवकहडा चक्र", labelEn: "Avakahada", icon: resolveDrawerIcon("jyotish", "avakahada") },
+  { id: "abhijit", href: "/abhijit-muhurta", labelNe: "अभिजित् मुहूर्त", labelEn: "Abhijit", icon: resolveDrawerIcon("jyotish", "abhijit") },
+  { id: "kundali", href: "/kundali", labelNe: "जन्मकुण्डली", labelEn: "Birth chart", icon: resolveDrawerIcon("jyotish", "kundali") },
+  { id: "kundali-milan", href: "/jyotish/kundali-milan", labelNe: "कुण्डली मिलान", labelEn: "Chart matching", icon: resolveDrawerIcon("jyotish", "kundali-milan") },
 ];
 
 const grahaItems: DrawerNavItem[] = [
-  { id: "aakash-gochar", href: "/aakash-gochar", labelNe: "३D आकाश गोचर", labelEn: "3D sky gochar", icon: "planet-outline" },
-  { id: "gochar", href: "/gochar", labelNe: "गोचर", labelEn: "Gochar", icon: "git-branch-outline" },
-  { id: "graha-sthiti", href: "/panchanga/graha-sthiti", labelNe: "ग्रह स्थिति", labelEn: "Graha sthiti", icon: "planet-outline" },
-  { id: "graha-asta", href: "/panchanga/graha-asta", labelNe: "ग्रह अस्त", labelEn: "Heliacal set", icon: "sunny-outline" },
-  { id: "graha-vakri", href: "/panchanga/graha-vakri", labelNe: "ग्रह वक्री", labelEn: "Retrograde", icon: "refresh-outline" },
-  { id: "chandra-grahan", href: "/panchanga/chandra-grahan", labelNe: "चन्द्र ग्रहण", labelEn: "Lunar eclipse", icon: "moon-outline" },
-  { id: "surya-grahan", href: "/panchanga/surya-grahan", labelNe: "सूर्य ग्रहण", labelEn: "Solar eclipse", icon: "ellipse-outline" },
+  { id: "aakash-gochar", href: "/aakash-gochar", labelNe: "३D आकाश गोचर", labelEn: "3D sky gochar", icon: resolveDrawerIcon("graha", "aakash-gochar") },
+  { id: "gochar", href: "/gochar", labelNe: "गोचर", labelEn: "Gochar", icon: resolveDrawerIcon("graha", "gochar") },
+  { id: "graha-sthiti", href: "/panchanga/graha-sthiti", labelNe: "ग्रह स्थिति", labelEn: "Graha sthiti", icon: resolveDrawerIcon("graha", "graha-sthiti") },
+  { id: "graha-asta", href: "/panchanga/graha-asta", labelNe: "ग्रह अस्त", labelEn: "Heliacal set", icon: resolveDrawerIcon("graha", "graha-asta") },
+  { id: "graha-vakri", href: "/panchanga/graha-vakri", labelNe: "ग्रह वक्री", labelEn: "Retrograde", icon: resolveDrawerIcon("graha", "graha-vakri") },
+  { id: "chandra-grahan", href: "/panchanga/chandra-grahan", labelNe: "चन्द्र ग्रहण", labelEn: "Lunar eclipse", icon: resolveDrawerIcon("graha", "chandra-grahan") },
+  { id: "surya-grahan", href: "/panchanga/surya-grahan", labelNe: "सूर्य ग्रहण", labelEn: "Solar eclipse", icon: resolveDrawerIcon("graha", "surya-grahan") },
 ];
 
 function elementItems(kind: "span" | "table"): DrawerNavItem[] {
+  const section = kind === "span" ? "spans" : "tables";
   return ELEMENT_META.filter((e) => e.kind === kind).map((e) => ({
     id: e.id,
     href: `/panchanga/element/${e.id}`,
     labelNe: e.titleNe,
     labelEn: e.titleEn,
-    icon: kind === "span" ? "arrow-forward-circle-outline" : "grid-outline",
+    icon: resolveDrawerIcon(section, e.id),
   }));
 }
 
@@ -60,7 +61,7 @@ function saitItems(): DrawerNavItem[] {
     href: c.id === "vivah" ? "/vivah-sait" : `/sait/${c.id}`,
     labelNe: c.titleNe,
     labelEn: c.titleEn,
-    icon: "heart-outline" as MobileNavIcon,
+    icon: resolveDrawerIcon("sait", c.id),
   }));
 }
 
@@ -77,9 +78,9 @@ export function getMobileDrawerSections(): DrawerNavSection[] {
 }
 
 export const DRAWER_MAIN_LINKS: DrawerNavItem[] = [
-  { id: "home", href: "/", labelNe: "गृह", labelEn: "Home", icon: "home-outline" },
-  { id: "panchanga", href: "/panchanga", labelNe: "सूर्य पञ्चाङ्ग", labelEn: "Panchanga", icon: "sunny-outline" },
-  { id: "learn", href: "/learn", labelNe: "सिकाइ", labelEn: "Learn", icon: "book-outline" },
-  { id: "shanti", href: "/shanti-vidhi", labelNe: "शान्ति विधि", labelEn: "Shanti vidhi", icon: "flower-outline" },
-  { id: "more", href: "/more", labelNe: "थप", labelEn: "More", icon: "ellipsis-horizontal-outline" },
+  { id: "home", href: "/", labelNe: "गृह", labelEn: "Home", icon: resolveDrawerIcon("main", "home") },
+  { id: "panchanga", href: "/panchanga", labelNe: "सूर्य पञ्चाङ्ग", labelEn: "Panchanga", icon: resolveDrawerIcon("main", "panchanga") },
+  { id: "learn", href: "/learn", labelNe: "सिकाइ", labelEn: "Learn", icon: resolveDrawerIcon("main", "learn") },
+  { id: "shanti", href: "/shanti-vidhi", labelNe: "शान्ति विधि", labelEn: "Shanti vidhi", icon: resolveDrawerIcon("main", "shanti") },
+  { id: "more", href: "/more", labelNe: "थप", labelEn: "More", icon: resolveDrawerIcon("main", "more") },
 ];

@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { apiForgotPassword } from "@/lib/auth/client";
 import { useLocale } from "@/lib/i18n";
@@ -33,7 +34,8 @@ export function AuthDialog({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { pick } = useLocale();
-  const { login, signup, loginWithGoogle, loginWithFacebook } = useAuth();
+  const router = useRouter();
+  const { login, signup, loginWithGoogle, loginWithFacebook, loginWithApple } = useAuth();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -130,6 +132,19 @@ export function AuthDialog({
     }
   }
 
+  async function onApple(identityToken: string, email?: string | null) {
+    setError(null);
+    setBusy(true);
+    try {
+      await loginWithApple(identityToken, email);
+      close();
+    } catch {
+      setError(pick("एपल लग-इन असफल", "Apple sign-in failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const title =
     mode === "login"
       ? pick("लग-इन", "Sign in")
@@ -218,6 +233,7 @@ export function AuthDialog({
                 <SocialSignInButtons
                   onGoogle={onGoogle}
                   onFacebook={onFacebook}
+                  onApple={onApple}
                   onError={setError}
                   disabled={busy}
                 />
@@ -303,6 +319,33 @@ export function AuthDialog({
                     {pick("लग-इनमा फर्कनुहोस्", "Back to sign in")}
                   </Text>
                 </Pressable>
+              ) : null}
+              {mode !== "forgot" ? (
+                <Text className="mt-2 px-4 text-center text-xs leading-relaxed text-muted-foreground">
+                  {pick(
+                    "जारी राखेर तपाईं गोपनीयता नीति र प्रयोगका सर्त मान्नुहुन्छ।",
+                    "By continuing you agree to the Privacy Policy and Terms of Use.",
+                  )}{" "}
+                  <Text
+                    className="font-semibold text-secondary"
+                    onPress={() => {
+                      close();
+                      router.push("/privacy" as never);
+                    }}
+                  >
+                    {pick("गोपनीयता", "Privacy")}
+                  </Text>
+                  {" · "}
+                  <Text
+                    className="font-semibold text-secondary"
+                    onPress={() => {
+                      close();
+                      router.push("/terms" as never);
+                    }}
+                  >
+                    {pick("सर्त", "Terms")}
+                  </Text>
+                </Text>
               ) : null}
             </View>
           </ScrollView>

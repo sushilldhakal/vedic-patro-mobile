@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform, StyleSheet, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
 import {
   useFonts,
   NotoSansDevanagari_400Regular,
@@ -47,6 +48,7 @@ export default function RootLayout() {
     NotoSansDevanagari_700Bold,
     FiraCode_400Regular,
     FiraCode_700Bold,
+    ...Ionicons.font,
   });
 
   useEffect(() => {
