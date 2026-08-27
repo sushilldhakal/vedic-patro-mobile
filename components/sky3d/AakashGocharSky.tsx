@@ -907,23 +907,94 @@ export function AakashGocharSky({
   const pointFromEvent = useCallback(
     (e: GestureResponderEvent, g: PanResponderGestureState): { x: number; y: number } | null => {
       const t = e.nativeEvent.touches?.[0] ?? e.nativeEvent.changedTouches?.[0];
+      /* Canvas-local first — that is the frame the picker projects into, and
+         when the touch landed on this view (the usual case) it is exact. */
+      const locX = typeof t?.locationX === "number" ? t.locationX : e.nativeEvent.locationX;
+      const locY = typeof t?.locationY === "number" ? t.locationY : e.nativeEvent.locationY;
+      if (typeof locX === "number" && typeof locY === "number" && Number.isFinite(locX)) {
+        return { x: locX, y: locY };
+      }
+      /* Otherwise window coordinates through this view's measured origin —
+         unambiguous whatever node the touch was dispatched against. */
+      const o = viewOrigin.current;
       const pageX = typeof t?.pageX === "number" ? t.pageX : e.nativeEvent.pageX;
       const pageY = typeof t?.pageY === "number" ? t.pageY : e.nativeEvent.pageY;
-      const o = viewOrigin.current;
       if (typeof pageX === "number" && typeof pageY === "number") {
         return { x: pageX - o.x, y: pageY - o.y };
       }
+      /* Last resort: where the gesture began, also in window coordinates. */
       if (typeof g?.x0 === "number" && typeof g?.y0 === "number" && (g.x0 !== 0 || g.y0 !== 0)) {
         return { x: g.x0 - o.x, y: g.y0 - o.y };
-      }
-      const { locationX, locationY } = e.nativeEvent;
-      if (typeof locationX === "number" && typeof locationY === "number") {
-        return { x: locationX, y: locationY };
       }
       return null;
     },
     [],
   );
+
+  /** Whether this gesture has already been settled — see the handlers below. */
+  const settled = useRef(false);
+  /**
+   * The end of a gesture, decided once: was it a tap, and if so, on what.
+   *
+   * Held in a ref rather than closed over by the `PanResponder`, which is
+   * built once, so it always sees the current `DRAG_SLOP`, picker and mode
+   * without the recogniser being rebuilt mid-gesture.
+   */
+  const settle = useCallback(
+    (e: GestureResponderEvent, g: PanResponderGestureState, via: string) => {
+      if (settled.current) return;
+      settled.current = true;
+      /* One last look before deciding: if more than one finger is still down,
+         or more than one came up together, this was never a single-finger
+         gesture whatever the earlier hooks saw. */
+      const endingFingers = Math.max(
+        g?.numberActiveTouches ?? 0,
+        e?.nativeEvent?.changedTouches?.length ?? 0,
+        e?.nativeEvent?.touches?.length ?? 0,
+      );
+      if (endingFingers >= 2) multiTouch.current = true;
+      const at = pressPoint.current ?? pointFromEvent(e, g);
+      pressPoint.current = null;
+      const travel = Math.hypot(g?.dx ?? 0, g?.dy ?? 0);
+      /* `multiTouch` first, and unconditionally: a gesture a second finger
+         ever joined is a multi-touch one for its whole life, even if it ended
+         with one finger sitting still on a graha. It is never a tap, so it is
+         never half of a double tap either — the double is two separate
+         one-finger presses, counted in the scene. */
+      const gesture = multiTouch.current
+        ? ("multiTouch" as const)
+        : sensorModeRef.current
+          ? ("sensor" as const)
+          : travel > DRAG_SLOP
+            ? ("drag" as const)
+            : ("tap" as const);
+      notePickDebug({
+        travel,
+        slop: DRAG_SLOP,
+        multiTouch: multiTouch.current,
+        fingerCount: maxFingers.current,
+        pixelRatio: PixelRatio.get(),
+        gesture,
+        tapCount: 0,
+      });
+      if (__DEV__) {
+        console.log(
+          "[sky-pick] settle",
+          JSON.stringify({ via, gesture, travel: Math.round(travel), at, picker: pressRef.current ? "ready" : "MISSING" }),
+        );
+      }
+      if (gesture !== "tap") return;
+      if (!at) return;
+      pressRef.current?.(at.x, at.y);
+    },
+    [pointFromEvent],
+  );
+  /* The recogniser is built once; this keeps it pointed at the current
+     `settle` without rebuilding it. */
+  const settleRef = useRef(settle);
+  useEffect(() => {
+    settleRef.current = settle;
+  }, [settle]);
 
   const responder = useMemo(
     () =>
@@ -939,14 +1010,24 @@ export function AakashGocharSky({
            moves its own centroid, so `g.dx`/`g.dy` stay near zero and none of
            the non-capture hooks above fire — which on a phone left the parent
            free to read the gesture as a scroll and swallow the zoom. */
+        /* `?.length ?? 0`, not `.length`. `touches` is not guaranteed to be
+           present on every native touch event, and reading `.length` off
+           undefined throws *inside* the responder negotiation — which is not
+           a crash anyone sees, it just leaves the touch half-registered. That
+           is what "Ended a touch event which was not counted in
+           trackedTouchCount" is reporting, and a touch RN never counted is one
+           whose release it never delivers: the drag (all in `onPanResponder-
+           Move`) kept working while every tap silently died at the end of the
+           gesture, in every view. */
         onStartShouldSetPanResponderCapture: (e, g) =>
-          g.numberActiveTouches >= 2 || e.nativeEvent.touches.length >= 2,
+          g.numberActiveTouches >= 2 || (e.nativeEvent.touches?.length ?? 0) >= 2,
         onMoveShouldSetPanResponderCapture: (e, g) =>
-          g.numberActiveTouches >= 2 || e.nativeEvent.touches.length >= 2,
+          g.numberActiveTouches >= 2 || (e.nativeEvent.touches?.length ?? 0) >= 2,
         onPanResponderGrant: (e, g) => {
           gestureStart.current = { ...view.current, pinch: 0 };
           pinchSpan.current = 0;
           multiTouch.current = false;
+          settled.current = false;
           maxFingers.current = Math.max(1, e.nativeEvent.touches?.length ?? 1);
           notePickDebug({
             gesture: null,
@@ -965,6 +1046,22 @@ export function AakashGocharSky({
               JSON.stringify({ point: pressPoint.current, touches: e.nativeEvent.touches?.length ?? 0 }),
             );
           }
+        },
+        /* Each additional finger landing, before anything has moved.
+         *
+         * The latch used to be set only from `onPanResponderMove`, which
+         * means a two-finger *tap* — down, down, up, up, without a pixel of
+         * travel — never latched at all, and settled as an ordinary tap that
+         * picked whatever was under the first finger. Rule: two fingers never
+         * select, moving or not. */
+        onPanResponderStart: (e, g) => {
+          const n = Math.max(g?.numberActiveTouches ?? 0, e.nativeEvent.touches?.length ?? 0);
+          maxFingers.current = Math.max(maxFingers.current, n);
+          if (n >= 2) {
+            multiTouch.current = true;
+            notePickDebug({ multiTouch: true, fingerCount: n, gesture: "multiTouch", tapCount: 0 });
+          }
+          if (__DEV__) console.log("[sky-pick] start", JSON.stringify({ fingers: n }));
         },
         /* Never hand the gesture back mid-pinch. The default is to say yes,
            which lets the parent ScrollView take over the moment it decides the
@@ -1129,72 +1226,19 @@ export function AakashGocharSky({
             gestureStart.current.pitch + dy * 0.005 * zoomScale,
           );
         },
-        /* A touch that never really moved was a press, not a drag — hand it to
-           the scene's picker in the canvas's own coordinates. `locationX/Y` are
-           already relative to this view, which is exactly the box the Canvas
-           fills, so no rect measurement is needed. A pinch is never a press. */
-        onPanResponderRelease: (e, g) => {
-          /* Grant is the best source — it is the touch-down point, before any
-             drift. But if it produced nothing, the gesture's own start (page
-             coordinates, always present on `gestureState`) is just as good a
-             description of where the finger landed, and it can never be
-             missing. A tap is no longer thrown away for want of a number. */
-          const at = pressPoint.current ?? pointFromEvent(e, g);
-          pressPoint.current = null;
-          const travel = Math.hypot(g.dx, g.dy);
-          /* `multiTouch` first, and unconditionally: a gesture a second
-             finger ever joined is a multi-touch one for its whole life, even
-             if it ended with one finger sitting still on a graha. It is never
-             a tap, so it is never half of a double tap either — the double is
-             two separate one-finger presses, counted in the scene. */
-          notePickDebug({
-            travel,
-            slop: DRAG_SLOP,
-            multiTouch: multiTouch.current,
-            fingerCount: maxFingers.current,
-            pixelRatio: PixelRatio.get(),
-            gesture: multiTouch.current
-              ? "multiTouch"
-              : sensorModeRef.current
-                ? "sensor"
-                : travel > DRAG_SLOP
-                  ? "drag"
-                  : "tap",
-            tapCount: 0,
-          });
-          if (sensorModeRef.current) return;
-          /* A pinch is never a press — including the tail of one, after the
-             second finger has already come up. See {@link multiTouch}. */
-          if (multiTouch.current) return;
-          if (travel > DRAG_SLOP) return;
-          if (!at) return;
-          if (__DEV__) {
-            console.log(
-              "[sky-pick] press",
-              JSON.stringify({ ...at, picker: pressRef.current ? "ready" : "MISSING" }),
-            );
-          }
-          pressRef.current?.(at.x, at.y);
-        },
-        /* A gesture torn away at the very end — the parent ScrollView deciding
-           late that it wanted it, say — still described a finger that went
-           down and came up without moving. Dropping it silently is the other
-           way a tap does nothing at all, so it takes the same path. */
-        onPanResponderTerminate: (e, g) => {
-          const at = pressPoint.current ?? pointFromEvent(e, g);
-          pressPoint.current = null;
-          const travel = Math.hypot(g.dx, g.dy);
-          if (__DEV__) {
-            console.log(
-              "[sky-pick] terminate",
-              JSON.stringify({ travel, multiTouch: multiTouch.current, at }),
-            );
-          }
-          if (sensorModeRef.current || multiTouch.current) return;
-          if (travel > DRAG_SLOP) return;
-          if (!at) return;
-          pressRef.current?.(at.x, at.y);
-        },
+        /* Every way a gesture can finish funnels here, once.
+         *
+         * `onPanResponderRelease` is the documented one, but it is not the
+         * only one that fires and — as the untracked-touch warnings show — it
+         * is not one that can be relied on to fire at all. `onPanResponderEnd`
+         * comes from a different path in the responder system and survives
+         * cases release does not; `onPanResponderTerminate` is the gesture
+         * being taken away, which for a finger that went down and came up
+         * without moving still describes a tap. Whichever arrives first wins,
+         * and `settled` stops the other two doing it again. */
+        onPanResponderRelease: (e, g) => settleRef.current(e, g, "release"),
+        onPanResponderEnd: (e, g) => settleRef.current(e, g, "end"),
+        onPanResponderTerminate: (e, g) => settleRef.current(e, g, "terminate"),
       }),
     [pointFromEvent],
   );
