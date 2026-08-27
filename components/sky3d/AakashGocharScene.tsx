@@ -123,12 +123,6 @@ import {
   injectHorizonFisheyeIn,
   projectHorizon,
 } from "@/lib/sky3d/horizon-projection";
-import {
-  notePickDebug,
-  pickDebug,
-  trimPickCandidates,
-  type PickDebugCandidate,
-} from "@/lib/sky3d/pick-debug";
 import { buildGridLabels } from "@/lib/sky3d/grid-labels";
 import {
   makeMoonMaterial,
@@ -2962,26 +2956,6 @@ export function AakashGocharScene({
       | null => {
       const field = fovForZoom("horizon", view.current.distance);
       rightAxis.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
-      /* Dev-only: every candidate this pick weighed, for the on-screen
-         readout. Costs nothing in production — `pickDebug.enabled` is
-         `__DEV__` — and runs once per press either way, never per frame. */
-      const seen: PickDebugCandidate[] = [];
-      const note = (
-        label: string,
-        centre: { x: number; y: number },
-        d: number,
-        radius: number,
-      ) => {
-        if (!pickDebug.enabled) return;
-        seen.push({ label, x: centre.x, y: centre.y, distance: d, radius, hit: d < radius });
-      };
-      const report = () => {
-        notePickDebug({
-          touch: { x: px, y: py },
-          viewport: { w: rect.width, h: rect.height },
-          candidates: trimPickCandidates(seen),
-        });
-      };
       let best: GrahaKey | null = null;
       let bestD = Infinity;
       for (const key of GEO_BODY_ORDER) {
@@ -2996,16 +2970,12 @@ export function AakashGocharScene({
         const edgeHit = project(edge, field, scratchEdge);
         const apparentPx = edgeHit ? Math.hypot(edgeHit.x - centre.x, edgeHit.y - centre.y) : 0;
         const radius = Math.max(GRAHA_PICK_RADIUS, apparentPx * 1.15);
-        note(key, centre, d, radius);
         if (d < radius && d < bestD) {
           bestD = d;
           best = key;
         }
       }
-      if (best) {
-        report();
-        return { kind: "graha", key: best };
-      }
+      if (best) return { kind: "graha", key: best };
       /* यम/वरुण/अरुण — decorative, so checked after every real graha (one
          must never steal a press meant for something that actually belongs
          to the chart) but before stars/नेबुला, the same priority a graha
@@ -3026,17 +2996,13 @@ export function AakashGocharScene({
           const edgeHit = project(edge, field, scratchEdge);
           const apparentPx = edgeHit ? Math.hypot(edgeHit.x - centre.x, edgeHit.y - centre.y) : 0;
           const radius = Math.max(GRAHA_PICK_RADIUS, apparentPx * 1.15);
-          note(key, centre, d, radius);
-          if (d < radius && d < bestD) {
+            if (d < radius && d < bestD) {
             bestD = d;
             bestOuter = key;
           }
         }
       }
-      if (bestOuter) {
-        report();
-        return { kind: "outerplanet", key: bestOuter };
-      }
+      if (bestOuter) return { kind: "outerplanet", key: bestOuter };
       let starKind: "vedicstar" | "skystar" | "nebula" | null = null;
       let starIndex = -1;
       const nVedic = vedicPickCount.current;
@@ -3045,7 +3011,6 @@ export function AakashGocharScene({
         const centre = project(hit.world, field, scratchPick);
         if (!centre) continue;
         const d = Math.hypot(centre.x - px, centre.y - py);
-        note(vedicStarsRef.current?.[hit.index]?.en ?? `vedic:${hit.index}`, centre, d, PICK_RADIUS);
         if (d < PICK_RADIUS && d < bestD) {
           bestD = d;
           starKind = "vedicstar";
@@ -3058,7 +3023,6 @@ export function AakashGocharScene({
         const centre = project(hit.world, field, scratchPick);
         if (!centre) continue;
         const d = Math.hypot(centre.x - px, centre.y - py);
-        note(starField.stars[hit.index]?.name ?? `star:${hit.index}`, centre, d, PICK_RADIUS);
         if (d < PICK_RADIUS && d < bestD) {
           bestD = d;
           starKind = "skystar";
@@ -3082,19 +3046,12 @@ export function AakashGocharScene({
         const edgeHit = project(edge, field, scratchEdge);
         const apparentPx = edgeHit ? Math.hypot(edgeHit.x - centre.x, edgeHit.y - centre.y) : 0;
         const radius = Math.max(PICK_RADIUS, apparentPx);
-        note(
-          nebulaField[nebulaMarkers[hit.index]?.nebulaIndex]?.nebula.en ?? `nebula:${hit.index}`,
-          centre,
-          d,
-          radius,
-        );
         if (d < radius && d < bestD) {
           bestD = d;
           starKind = "nebula";
           starIndex = hit.index;
         }
       }
-      report();
       if (starKind && starIndex >= 0) return { kind: starKind, index: starIndex };
       return null;
     };
@@ -3102,17 +3059,9 @@ export function AakashGocharScene({
     const handlePress = (px: number, py: number) => {
       const hit = pick(px, py);
       if (!hit) {
-        notePickDebug({ selected: null, gesture: "tap", tapCount: 1 });
-        if (__DEV__) console.log("[sky-pick] miss", JSON.stringify({ px, py }));
         onEmptyPressRef.current?.();
         return;
       }
-      notePickDebug({
-        selected:
-          hit.kind === "graha" || hit.kind === "outerplanet"
-            ? `${hit.kind}:${hit.key}`
-            : `${hit.kind}:${hit.index}`,
-      });
 
       /* One press marks it where it stands; a second press on the *same*
          thing inside {@link DOUBLE_MS} rides it — a graha under
@@ -3135,17 +3084,9 @@ export function AakashGocharScene({
          a gesture a second finger joined never reaches here at all, the
          `multiTouch` latch in the shell returns first — so this counts taps,
          never fingers. */
-      const sinceLast = now - lastAt;
-      const again = thisKey === lastKey && sinceLast < DOUBLE_MS;
+      const again = thisKey === lastKey && now - lastAt < DOUBLE_MS;
       lastKey = again ? null : thisKey;
       lastAt = now;
-      notePickDebug({ gesture: again ? "doubleTap" : "tap", tapCount: again ? 2 : 1 });
-      if (__DEV__) {
-        console.log(
-          "[sky-pick] hit",
-          JSON.stringify({ key: thisKey, again, sinceLastMs: Math.round(sinceLast), lastKey }),
-        );
-      }
 
       if (hit.kind === "outerplanet") {
         /* Identify-only, on purpose — see {@link OUTER_PLANET_ORDER}'s own

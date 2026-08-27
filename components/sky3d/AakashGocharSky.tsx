@@ -12,7 +12,6 @@ import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   Modal,
   PanResponder,
-  PixelRatio,
   Pressable,
   ScrollView,
   TextInput,
@@ -98,8 +97,6 @@ import {
   type ViewState,
 } from "@/components/sky3d/AakashGocharScene";
 import CompassNeedle from "@/assets/compass.svg";
-import { PickDebugOverlay } from "./PickDebugOverlay";
-import { notePickDebug } from "@/lib/sky3d/pick-debug";
 import { CompassControl, DIAL_SIZE } from "@/components/sky3d/CompassControl";
 import { useDeviceOrientation } from "@/lib/sky3d/device-orientation";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -872,8 +869,6 @@ export function AakashGocharSky({
    * this a pinch."
    */
   const multiTouch = useRef(false);
-  /** Most fingers down at once this gesture — reported, never decided on. */
-  const maxFingers = useRef(0);
   /**
    * The gesture view's box in window coordinates.
    *
@@ -941,7 +936,7 @@ export function AakashGocharSky({
    * without the recogniser being rebuilt mid-gesture.
    */
   const settle = useCallback(
-    (e: GestureResponderEvent, g: PanResponderGestureState, via: string) => {
+    (e: GestureResponderEvent, g: PanResponderGestureState) => {
       if (settled.current) return;
       settled.current = true;
       /* One last look before deciding: if more than one finger is still down,
@@ -968,21 +963,6 @@ export function AakashGocharSky({
           : travel > DRAG_SLOP
             ? ("drag" as const)
             : ("tap" as const);
-      notePickDebug({
-        travel,
-        slop: DRAG_SLOP,
-        multiTouch: multiTouch.current,
-        fingerCount: maxFingers.current,
-        pixelRatio: PixelRatio.get(),
-        gesture,
-        tapCount: 0,
-      });
-      if (__DEV__) {
-        console.log(
-          "[sky-pick] settle",
-          JSON.stringify({ via, gesture, travel: Math.round(travel), at, picker: pressRef.current ? "ready" : "MISSING" }),
-        );
-      }
       if (gesture !== "tap") return;
       if (!at) return;
       pressRef.current?.(at.x, at.y);
@@ -1028,24 +1008,8 @@ export function AakashGocharSky({
           pinchSpan.current = 0;
           multiTouch.current = false;
           settled.current = false;
-          maxFingers.current = Math.max(1, e.nativeEvent.touches?.length ?? 1);
-          notePickDebug({
-            gesture: null,
-            travel: 0,
-            tapCount: 0,
-            fingerCount: maxFingers.current,
-            multiTouch: false,
-            selected: null,
-            candidates: [],
-          });
           dragOrigin.current = { dx: 0, dy: 0 };
           pressPoint.current = pointFromEvent(e, g);
-          if (__DEV__) {
-            console.log(
-              "[sky-pick] grant",
-              JSON.stringify({ point: pressPoint.current, touches: e.nativeEvent.touches?.length ?? 0 }),
-            );
-          }
         },
         /* Each additional finger landing, before anything has moved.
          *
@@ -1056,12 +1020,7 @@ export function AakashGocharSky({
          * select, moving or not. */
         onPanResponderStart: (e, g) => {
           const n = Math.max(g?.numberActiveTouches ?? 0, e.nativeEvent.touches?.length ?? 0);
-          maxFingers.current = Math.max(maxFingers.current, n);
-          if (n >= 2) {
-            multiTouch.current = true;
-            notePickDebug({ multiTouch: true, fingerCount: n, gesture: "multiTouch", tapCount: 0 });
-          }
-          if (__DEV__) console.log("[sky-pick] start", JSON.stringify({ fingers: n }));
+          if (n >= 2) multiTouch.current = true;
         },
         /* Never hand the gesture back mid-pinch. The default is to say yes,
            which lets the parent ScrollView take over the moment it decides the
@@ -1081,13 +1040,6 @@ export function AakashGocharSky({
              zooming and panning several times a second. */
           if (g.numberActiveTouches >= 2) {
             multiTouch.current = true;
-            maxFingers.current = Math.max(maxFingers.current, g.numberActiveTouches);
-            notePickDebug({
-              multiTouch: true,
-              fingerCount: maxFingers.current,
-              gesture: "multiTouch",
-              tapCount: 0,
-            });
             if (touches.length < 2) return;
             const [a, b] = touches;
             const raw = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
@@ -1236,9 +1188,9 @@ export function AakashGocharSky({
          * being taken away, which for a finger that went down and came up
          * without moving still describes a tap. Whichever arrives first wins,
          * and `settled` stops the other two doing it again. */
-        onPanResponderRelease: (e, g) => settleRef.current(e, g, "release"),
-        onPanResponderEnd: (e, g) => settleRef.current(e, g, "end"),
-        onPanResponderTerminate: (e, g) => settleRef.current(e, g, "terminate"),
+        onPanResponderRelease: (e, g) => settleRef.current(e, g),
+        onPanResponderEnd: (e, g) => settleRef.current(e, g),
+        onPanResponderTerminate: (e, g) => settleRef.current(e, g),
       }),
     [pointFromEvent],
   );
@@ -2127,9 +2079,6 @@ export function AakashGocharSky({
           bottom={compassBottom}
           visible={mode === "horizon"}
         />
-
-        {/* Dev-only readout of what the picker saw on the last press. */}
-        <PickDebugOverlay />
 
         {/* क्षितिज's field of view — named only while it is actually moving,
             the same "flashes then fades" pattern the सङ्क्रान्ति banner uses.
