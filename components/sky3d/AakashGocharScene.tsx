@@ -644,6 +644,18 @@ const DRAG_SLOP = 6;
 /** Two presses on one graha inside this are a double press. Milliseconds. */
 const DOUBLE_MS = 400;
 
+/**
+ * How long the one-shot centring takes to arrive, milliseconds.
+ *
+ * A double press used to write the target's own yaw/pitch straight into the
+ * camera on the frame it arrived — a teleport, which on a phone reads as the
+ * sky having been swapped for a different sky rather than as having turned to
+ * look at something. Stellarium eases, and so does this. Only the *one-shot*
+ * centring eases; holding a graha in the middle while the clock runs stays a
+ * per-frame snap, because that is tracking and has to be exact.
+ */
+const CENTRE_MS = 420;
+
 /** Grahas are picked by hand in every view, so the raycaster must not also try. */
 const NO_RAYCAST = () => {};
 
@@ -3169,6 +3181,23 @@ export function AakashGocharScene({
   const lastFocusNonce = useRef(focusNonce);
   const recentre = useRef(false);
   const lastAim = useRef(0);
+  /**
+   * The one-shot centring in flight, if any.
+   *
+   * `wroteYaw`/`wrotePitch` are what this last put into `view.current`. If the
+   * next frame finds something else there, a drag (or the sensors) moved the
+   * camera mid-flight, and the reader's hand wins: the animation drops rather
+   * than fighting the finger for the same two numbers.
+   */
+  const centreAnim = useRef<{
+    t0: number;
+    yaw0: number;
+    pitch0: number;
+    yaw1: number;
+    pitch1: number;
+    wroteYaw: number;
+    wrotePitch: number;
+  } | null>(null);
   const aimAt = useRef(new THREE.Vector3());
   const target = useRef(new THREE.Vector3());
   /** Screen-up in world space, so a name can be hung off the edge of a disc. */
@@ -5165,9 +5194,61 @@ export function AakashGocharScene({
          * the camera low in the south-west, and the thing you asked to look at
          * was the one place on the dome you were not looking. */
         const len = Math.hypot(trackAt.x, trackAt.y, trackAt.z) || 1;
-        v.pitch = -Math.asin(Math.max(-1, Math.min(1, trackAt.y / len)));
-        v.yaw = -Math.atan2(trackAt.x, -trackAt.z);
+        const aimPitch = -Math.asin(Math.max(-1, Math.min(1, trackAt.y / len)));
+        const aimYaw = -Math.atan2(trackAt.x, -trackAt.z);
+        if (s.playing) {
+          /* Following a moving body with the clock running — snap, every
+             frame. An ease here would simply lag behind the thing it is
+             supposed to be nailed to. */
+          centreAnim.current = null;
+          v.pitch = aimPitch;
+          v.yaw = aimYaw;
+        } else {
+          /* A double press, or केन्द्रविन्दु, on a still sky: turn to it over
+             {@link CENTRE_MS} instead of arriving there instantly. The yaw
+             delta is unwrapped to the short way round, so centring something
+             just west of north never takes the camera the long way through
+             south. */
+          let dYaw = aimYaw - v.yaw;
+          while (dYaw > Math.PI) dYaw -= 2 * Math.PI;
+          while (dYaw < -Math.PI) dYaw += 2 * Math.PI;
+          centreAnim.current = {
+            t0: performance.now(),
+            yaw0: v.yaw,
+            pitch0: v.pitch,
+            yaw1: v.yaw + dYaw,
+            pitch1: aimPitch,
+            wroteYaw: v.yaw,
+            wrotePitch: v.pitch,
+          };
+        }
         target.current.copy(trackAt);
+      }
+      /* The centring in flight, advanced one frame. Written *after* the block
+         above so a fresh press always re-targets rather than queueing. */
+      const anim = centreAnim.current;
+      if (anim) {
+        if (v.yaw !== anim.wroteYaw || v.pitch !== anim.wrotePitch) {
+          /* A finger (or the gyro) took the camera mid-flight — let it. */
+          centreAnim.current = null;
+        } else {
+          const t = Math.min(1, (performance.now() - anim.t0) / CENTRE_MS);
+          /* smoothstep: leaves and arrives at rest, which is what makes it
+             read as the camera turning rather than as a cut. */
+          const e = t * t * (3 - 2 * t);
+          v.yaw = anim.yaw0 + (anim.yaw1 - anim.yaw0) * e;
+          v.pitch = anim.pitch0 + (anim.pitch1 - anim.pitch0) * e;
+          if (t >= 1) {
+            /* Landed exactly on the target, not merely near it — the whole
+               point is that the object ends up at the centre pixel. */
+            v.yaw = anim.yaw1;
+            v.pitch = anim.pitch1;
+            centreAnim.current = null;
+          } else {
+            anim.wroteYaw = v.yaw;
+            anim.wrotePitch = v.pitch;
+          }
+        }
       }
       cam.rotation.order = "YXZ";
       cam.rotation.set(-v.pitch, v.yaw, v.roll ?? 0);

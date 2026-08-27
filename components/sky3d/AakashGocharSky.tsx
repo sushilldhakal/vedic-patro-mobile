@@ -74,6 +74,7 @@ import {
   SKY_KINDS,
   searchSky,
   skyTargetsOfKind,
+  displayVedicStars,
   vedicStarTargets,
   type SkyTarget,
   type SkyTargetKind,
@@ -547,7 +548,8 @@ export function AakashGocharSky({
     [signedIn],
   );
 
-  const namedStars = useMemo(() => vedicStarTargets(vedicStars ?? []), [vedicStars]);
+  const catalogStars = useMemo(() => displayVedicStars(vedicStars ?? []), [vedicStars]);
+  const namedStars = useMemo(() => vedicStarTargets(catalogStars), [catalogStars]);
   const [searchQuery, setSearchQuery] = useState("");
   type SearchPane =
     | { view: "home" }
@@ -794,8 +796,14 @@ export function AakashGocharSky({
    * of a drag. It measures that, and calls this with canvas-local pixels.
    */
   const pressRef = useRef<((x: number, y: number) => void) | null>(null);
-  /** How far a finger may travel and still count as a press, px — web's `DRAG_SLOP`. */
-  const DRAG_SLOP = 6;
+  /** How far a finger may travel and still count as a press, px.
+   *
+   *  10, not the web's 6. A mouse click does not move; a finger on glass
+   *  drifts several pixels between landing and lifting, and at 6 a fair
+   *  proportion of honest taps on a star were being read as drags and
+   *  silently selecting nothing. Still well under the distance at which a
+   *  deliberate drag has visibly turned the sky. */
+  const DRAG_SLOP = 10;
 
   const gestureStart = useRef({ yaw: 0, pitch: 0, distance: 0, pinch: 0 });
   /**
@@ -1896,7 +1904,7 @@ export function AakashGocharSky({
               pressRef={pressRef}
               skyAim={skyAim}
               arBackground={showCamera}
-              vedicStars={vedicStars}
+              vedicStars={catalogStars}
             />
           </Suspense>
         </Canvas>
