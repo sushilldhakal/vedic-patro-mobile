@@ -3103,6 +3103,7 @@ export function AakashGocharScene({
       const hit = pick(px, py);
       if (!hit) {
         notePickDebug({ selected: null, gesture: "tap", tapCount: 1 });
+        if (__DEV__) console.log("[sky-pick] miss", JSON.stringify({ px, py }));
         onEmptyPressRef.current?.();
         return;
       }
@@ -3134,10 +3135,17 @@ export function AakashGocharScene({
          a gesture a second finger joined never reaches here at all, the
          `multiTouch` latch in the shell returns first — so this counts taps,
          never fingers. */
-      const again = thisKey === lastKey && now - lastAt < DOUBLE_MS;
+      const sinceLast = now - lastAt;
+      const again = thisKey === lastKey && sinceLast < DOUBLE_MS;
       lastKey = again ? null : thisKey;
       lastAt = now;
       notePickDebug({ gesture: again ? "doubleTap" : "tap", tapCount: again ? 2 : 1 });
+      if (__DEV__) {
+        console.log(
+          "[sky-pick] hit",
+          JSON.stringify({ key: thisKey, again, sinceLastMs: Math.round(sinceLast), lastKey }),
+        );
+      }
 
       if (hit.kind === "outerplanet") {
         /* Identify-only, on purpose — see {@link OUTER_PLANET_ORDER}'s own

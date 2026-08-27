@@ -19,6 +19,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import type { GestureResponderEvent, PanResponderGestureState } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@/components/sky3d/GeocentricSkyCanvas";
@@ -873,6 +874,57 @@ export function AakashGocharSky({
   const multiTouch = useRef(false);
   /** Most fingers down at once this gesture — reported, never decided on. */
   const maxFingers = useRef(0);
+  /**
+   * The gesture view's box in window coordinates.
+   *
+   * `locationX`/`locationY` are relative to whichever node the touch was
+   * dispatched against, and inside this view that is not reliably the view
+   * itself — the GL surface and the camera backdrop are both children filling
+   * the same box, and a touch landing on one of those reports against *it*.
+   * When that node is not the canvas, or the value arrives undefined (it can),
+   * the press had no usable coordinates and was dropped: `pressPoint` stayed
+   * null and `onPanResponderRelease` returned before ever reaching the picker.
+   * That is a tap that visibly does nothing.
+   *
+   * `pageX`/`pageY` have no such ambiguity — they are window coordinates, the
+   * same for every node — so with the view's own origin measured once they
+   * convert to canvas-local pixels exactly, whatever the touch landed on.
+   */
+  const viewRef = useRef<View>(null);
+  const viewOrigin = useRef({ x: 0, y: 0 });
+  const measureView = useCallback(() => {
+    viewRef.current?.measureInWindow((x, y) => {
+      if (typeof x === "number" && typeof y === "number") viewOrigin.current = { x, y };
+    });
+  }, []);
+  /**
+   * Where a touch landed, in canvas-local pixels.
+   *
+   * Tries window coordinates first (unambiguous, see {@link viewOrigin}),
+   * then the gesture's own start point, then `locationX`/`locationY` as a
+   * last resort. Null only if every one of those is unusable.
+   */
+  const pointFromEvent = useCallback(
+    (e: GestureResponderEvent, g: PanResponderGestureState): { x: number; y: number } | null => {
+      const t = e.nativeEvent.touches?.[0] ?? e.nativeEvent.changedTouches?.[0];
+      const pageX = typeof t?.pageX === "number" ? t.pageX : e.nativeEvent.pageX;
+      const pageY = typeof t?.pageY === "number" ? t.pageY : e.nativeEvent.pageY;
+      const o = viewOrigin.current;
+      if (typeof pageX === "number" && typeof pageY === "number") {
+        return { x: pageX - o.x, y: pageY - o.y };
+      }
+      if (typeof g?.x0 === "number" && typeof g?.y0 === "number" && (g.x0 !== 0 || g.y0 !== 0)) {
+        return { x: g.x0 - o.x, y: g.y0 - o.y };
+      }
+      const { locationX, locationY } = e.nativeEvent;
+      if (typeof locationX === "number" && typeof locationY === "number") {
+        return { x: locationX, y: locationY };
+      }
+      return null;
+    },
+    [],
+  );
+
   const responder = useMemo(
     () =>
       PanResponder.create({
@@ -891,7 +943,7 @@ export function AakashGocharSky({
           g.numberActiveTouches >= 2 || e.nativeEvent.touches.length >= 2,
         onMoveShouldSetPanResponderCapture: (e, g) =>
           g.numberActiveTouches >= 2 || e.nativeEvent.touches.length >= 2,
-        onPanResponderGrant: (e) => {
+        onPanResponderGrant: (e, g) => {
           gestureStart.current = { ...view.current, pinch: 0 };
           pinchSpan.current = 0;
           multiTouch.current = false;
@@ -906,11 +958,13 @@ export function AakashGocharSky({
             candidates: [],
           });
           dragOrigin.current = { dx: 0, dy: 0 };
-          const { locationX, locationY } = e.nativeEvent;
-          pressPoint.current =
-            typeof locationX === "number" && typeof locationY === "number"
-              ? { x: locationX, y: locationY }
-              : null;
+          pressPoint.current = pointFromEvent(e, g);
+          if (__DEV__) {
+            console.log(
+              "[sky-pick] grant",
+              JSON.stringify({ point: pressPoint.current, touches: e.nativeEvent.touches?.length ?? 0 }),
+            );
+          }
         },
         /* Never hand the gesture back mid-pinch. The default is to say yes,
            which lets the parent ScrollView take over the moment it decides the
@@ -1079,8 +1133,13 @@ export function AakashGocharSky({
            the scene's picker in the canvas's own coordinates. `locationX/Y` are
            already relative to this view, which is exactly the box the Canvas
            fills, so no rect measurement is needed. A pinch is never a press. */
-        onPanResponderRelease: (_e, g) => {
-          const at = pressPoint.current;
+        onPanResponderRelease: (e, g) => {
+          /* Grant is the best source — it is the touch-down point, before any
+             drift. But if it produced nothing, the gesture's own start (page
+             coordinates, always present on `gestureState`) is just as good a
+             description of where the finger landed, and it can never be
+             missing. A tap is no longer thrown away for want of a number. */
+          const at = pressPoint.current ?? pointFromEvent(e, g);
           pressPoint.current = null;
           const travel = Math.hypot(g.dx, g.dy);
           /* `multiTouch` first, and unconditionally: a gesture a second
@@ -1109,10 +1168,35 @@ export function AakashGocharSky({
           if (multiTouch.current) return;
           if (travel > DRAG_SLOP) return;
           if (!at) return;
+          if (__DEV__) {
+            console.log(
+              "[sky-pick] press",
+              JSON.stringify({ ...at, picker: pressRef.current ? "ready" : "MISSING" }),
+            );
+          }
+          pressRef.current?.(at.x, at.y);
+        },
+        /* A gesture torn away at the very end — the parent ScrollView deciding
+           late that it wanted it, say — still described a finger that went
+           down and came up without moving. Dropping it silently is the other
+           way a tap does nothing at all, so it takes the same path. */
+        onPanResponderTerminate: (e, g) => {
+          const at = pressPoint.current ?? pointFromEvent(e, g);
+          pressPoint.current = null;
+          const travel = Math.hypot(g.dx, g.dy);
+          if (__DEV__) {
+            console.log(
+              "[sky-pick] terminate",
+              JSON.stringify({ travel, multiTouch: multiTouch.current, at }),
+            );
+          }
+          if (sensorModeRef.current || multiTouch.current) return;
+          if (travel > DRAG_SLOP) return;
+          if (!at) return;
           pressRef.current?.(at.x, at.y);
         },
       }),
-    [],
+    [pointFromEvent],
   );
 
   const onSample = useCallback((next: SkySample) => {
@@ -1918,6 +2002,8 @@ export function AakashGocharSky({
           finger instead of turning the sky. This tells the browser the touch
           is this element's alone. */}
       <View
+        ref={viewRef}
+        onLayout={measureView}
         style={{ height: canvasHeight, backgroundColor: CANVAS_BG, touchAction: "none" }}
         {...responder.panHandlers}
       >
