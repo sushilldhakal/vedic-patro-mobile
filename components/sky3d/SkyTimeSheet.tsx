@@ -228,7 +228,7 @@ export function SkyTimeSheet({
       </Pressable>
       <Text
         className="text-xl font-bold"
-        style={[nepaliTextStyle(20), { color: "#ffffff", fontVariant: ["tabular-nums"] }]}
+        style={[nepaliTextStyle(20, { dense: true }), { color: "#ffffff", fontVariant: ["tabular-nums"] }]}
       >
         {digits(plain(field))}
       </Text>
@@ -264,7 +264,7 @@ export function SkyTimeSheet({
       <Text
         numberOfLines={1}
         className="text-[11px] font-semibold"
-        style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.75)" }]}
+        style={[nepaliTextStyle(11, { dense: true }), { color: "rgba(255,255,255,0.75)" }]}
       >
         {label}
       </Text>
@@ -309,7 +309,7 @@ export function SkyTimeSheet({
 
         <Text
           className="mb-1 mt-4 text-center text-sm font-semibold"
-          style={[nepaliTextStyle(13), { color: "rgba(255,255,255,0.9)" }]}
+          style={[nepaliTextStyle(13, { dense: true }), { color: "rgba(255,255,255,0.9)" }]}
         >
           {speedLabel}
         </Text>
@@ -391,7 +391,7 @@ export function SkyTimeSheet({
                 key={band.id}
                 className="text-[10px]"
                 style={[
-                  nepaliTextStyle(10),
+                  nepaliTextStyle(10, { dense: true }),
                   {
                     color: band.id === activePeriod ? "#ffffff" : "rgba(255,255,255,0.55)",
                     fontWeight: band.id === activePeriod ? "600" : "500",

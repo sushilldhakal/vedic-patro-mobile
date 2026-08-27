@@ -199,8 +199,27 @@ const HOME_DISTANCE: Record<SkyMode, number> = {
 };
 
 /** Look all the way up to the zenith, and almost to the nadir. */
-function clampPitch(p: number) {
-  return Math.max(-1.52, Math.min(1.52, p));
+/**
+ * How far क्षितिज may tip: all the way to the zenith and the nadir.
+ *
+ * The dome view writes the camera's rotation directly (`rotation.set(-pitch,
+ * yaw, 0)` in YXZ), so a pole is an ordinary direction there — nothing
+ * degenerates at it. Stopping three degrees short, which is what ±1.52 did,
+ * meant the one thing you cannot reach is the point every vertical converges
+ * on: pushed in to a one-degree field the pole sat off the edge of the frame
+ * and the centre of the grid could not be looked at at all.
+ */
+const DOME_PITCH_MAX = Math.PI / 2;
+/**
+ * अन्तरिक्ष and पृथ्वी गोला stop short of it, and have to.
+ *
+ * Those two orbit the target and aim with `lookAt`, which needs an up vector
+ * that is not parallel to the view — exactly at the pole it is, and the frame
+ * rolls right over. This is the original limit, kept where it is load-bearing.
+ */
+const ORBIT_PITCH_MAX = 1.52;
+function clampPitch(p: number, max: number = ORBIT_PITCH_MAX) {
+  return Math.max(-max, Math.min(max, p));
 }
 const RAD_TO_DEG = 180 / Math.PI;
 
@@ -1160,7 +1179,7 @@ export function AakashGocharSky({
                infinity — spins fast but stays finite. */
             const cosPitch = Math.max(Math.cos(view.current.pitch), 0.15);
             view.current.yaw += (ddx * k) / cosPitch;
-            view.current.pitch = clampPitch(view.current.pitch - ddy * k);
+            view.current.pitch = clampPitch(view.current.pitch - ddy * k, DOME_PITCH_MAX);
             return;
           }
           /* अन्तरिक्ष and पृथ्वी गोला drag the sphere rather than the camera:
@@ -1691,7 +1710,7 @@ export function AakashGocharSky({
     <Dropdown width={Math.min(230, panelWidth)} maxHeight={canvasHeight - overlayTop - 56} top={panelTop}>
       <Text
         className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-        style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.55)" }]}
+        style={[nepaliTextStyle(11, { dense: true }), { color: "rgba(255,255,255,0.55)" }]}
       >
         {pick("केन्द्रविन्दु", "Focus")}
       </Text>
@@ -1735,7 +1754,7 @@ export function AakashGocharSky({
               </View>
               <Text
                 className="text-xs font-semibold"
-                style={[nepaliTextStyle(12), { color: checked ? "#ffffff" : "rgba(255,255,255,0.7)" }]}
+                style={[nepaliTextStyle(12, { dense: true }), { color: checked ? "#ffffff" : "rgba(255,255,255,0.7)" }]}
               >
                 {pick(neName, en)}
               </Text>
@@ -1770,7 +1789,7 @@ export function AakashGocharSky({
         <Text
           className="text-xs font-semibold"
           style={[
-            nepaliTextStyle(12),
+            nepaliTextStyle(12, { dense: true }),
             { color: selectedKey ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" },
           ]}
         >
@@ -1813,7 +1832,7 @@ export function AakashGocharSky({
         <Text
           numberOfLines={1}
           className="shrink text-sm font-semibold text-white/90"
-          style={nepaliTextStyle(13)}
+          style={nepaliTextStyle(13, { dense: true })}
         >
           {searchName(t)}
         </Text>
@@ -1850,7 +1869,7 @@ export function AakashGocharSky({
       className="flex-row items-center gap-2.5 rounded-lg px-2.5 py-2 active:bg-white/10"
     >
       <Ionicons name={icon} size={16} color="rgba(255,255,255,0.6)" />
-      <Text className="flex-1 text-sm font-semibold text-white/80" style={nepaliTextStyle(13)}>
+      <Text className="flex-1 text-sm font-semibold text-white/80" style={nepaliTextStyle(13, { dense: true })}>
         {label}
       </Text>
       {count !== null ? (
@@ -1868,7 +1887,7 @@ export function AakashGocharSky({
       <Ionicons name="chevron-back" size={13} color="rgba(255,255,255,0.45)" />
       <Text
         className="text-[10px] font-bold uppercase tracking-wide"
-        style={[nepaliTextStyle(10), { color: "rgba(255,255,255,0.45)" }]}
+        style={[nepaliTextStyle(10, { dense: true }), { color: "rgba(255,255,255,0.45)" }]}
       >
         {label}
       </Text>
@@ -1916,7 +1935,7 @@ export function AakashGocharSky({
              anyone had said they wanted to type. Pressing the field still
              focuses it, which is when they have. */
           className="min-w-0 flex-1 py-2 text-base font-semibold text-white"
-          style={nepaliTextStyle(15)}
+          style={nepaliTextStyle(15, { dense: true })}
         />
         <Pressable
           onPress={() => (searchQuery ? setSearchQuery("") : setSheet(null))}
@@ -2097,7 +2116,7 @@ export function AakashGocharSky({
             style={{ bottom: fovBadgeBottom, left: 0, right: 0 }}
           >
             <View className="rounded-full border border-white/15 bg-black/60 px-3 py-1">
-              <Text className="text-xs font-bold text-white" style={nepaliTextStyle(12)}>
+              <Text className="text-xs font-bold text-white" style={nepaliTextStyle(12, { dense: true })}>
                 {pick("दृश्य क्षेत्र", "FOV")}{" "}
                 {digits(Math.round(fovForZoom("horizon", sample.zoomDistance)))}°
               </Text>
@@ -2117,7 +2136,7 @@ export function AakashGocharSky({
               <CompassNeedle width={56} height={56} color="#f4c542" />
               <Text
                 className="text-center text-2xl font-extrabold text-white"
-                style={nepaliTextStyle(24)}
+                style={nepaliTextStyle(24, { dense: true })}
               >
                 {pick("फोन माथि उठाउनुहोस्", "Point your device up")}
               </Text>
@@ -2141,13 +2160,13 @@ export function AakashGocharSky({
           className="absolute left-3 rounded-lg bg-black/45 px-2.5 py-1.5"
           style={{ top: overlayTop }}
         >
-          <Text className="text-[11px] font-bold" style={[nepaliTextStyle(11), { color: LABEL_COLOR.hud }]}>
+          <Text className="text-[11px] font-bold" style={[nepaliTextStyle(11, { dense: true }), { color: LABEL_COLOR.hud }]}>
             {simStamp.date}
           </Text>
-          <Text className="text-[10px]" style={[nepaliTextStyle(10), { color: LABEL_COLOR.hudDim }]}>
+          <Text className="text-[10px]" style={[nepaliTextStyle(10, { dense: true }), { color: LABEL_COLOR.hudDim }]}>
             {simStamp.time}
           </Text>
-          <Text className="text-[10px]" style={[nepaliTextStyle(10), { color: LABEL_COLOR.hudDim }]}>
+          <Text className="text-[10px]" style={[nepaliTextStyle(10, { dense: true }), { color: LABEL_COLOR.hudDim }]}>
             {mode === "horizon"
               ? `${pick("क्षितिज", "Horizon")} · ${digits(observer.lat.toFixed(2))}°, ${digits(observer.lon.toFixed(2))}° · ${
                   isDay ? pick("दिन", "day") : pick("रात", "night")
@@ -2157,7 +2176,7 @@ export function AakashGocharSky({
                 : pick("अन्तरिक्षबाट", "From space")}
           </Text>
           {/* The rate, since the speed buttons no longer carry a caption. */}
-          <Text className="text-[10px]" style={[nepaliTextStyle(10), { color: LABEL_COLOR.hudDim }]}>
+          <Text className="text-[10px]" style={[nepaliTextStyle(10, { dense: true }), { color: LABEL_COLOR.hudDim }]}>
             {playing
               ? `${reverse ? "◀◀" : "▶▶"} ${pick(speed.ne, speed.en)}`
               : pick("⏸ रोकिएको", "⏸ paused")}
@@ -2218,7 +2237,7 @@ export function AakashGocharSky({
             <View className="rounded-full border border-amber-400/60 bg-amber-500/25 px-3 py-1">
               <Text
                 className="text-[12px] font-bold"
-                style={[nepaliTextStyle(12), { color: "#fde68a", fontSize: 12 }]}
+                style={[nepaliTextStyle(12, { dense: true }), { color: "#fde68a", fontSize: 12 }]}
               >
                 {`${pick("सङ्क्रान्ति", "Sankranti")} · ${rashiNames[sankranti]} · ${
                   monthNames[sankranti]
@@ -2254,7 +2273,7 @@ export function AakashGocharSky({
               <Text
                 className="text-[12px] font-bold"
                 style={[
-                  nepaliTextStyle(12),
+                  nepaliTextStyle(12, { dense: true }),
                   { color: eclipse ? "#fecaca" : "#e2e8f0", fontSize: 12 },
                 ]}
               >
@@ -2301,10 +2320,10 @@ export function AakashGocharSky({
             accessibilityRole="button"
             accessibilityLabel={pick("समय नियन्त्रण", "Time controls")}
           >
-            <Text className="text-[13px] font-bold" style={[nepaliTextStyle(13), { color: "#ffffff" }]}>
+            <Text className="text-[13px] font-bold" style={[nepaliTextStyle(13, { dense: true }), { color: "#ffffff" }]}>
               {simStamp.short.day}
             </Text>
-            <Text className="text-[11px] font-semibold" style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.7)" }]}>
+            <Text className="text-[11px] font-semibold" style={[nepaliTextStyle(11, { dense: true }), { color: "rgba(255,255,255,0.7)" }]}>
               {simStamp.short.clock}
             </Text>
           </Pressable>
@@ -2348,7 +2367,7 @@ export function AakashGocharSky({
               <Text
                 className="absolute whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold"
                 style={[
-                  nepaliTextStyle(11),
+                  nepaliTextStyle(11, { dense: true }),
                   {
                     top: 56,
                     color: "#fef3c7",
@@ -2511,7 +2530,7 @@ const SkyLabels = memo(function SkyLabels({
               numberOfLines={1}
               className="absolute font-semibold"
               style={[
-                nepaliTextStyle(11 * scale),
+                nepaliTextStyle(11 * scale, { dense: true }),
                 {
                   left: label.x - boxWidth / 2,
                   top: label.y - 7 * scale,
@@ -2544,7 +2563,7 @@ const SkyLabels = memo(function SkyLabels({
               <Icon width={iconSize} height={iconSize} color="#f4c542" />
               <Text
                 className="font-bold"
-                style={[nepaliTextStyle(fontSize), { color: LABEL_COLOR.rashi }]}
+                style={[nepaliTextStyle(fontSize, { dense: true }), { color: LABEL_COLOR.rashi }]}
                 numberOfLines={1}
               >
                 {formatRashiByNumber(label.index, lang)}
@@ -2570,7 +2589,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - boxWidth / 2, top: label.y - 6 * scale, width: boxWidth, textAlign: "center", color: LABEL_COLOR.nakshatra },
-                nepaliTextStyle(fontSize),
+                nepaliTextStyle(fontSize, { dense: true }),
               ]}
               numberOfLines={1}
             >
@@ -2611,7 +2630,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 30, top: label.y + 6, width: 60, textAlign: "center", color: LABEL_COLOR.asterism },
-                nepaliTextStyle(10),
+                nepaliTextStyle(10, { dense: true }),
               ]}
               className="text-[10px] font-bold"
               numberOfLines={1}
@@ -2626,7 +2645,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 65, top: label.y + (label.clear ?? 8), width: 130, textAlign: "center", color: LABEL_COLOR.vedicStar },
-                nepaliTextStyle(11),
+                nepaliTextStyle(11, { dense: true }),
               ]}
               className="text-[11px] font-semibold"
               numberOfLines={1}
@@ -2644,7 +2663,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 45, top: label.y + 6, width: 90, textAlign: "center", color: LABEL_COLOR.asterism },
-                nepaliTextStyle(10),
+                nepaliTextStyle(10, { dense: true }),
               ]}
               className="text-[10px] font-bold"
               numberOfLines={1}
@@ -2659,7 +2678,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 65, top: label.y + (label.clear ?? 8), width: 130, textAlign: "center", color: LABEL_COLOR.asterism },
-                nepaliTextStyle(9),
+                nepaliTextStyle(9, { dense: true }),
               ]}
               className="text-[9px] font-semibold"
               numberOfLines={1}
@@ -2674,7 +2693,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 75, top: label.y + (label.clear ?? 6), width: 150, textAlign: "center", color: LABEL_COLOR.nebula },
-                nepaliTextStyle(9),
+                nepaliTextStyle(9, { dense: true }),
               ]}
               className="text-[9px] font-semibold"
               numberOfLines={1}
@@ -2701,7 +2720,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 60, top: label.y - 7, width: 120, textAlign: "center", color: LABEL_COLOR.station },
-                nepaliTextStyle(10),
+                nepaliTextStyle(10, { dense: true }),
               ]}
               className="text-[10px] font-bold"
               numberOfLines={2}
@@ -2716,7 +2735,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 60, top: label.y - 16, width: 120, textAlign: "center", color: LABEL_COLOR.axis },
-                nepaliTextStyle(9),
+                nepaliTextStyle(9, { dense: true }),
               ]}
               className="text-[9px] font-bold"
               numberOfLines={2}
@@ -2733,7 +2752,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 45, top: label.y - 7, width: 90, textAlign: "center", color: LABEL_COLOR.tilt },
-                nepaliTextStyle(11),
+                nepaliTextStyle(11, { dense: true }),
               ]}
               className="text-[11px] font-bold"
               numberOfLines={1}
@@ -2756,7 +2775,7 @@ const SkyLabels = memo(function SkyLabels({
               <Text
                 style={[
                   { color: reigning ? LABEL_COLOR.station : LABEL_COLOR.poleStar },
-                  nepaliTextStyle(reigning ? 11 : 9),
+                  nepaliTextStyle(reigning ? 11 : 9, { dense: true }),
                 ]}
                 className={reigning ? "text-[11px] font-bold" : "text-[9px]"}
                 numberOfLines={1}
@@ -2764,7 +2783,7 @@ const SkyLabels = memo(function SkyLabels({
                 {lang === "en" ? star.en.replace(/\s*\(.*\)$/, "") : star.ne}
               </Text>
               <Text
-                style={[{ color: LABEL_COLOR.overlayDim }, nepaliTextStyle(8)]}
+                style={[{ color: LABEL_COLOR.overlayDim }, nepaliTextStyle(8, { dense: true })]}
                 className="text-[8px]"
                 numberOfLines={1}
               >
@@ -2779,7 +2798,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 55, top: label.y - 7, width: 110, textAlign: "center", color: LABEL_COLOR.tropic },
-                nepaliTextStyle(9),
+                nepaliTextStyle(9, { dense: true }),
               ]}
               className="text-[9px]"
               numberOfLines={1}
@@ -2811,7 +2830,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 45, top: label.y + 10, width: 90, textAlign: "center", color: label.color ?? "rgba(255,255,255,0.75)", opacity: 0.85 },
-                nepaliTextStyle(9),
+                nepaliTextStyle(9, { dense: true }),
               ]}
               className="text-[9px] font-bold"
               numberOfLines={1}
@@ -2826,7 +2845,7 @@ const SkyLabels = memo(function SkyLabels({
               key={label.id}
               style={[
                 { position: "absolute", left: label.x - 45, top: label.y + 10, width: 90, textAlign: "center", color: GRAHA_COLOR[label.key] },
-                nepaliTextStyle(10),
+                nepaliTextStyle(10, { dense: true }),
               ]}
               className="text-[10px] font-bold"
               numberOfLines={1}
@@ -2895,7 +2914,7 @@ function Chip({
         className={`font-semibold ${compact ? "text-[11px]" : "text-xs"}`}
         numberOfLines={1}
         style={[
-          nepaliTextStyle(compact ? 10 : 11),
+          nepaliTextStyle(compact ? 10 : 11, { dense: true }),
           {
             color: active
               ? "#000000"
@@ -2984,7 +3003,7 @@ function ViewTile({
         numberOfLines={1}
         className="w-full text-center text-[10px] font-semibold"
         style={[
-          nepaliTextStyle(10),
+          nepaliTextStyle(10, { dense: true }),
           { color: active ? "#ffffff" : "rgba(255,255,255,0.45)" },
         ]}
       >
