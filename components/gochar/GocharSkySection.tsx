@@ -119,7 +119,7 @@ export function GocharSkySection({
                   >
                     <Text
                       style={{ color: colors.primary, ...nepaliTextStyle(10) }}
-                      className="text-[10px] font-bold"
+                      className="text-[12px] font-bold"
                     >
                       {pick("उच्च", "Exalted")}
                     </Text>

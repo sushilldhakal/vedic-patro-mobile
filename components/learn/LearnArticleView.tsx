@@ -38,7 +38,7 @@ function TopicNavCard({
           <Ionicons name="chevron-back" size={18} color={colors.secondary} />
         ) : null}
         <View className={`min-w-0 flex-1 ${direction === "next" ? "items-end" : ""}`}>
-          <Text className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+          <Text className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
             {direction === "prev" ? pick("अघिल्लो", "Previous") : pick("अर्को", "Next")}
           </Text>
           <Text

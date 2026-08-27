@@ -156,7 +156,7 @@ export function GocharIngressSection({
                   <View className="bg-secondary px-1 py-0.5">
                     <Text
                       numberOfLines={1}
-                      className="text-center text-[10px] font-bold text-secondary-foreground"
+                      className="text-center text-[12px] font-bold text-secondary-foreground"
                       style={nepaliTextStyle(10)}
                     >
                       {chip.month}

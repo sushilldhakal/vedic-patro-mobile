@@ -176,7 +176,7 @@ export function EotGraph({ eccentricity, tilt, dayOfYear, daysPerYear }: EotGrap
               }}
             />
             <Text
-              className="text-[10px]"
+              className="text-[12px]"
               style={[nepaliTextStyle(10), { color: "rgba(226,232,240,0.8)", fontSize: 10 }]}
             >
               {item.label}
@@ -269,7 +269,7 @@ export function EotGraph({ eccentricity, tilt, dayOfYear, daysPerYear }: EotGrap
         </Svg>
       </View>
       <Text
-        className="mt-1.5 text-[11px] leading-snug"
+        className="mt-1.5 text-[12px] leading-snug"
         style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.5)", fontSize: 11 }]}
       >
         {pick(

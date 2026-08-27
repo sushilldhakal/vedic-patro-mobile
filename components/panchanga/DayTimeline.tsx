@@ -33,8 +33,23 @@ import { NOTO_DEVANAGARI_CHART, NOTO_DEVANAGARI_CHART_SM } from "@/lib/fonts";
 import { useTheme } from "@/lib/theme-context";
 
 const W = 1000;
-/** Match web `min-w-[768px]` — chart never narrower; scroll when viewport is smaller. */
-const MIN_CHART_WIDTH = 767;
+/**
+ * The width the scrolling chart is drawn at — its own coordinate width, so
+ * the SVG renders 1:1.
+ *
+ * This used to be 767, borrowed from the web's `min-w-[768px]`. But the
+ * viewBox is {@link W} = 1000 units wide, so drawing it into 767 px scaled
+ * everything by 0.767 — and every `fontSize` in here is in *viewBox* units.
+ * A band label asking for 10 landed on screen at 7.7 px, and the 9s at 6.9,
+ * which is below anything a person can read Devanagari at. Web gets away
+ * with it because 768 px there is a desktop column; on a phone the chart is
+ * a horizontal scroll either way.
+ *
+ * Drawing at 1:1 makes every number in this file mean screen pixels, and
+ * grows the marks and the text together — so nothing inside the chart can
+ * collide as a result of it.
+ */
+const MIN_CHART_WIDTH = W;
 const X0 = 70;
 const X1 = 994;
 const RULER_H = 58;
@@ -565,8 +580,13 @@ export function DayTimeline({
                       textAnchor="middle"
                       {...nepaliSvgTextCenter}
                     >
-                      {mainName}
-                      {!narrow && paksha ? ` · ${paksha}` : ""}
+                      {/* One string, not two children. `SvgText` anchors every
+                          child run at the same x, so a name and its पक्ष
+                          handed over separately were both centred on `midX`
+                          and drawn on top of each other — "पूर्णिमा" and
+                          "· शुक्ल पक्ष" overlapping into an unreadable
+                          smear. Joining them first makes it one run. */}
+                      {`${mainName}${!narrow && paksha ? ` · ${paksha}` : ""}`}
                     </SvgText>
                   ) : null}
                 </G>

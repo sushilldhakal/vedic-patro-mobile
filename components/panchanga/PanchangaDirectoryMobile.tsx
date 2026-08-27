@@ -85,7 +85,7 @@ function LinkGrid({ items }: { items: LinkItem[] }) {
             <Ionicons name={item.icon} size={20} color={colors.secondary} />
             <Text className="text-sm font-semibold text-foreground">{pick(item.titleNe, item.titleEn)}</Text>
             {item.blurbNe ? (
-              <Text className="text-[11px] leading-snug text-muted-foreground">
+              <Text className="text-[12px] leading-snug text-muted-foreground">
                 {pick(item.blurbNe, item.blurbEn ?? item.blurbNe)}
               </Text>
             ) : null}

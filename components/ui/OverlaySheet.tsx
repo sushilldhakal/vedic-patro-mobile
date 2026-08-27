@@ -39,7 +39,7 @@ export function OverlaySheet({
     >
       <View className="flex-row items-center justify-between px-3 pb-1 pt-2.5">
         <Text
-          className="text-[11px] font-bold uppercase tracking-wide"
+          className="text-[12px] font-bold uppercase tracking-wide"
           style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.75)", fontSize: 11 }]}
         >
           {title}
@@ -70,7 +70,7 @@ export function SheetSection({
   return (
     <View className="gap-1.5">
       <Text
-        className="text-[10px] font-bold uppercase tracking-wide"
+        className="text-[12px] font-bold uppercase tracking-wide"
         style={[nepaliTextStyle(10), { color: "rgba(255,255,255,0.55)", fontSize: 10 }]}
       >
         {heading}

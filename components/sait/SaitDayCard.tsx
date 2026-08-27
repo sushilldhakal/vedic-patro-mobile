@@ -83,7 +83,7 @@ export function SaitDayCard({
         >
           <Text
             style={{ color: colors.secondary, ...nepaliTextStyle(10) }}
-            className="text-[10px] font-semibold uppercase tracking-wider"
+            className="text-[12px] font-semibold uppercase tracking-wider"
           >
             {monthLabel}
           </Text>

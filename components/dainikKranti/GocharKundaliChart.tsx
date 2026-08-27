@@ -78,8 +78,9 @@ export function GocharKundaliChart({
           {pick("विवरण उपलब्ध छैन।", "No details available.")}
         </Text>
       ) : (
-        <View className="w-full items-center">
-          <Svg width="100%" height={280} viewBox="0 0 300 300" accessibilityLabel={pick("गोचर कुण्डली", "Transit chart")}>
+        /* Square and full-width — see `D1Chart`'s note; same letterboxing. */
+        <View className="w-full items-center" style={{ width: "100%", aspectRatio: 1 }}>
+          <Svg width="100%" height="100%" viewBox="0 0 300 300" accessibilityLabel={pick("गोचर कुण्डली", "Transit chart")}>
             <Rect x={0} y={0} width={300} height={300} rx={2} fill={colors.card} />
             {RASHI_NE.map((rashiNe, idx) => {
               const rashiNo = idx + 1;

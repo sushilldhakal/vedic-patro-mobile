@@ -53,9 +53,15 @@ export function D1Chart({ houses }: Props) {
   const byHouse = useMemo(() => new Map(houses.map((h) => [h.house, h])), [houses]);
   const showLegend = useMemo(() => bhavaHousesHaveStatusMarks(houses), [houses]);
 
+  /* Square, and the full width of the column. `height={280}` against a
+     viewBox 300 units square letterboxed the चक्र: `meet` scales by the
+     smaller ratio, so on a ~340 px phone column the whole chart — glyphs
+     included — was drawn at 0.93, and a crowded house's already-small text
+     shrank again on the way to the screen. An `aspectRatio` box lets it use
+     the width it has. */
   return (
-    <View className="w-full items-center">
-      <Svg width="100%" height={280} viewBox="0 0 300 300" accessibilityLabel={pick("उत्तर भारतीय D1 चक्र", "North Indian D1 chart")}>
+    <View className="w-full items-center" style={{ width: "100%", aspectRatio: 1 }}>
+      <Svg width="100%" height="100%" viewBox="0 0 300 300" accessibilityLabel={pick("उत्तर भारतीय D1 चक्र", "North Indian D1 chart")}>
         <Rect x={0} y={0} width={300} height={300} rx={4} fill={colors.card} stroke={colors.border} strokeWidth={1.5} />
         <Line x1={0} y1={0} x2={300} y2={300} stroke={colors.border} strokeWidth={1.25} opacity={0.8} />
         <Line x1={300} y1={0} x2={0} y2={300} stroke={colors.border} strokeWidth={1.25} opacity={0.8} />

@@ -95,7 +95,7 @@ export function RashifalSignCard({ sign, period }: Props) {
       </View>
 
       {grade ? (
-        <Text className="border-b border-border/60 px-4 pb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <Text className="border-b border-border/60 px-4 pb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
           {grade}
         </Text>
       ) : null}
@@ -109,7 +109,7 @@ export function RashifalSignCard({ sign, period }: Props) {
               <View key={domain.key} className="mb-2 w-1/3 min-w-0 px-1">
                 <View className="flex-row items-center gap-1">
                   <Ionicons name={icon} size={14} color={colors.mutedForeground} />
-                  <Text className="flex-1 text-[10px] font-semibold text-muted-foreground" numberOfLines={1}>
+                  <Text className="flex-1 text-[12px] font-semibold text-muted-foreground" numberOfLines={1}>
                     {label}
                   </Text>
                 </View>
@@ -182,8 +182,8 @@ export function RashifalSignCard({ sign, period }: Props) {
                     row.vedha_by ? "bg-tone-neutral" : row.favourable ? "bg-tone-good" : "bg-tone-bad",
                   )}
                 >
-                  <Text className="text-[10px] font-semibold">{ne ? row.graha_ne : row.graha_en}</Text>
-                  <Text className="text-[10px] font-semibold opacity-80">{digits(row.house)}</Text>
+                  <Text className="text-[12px] font-semibold">{ne ? row.graha_ne : row.graha_en}</Text>
+                  <Text className="text-[12px] font-semibold opacity-80">{digits(row.house)}</Text>
                 </View>
               ))}
             </View>

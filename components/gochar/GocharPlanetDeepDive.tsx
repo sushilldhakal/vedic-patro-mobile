@@ -120,7 +120,7 @@ export function GocharPlanetDeepDive({
                   color: active ? colors.secondary : colors.foreground,
                   ...nepaliTextStyle(10),
                 }}
-                className="text-[10px] font-bold"
+                className="text-[12px] font-bold"
               >
                 {pick(GRAHA_NAME[key].ne, GRAHA_NAME[key].en)}
               </Text>
@@ -211,7 +211,7 @@ function Detail({ width, label, value }: { width: string; label: string; value: 
       className="rounded-lg border border-border bg-background px-3 py-2.5"
     >
       <Text
-        className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
+        className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground"
         style={nepaliTextStyle(10)}
       >
         {label}

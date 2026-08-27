@@ -202,7 +202,7 @@ export default function AccountScreen() {
                       <Ionicons name="star" size={10} color={colors.secondary} />
                       <Text
                         style={{ color: colors.secondary, ...nepaliTextStyle(10) }}
-                        className="text-[10px] font-semibold"
+                        className="text-[12px] font-semibold"
                       >
                         {pick("पूर्वनिर्धारित", "Default")}
                       </Text>

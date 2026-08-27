@@ -194,7 +194,7 @@ export default function RashifalScreen() {
                 />
                 {active ? (
                   <Text
-                    className="text-[10px] font-bold text-foreground"
+                    className="text-[12px] font-bold text-foreground"
                     style={nepaliTextStyle(10)}
                     numberOfLines={1}
                   >

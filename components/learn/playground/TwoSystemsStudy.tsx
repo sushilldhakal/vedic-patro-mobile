@@ -299,7 +299,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
       style={active ? { backgroundColor: "#d8c84a" } : undefined}
     >
       <Text
-        className="text-[11px] font-semibold"
+        className="text-[12px] font-semibold"
         style={[
           nepaliTextStyle(11),
           { color: active ? "#1a1500" : "rgba(255,255,255,0.7)", fontSize: 11 },
@@ -313,7 +313,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
   const readout = (k: string, v: string, tone?: string) => (
     <View key={k} className="rounded-lg border border-white/15 px-2.5 py-1.5">
       <Text
-        className="text-[9px] font-bold uppercase tracking-wide"
+        className="text-[12px] font-bold uppercase tracking-wide"
         style={[nepaliTextStyle(9), { color: "rgba(255,255,255,0.5)", fontSize: 9 }]}
       >
         {k}
@@ -342,7 +342,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
           >
             {title ?? pick("सौरमान र चान्द्रमान", "Sauramāna and Chāndramāna")}
           </Text>
-          <Text className="text-[10px] text-muted-foreground" style={nepaliTextStyle(10)}>
+          <Text className="text-[12px] text-muted-foreground" style={nepaliTextStyle(10)}>
             {pick("घुमाउन तान्नुहोस्", "Drag to rotate")}
           </Text>
         </View>
@@ -475,7 +475,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
               pointerEvents="none"
               className="absolute bottom-2.5 left-2.5 rounded-lg bg-black/70 px-2 py-1"
             >
-              <Text className="text-[11px] font-bold" style={{ color: "#f1f5f9", fontSize: 11 }}>
+              <Text className="text-[12px] font-bold" style={{ color: "#f1f5f9", fontSize: 11 }}>
                 {`${perf.fps.toFixed(0)} fps · worst ${perf.worstMs.toFixed(0)} ms`}
               </Text>
             </View>
@@ -534,7 +534,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
             accessibilityLabel={pick("वर्षभरि सार्नुहोस्", "Scrub through the year")}
           />
           <Text
-            className="text-[11px]"
+            className="text-[12px]"
             style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}
           >
             {`${num(Math.max(0, Math.floor(dayOfYear)))}/${num(Math.round(year.yearDays))}`}
@@ -593,7 +593,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
             <View className="gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-2.5">
               <View>
                 <Text
-                  className="text-[11px] font-semibold"
+                  className="text-[12px] font-semibold"
                   style={[nepaliTextStyle(11), { color: "#bae6fd", fontSize: 11 }]}
                 >
                   {pick("औंसीदेखि चन्द्र हिँडेको", "Moon travelled since amavasya")}
@@ -613,7 +613,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
                     }}
                   >
                     <Text
-                      className="text-[10px] font-bold"
+                      className="text-[12px] font-bold"
                       style={[
                         nepaliTextStyle(10),
                         {
@@ -635,7 +635,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
                   </View>
                 </View>
                 <Text
-                  className="mt-0.5 text-[11px] leading-snug"
+                  className="mt-0.5 text-[12px] leading-snug"
                   style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.55)", fontSize: 11 }]}
                 >
                   {pick(
@@ -647,7 +647,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
 
               <View className="border-t border-white/10 pt-2">
                 <Text
-                  className="text-[11px] font-semibold"
+                  className="text-[12px] font-semibold"
                   style={[nepaliTextStyle(11), { color: "#fde68a", fontSize: 11 }]}
                 >
                   {pick("यो वर्षमा सूर्य हिँडेको", "Sun travelled this year")}
@@ -662,7 +662,7 @@ export function TwoSystemsStudy({ title }: { title?: string }) {
                   )} ${num(distanceAu.toFixed(4))} AU`}
                 </Text>
                 <Text
-                  className="mt-0.5 text-[11px] leading-snug"
+                  className="mt-0.5 text-[12px] leading-snug"
                   style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.55)", fontSize: 11 }]}
                 >
                   {pick(
@@ -734,7 +734,7 @@ function Chain({ tone, steps }: { tone: "sun" | "moon"; steps: string[] }) {
       {steps.map((s, i) => (
         <Text
           key={s}
-          className="text-[10px] font-semibold"
+          className="text-[12px] font-semibold"
           style={[
             nepaliTextStyle(10),
             { color: sun ? "#fde68a" : "#bae6fd", fontSize: 10, marginTop: i > 0 ? 2 : 0 },
@@ -779,13 +779,13 @@ function DriftLadder({
     <View className="gap-1">
       <View className="flex-row flex-wrap items-baseline justify-between gap-x-3">
         <Text
-          className="text-[11px]"
+          className="text-[12px]"
           style={[nepaliTextStyle(11), { color: "rgba(255,255,255,0.6)", fontSize: 11 }]}
         >
           {pick("एउटै समयरेखा", "One shared timeline")}
         </Text>
         <Text
-          className="text-[10px]"
+          className="text-[12px]"
           style={[nepaliTextStyle(10), { color: "rgba(255,255,255,0.6)", fontSize: 10 }]}
         >
           {pick(
@@ -815,7 +815,7 @@ function DriftLadder({
             >
               <Text
                 numberOfLines={1}
-                className="text-[9px] font-semibold"
+                className="text-[12px] font-semibold"
                 style={[nepaliTextStyle(9), { color: "#fffbeb", fontSize: 9 }]}
               >
                 {ne ? m.nameNe : m.name}
@@ -848,7 +848,7 @@ function DriftLadder({
               >
                 <Text
                   numberOfLines={1}
-                  className="text-[9px] font-semibold"
+                  className="text-[12px] font-semibold"
                   style={{ color: "#f0f9ff", fontSize: 9 }}
                 >
                   {num(i + 1)}
@@ -877,7 +877,7 @@ function DriftLadder({
           >
             <Text
               numberOfLines={1}
-              className="px-1 text-[9px] font-semibold"
+              className="px-1 text-[12px] font-semibold"
               style={[nepaliTextStyle(9), { color: "#f0f9ff", fontSize: 9 }]}
             >
               {pick(
@@ -891,7 +891,7 @@ function DriftLadder({
               className="absolute inset-y-0 right-0 items-center justify-center"
               style={{ width: pct(shortfall), backgroundColor: "rgba(52,211,153,0.35)" }}
             >
-              <Text className="text-[9px] font-bold" style={{ color: "#ecfdf5", fontSize: 9 }}>
+              <Text className="text-[12px] font-bold" style={{ color: "#ecfdf5", fontSize: 9 }}>
                 {num(shortfall.toFixed(0))}
               </Text>
             </View>
@@ -928,7 +928,7 @@ function LadderKey({ color, children }: { color: string; children: React.ReactNo
     <View className="flex-row items-center gap-1.5">
       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
       <Text
-        className="flex-1 text-[10px]"
+        className="flex-1 text-[12px]"
         style={[nepaliTextStyle(10), { color: "rgba(255,255,255,0.55)", fontSize: 10 }]}
       >
         {children}

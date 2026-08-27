@@ -77,7 +77,14 @@ export function planetGridLayout(points: Point[], count: number): HouseGridLayou
   const PITCH_RATIO = 1.3;
   const fontFromWidth = safeWidth / columns / PITCH_RATIO;
   const fontFromHeight = safeHeight / rows / PITCH_RATIO;
-  const fontSize = Math.max(7, Math.min(13, fontFromWidth, fontFromHeight));
+  /* The floor is what a reader actually has to make out, not what the house
+     polygon would prefer. A crowded house used to shrink its glyphs to 7 px,
+     which in a chart scaled down to phone width is nothing at all — the whole
+     point of the चक्र is reading which graha sits where. Ten is the smallest
+     that stays legible; a house with more grahas than fit at that size now
+     lets them sit closer instead of vanishing. The cap is raised to match, so
+     an empty-ish house uses the room it has. */
+  const fontSize = Math.max(10, Math.min(15, fontFromWidth, fontFromHeight));
 
   return {
     columns,

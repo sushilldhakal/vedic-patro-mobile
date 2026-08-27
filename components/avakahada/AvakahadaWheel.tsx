@@ -284,20 +284,20 @@ function HubContent({ focus, row }: { focus: HubFocus; row: AvakahadaWheelRow })
               className="flex-row justify-between gap-1 border-b py-0.5"
               style={{ borderBottomColor: W_SEP_SOFT }}
             >
-              <Text style={{ color: W_INK_FAINT, ...nepaliTextStyle(9) }} className="text-[9px]">
+              <Text style={{ color: W_INK_FAINT, ...nepaliTextStyle(9) }} className="text-[12px]">
                 {pick(RING_LABELS[attr.id].ne, RING_LABELS[attr.id].en)}
               </Text>
               <Text
                 numberOfLines={1}
                 style={{ color: W_INK, ...nepaliTextStyle(9) }}
-                className="shrink text-[9px] font-semibold"
+                className="shrink text-[12px] font-semibold"
               >
                 {attrValue(attr.id, row, lang)}
               </Text>
             </View>
           ))}
         </View>
-        <Text style={{ color: W_INK_FAINT, ...nepaliTextStyle(9) }} className="mt-1 text-[9px]">
+        <Text style={{ color: W_INK_FAINT, ...nepaliTextStyle(9) }} className="mt-1 text-[12px]">
           {vairiLine}
         </Text>
       </ScrollView>
@@ -315,7 +315,7 @@ function HubContent({ focus, row }: { focus: HubFocus; row: AvakahadaWheelRow })
     <View className="items-center px-1 py-1">
       <Text
         style={{ color: W_ACCENT, ...nepaliTextStyle(10) }}
-        className="text-center text-[10px] font-bold uppercase tracking-wide"
+        className="text-center text-[12px] font-bold uppercase tracking-wide"
       >
         {label}
       </Text>
@@ -342,7 +342,7 @@ function HubContent({ focus, row }: { focus: HubFocus; row: AvakahadaWheelRow })
       {ring === "pada" && padaIndex != null ? (
         <Text
           style={{ color: W_INK_FAINT, ...nepaliTextStyle(10) }}
-          className="mt-1 text-center text-[10px]"
+          className="mt-1 text-center text-[12px]"
         >
           {pick(
             `चरण ${padaIndex + 1} · ${localizeRashi(row.charanRashis[padaIndex]!, lang)}`,
@@ -352,13 +352,13 @@ function HubContent({ focus, row }: { focus: HubFocus; row: AvakahadaWheelRow })
       ) : null}
       <Text
         style={{ color: W_INK_FAINT, ...nepaliTextStyle(10) }}
-        className="mt-1 text-center text-[10px]"
+        className="mt-1 text-center text-[12px]"
         numberOfLines={2}
       >
         {row.index}. {row.nakshatraLabel}
       </Text>
       {ring === "yoni" ? (
-        <Text style={{ color: W_INK_FAINT, ...nepaliTextStyle(9) }} className="text-[9px]">
+        <Text style={{ color: W_INK_FAINT, ...nepaliTextStyle(9) }} className="text-[12px]">
           {vairiLine}
         </Text>
       ) : null}
@@ -595,14 +595,14 @@ export function AvakahadaWheel({ highlighted }: Props) {
               style={{ borderColor: W_SURFACE_BORDER }}
               className="rounded-md border px-2 py-1 active:opacity-70"
             >
-              <Text style={{ color: W_INK_DIM }} className="text-[11px] font-semibold">
+              <Text style={{ color: W_INK_DIM }} className="text-[12px] font-semibold">
                 1:1
               </Text>
             </Pressable>
           ) : null}
           <Text
             style={{ color: W_INK_DIM, fontFamily: NUM_FONT }}
-            className="min-w-[42px] text-center text-[11px] font-semibold"
+            className="min-w-[42px] text-center text-[12px] font-semibold"
           >
             {digits(Math.round(zoom * 100))}%
           </Text>
@@ -711,7 +711,7 @@ export function AvakahadaWheel({ highlighted }: Props) {
                   </Text>
                   <Text
                     style={{ color: W_INK, ...nepaliTextStyle(10) }}
-                    className="mt-1 text-center text-[10px] font-semibold"
+                    className="mt-1 text-center text-[12px] font-semibold"
                   >
                     {pick(
                       "वलय छुनुहोस् — नक्षत्र, अक्षर, राशि, वर्ण, वश्य, योनि, गण, नाडी",

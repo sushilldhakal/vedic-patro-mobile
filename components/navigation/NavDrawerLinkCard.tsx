@@ -31,7 +31,7 @@ export function NavDrawerLinkCard({
       <AppNavIcon name={icon} size={20} color={active ? colors.secondary : colors.danger} />
       <Text
         className={cn(
-          "w-full text-center text-[11px] font-bold leading-tight text-foreground",
+          "w-full text-center text-[12px] font-bold leading-tight text-foreground",
           active && "text-secondary",
         )}
         numberOfLines={3}
@@ -54,7 +54,7 @@ export function DrawerNavSection({
   return (
     <View className="px-3 pb-4">
       <Text
-        className="mb-2 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+        className="mb-2 text-center text-[12px] font-bold uppercase tracking-wider text-muted-foreground"
         style={lang === "en" ? undefined : nepaliTextStyle(10)}
       >
         {title}

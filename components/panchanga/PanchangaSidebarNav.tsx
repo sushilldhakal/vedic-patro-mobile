@@ -57,7 +57,7 @@ function SidebarLink({
         {pick(item.labelNe, item.labelEn)}
       </Text>
       {item.blurbNe ? (
-        <Text className="mt-0.5 text-[11px] leading-snug text-muted-foreground" style={nepaliTextStyle(11)}>
+        <Text className="mt-0.5 text-[12px] leading-snug text-muted-foreground" style={nepaliTextStyle(11)}>
           {pick(item.blurbNe, item.blurbEn ?? item.blurbNe)}
         </Text>
       ) : null}

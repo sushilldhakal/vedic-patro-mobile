@@ -100,7 +100,7 @@ export function HomeRashifalSignPicker({
                     style={{ width: `${pct}%` }}
                   />
                 </View>
-                <Text className={cn("shrink-0 text-[10px] font-bold tabular-nums", rashifalToneText(sign.tone))}>
+                <Text className={cn("shrink-0 text-[12px] font-bold tabular-nums", rashifalToneText(sign.tone))}>
                   {toNepaliDigits(pct, lang)}
                 </Text>
               </View>

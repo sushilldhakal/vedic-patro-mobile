@@ -65,7 +65,7 @@ export function FloatingNavBar() {
                 numberOfLines={1}
                 className={cn(
                   "mt-0.5 text-center font-medium",
-                  isTablet ? "text-[11px]" : "text-[10px]",
+                  isTablet ? "text-[12px]" : "text-[12px]",
                   active ? "font-bold text-primary" : "text-muted-foreground",
                 )}
                 style={[nepaliTextStyle(isTablet ? 11 : 10), { paddingTop: 0 }]}

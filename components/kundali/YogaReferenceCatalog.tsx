@@ -78,16 +78,16 @@ export function YogaReferenceCatalog({ excludeIds }: Props) {
       filtered.map((e) => ({
         key: e.yogaId,
         cells: [
-          <Text key="id" className="font-num text-[11px] text-muted-foreground">
+          <Text key="id" className="font-num text-[12px] text-muted-foreground">
             {e.yogaId}
           </Text>,
-          <Text key="n" className="text-[11px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
+          <Text key="n" className="text-[12px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
             {entryName(e, lang)}
           </Text>,
-          <Text key="d" className="text-[11px] leading-snug text-foreground" style={nepaliTextStyle(11)}>
+          <Text key="d" className="text-[12px] leading-snug text-foreground" style={nepaliTextStyle(11)}>
             {entryDefinition(e, lang)}
           </Text>,
-          <Text key="r" className="text-[11px] leading-snug text-foreground" style={nepaliTextStyle(11)}>
+          <Text key="r" className="text-[12px] leading-snug text-foreground" style={nepaliTextStyle(11)}>
             {entryResult(e, lang)}
           </Text>,
         ],

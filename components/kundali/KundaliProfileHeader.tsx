@@ -23,7 +23,7 @@ function MetaItem({
       <View className="mb-0.5 flex-row items-center gap-1">
         <Ionicons name={icon} size={10} color={colors.mutedForeground} />
         <Text
-          className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground"
           style={nepaliTextStyle(10)}
         >
           {label}

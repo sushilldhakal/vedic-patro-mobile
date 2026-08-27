@@ -392,7 +392,7 @@ export function ShadbalaCard({
                   >
                     <Text
                       style={{ color: active ? color : colors.mutedForeground, ...nepaliTextStyle(10) }}
-                      className="text-[10px]"
+                      className="text-[12px]"
                     >
                       {pick(STATUS_LABEL[s].ne, STATUS_LABEL[s].en)} {digits(summary.counts[s])}
                     </Text>

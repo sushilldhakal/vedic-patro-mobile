@@ -175,7 +175,7 @@ function DashaDurationGrid({
             <View key={col.ne} className="min-w-[56px] flex-1 border-r border-border/50 px-1.5 py-1 last:border-r-0">
               <Text
                 numberOfLines={2}
-                className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground"
                 style={nepaliTextStyle(10)}
               >
                 {lang === "en" ? col.en : col.ne}

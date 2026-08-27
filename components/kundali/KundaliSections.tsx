@@ -127,11 +127,11 @@ export function GrahaAstroTable({
             {grahaName(e.key, lang)}
           </Text>
           {e.retrograde ? (
-            <Text style={{ color: colors.danger }} className="text-[10px] font-bold">
+            <Text style={{ color: colors.danger }} className="text-[12px] font-bold">
               ↺
             </Text>
           ) : null}
-          {combust ? <Text className="text-[10px]">🔥</Text> : null}
+          {combust ? <Text className="text-[12px]">🔥</Text> : null}
         </GrahaInlineChildren>,
         <RashiInline key="r" rashiNum={e.vargaRashi} lang={lang} size={18} textSize={12} />,
         <Text key="d" className="font-num text-xs text-foreground">
@@ -206,7 +206,7 @@ export function BhavaTable({
         key: String(r.house),
         highlight: r.house === 1,
         cells: [
-          <Text key="h" className="font-num text-[11px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
+          <Text key="h" className="font-num text-[12px] font-semibold text-foreground" style={nepaliTextStyle(11)}>
             {digits(r.house)}
             {r.badge ? (
               <Text className="text-muted-foreground"> ({formatHouseBadge(r.badge, lang)})</Text>
@@ -320,7 +320,7 @@ export function YogaList({ yogas }: { yogas: KundaliYoga[] }) {
               >
                 <Text
                   style={{ color: nature.tone, ...nepaliTextStyle(10) }}
-                  className="text-[10px] font-bold"
+                  className="text-[12px] font-bold"
                 >
                   {pick(nature.ne, nature.en)}
                 </Text>

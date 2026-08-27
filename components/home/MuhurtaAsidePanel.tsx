@@ -309,7 +309,7 @@ export function MuhurtaAsidePanel({ p }: Props) {
           >
             <Text
               className={cn(
-                "text-center text-[10px] font-semibold leading-tight",
+                "text-center text-[12px] font-semibold leading-tight",
                 subTab === tab.id ? "font-bold text-foreground" : "text-muted-foreground",
               )}
             >

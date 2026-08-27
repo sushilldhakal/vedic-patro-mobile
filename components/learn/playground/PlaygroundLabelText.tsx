@@ -83,7 +83,7 @@ export const PlaygroundLabelText = memo(function PlaygroundLabelText({
       {glyph}
       <Text
         numberOfLines={1}
-        className="text-[10px] font-semibold"
+        className="text-[12px] font-semibold"
         style={[
           nepaliTextStyle(10),
           {

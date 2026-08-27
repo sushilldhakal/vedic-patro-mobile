@@ -73,7 +73,7 @@ function KutaDetailPanel({
             className="rounded-md border bg-card px-3 py-2"
           >
             <Text
-              className="text-[10px] uppercase tracking-wider text-muted-foreground"
+              className="text-[12px] uppercase tracking-wider text-muted-foreground"
               style={nepaliTextStyle(10)}
             >
               {r.who}
