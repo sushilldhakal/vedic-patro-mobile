@@ -12,6 +12,7 @@ import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   Modal,
   PanResponder,
+  PixelRatio,
   Pressable,
   ScrollView,
   TextInput,
@@ -96,6 +97,8 @@ import {
   type ViewState,
 } from "@/components/sky3d/AakashGocharScene";
 import CompassNeedle from "@/assets/compass.svg";
+import { PickDebugOverlay } from "./PickDebugOverlay";
+import { notePickDebug } from "@/lib/sky3d/pick-debug";
 import { CompassControl, DIAL_SIZE } from "@/components/sky3d/CompassControl";
 import { useDeviceOrientation } from "@/lib/sky3d/device-orientation";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -856,6 +859,18 @@ export function AakashGocharSky({
    * was ever within a hit radius and nothing in the sky could be selected.
    */
   const pressPoint = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Whether a second finger was ever down during this gesture.
+   *
+   * The release test used to ask `pinchSpan`, which is the *live* span and is
+   * deliberately zeroed the moment the gesture drops back to one finger. A
+   * symmetric pinch barely moves its own centroid, so `g.dx`/`g.dy` stay near
+   * zero too — which meant lifting the second finger and then the first ended
+   * a pinch by selecting whatever the remaining finger happened to be over.
+   * A latch, cleared only on grant, is the thing that actually answers "was
+   * this a pinch."
+   */
+  const multiTouch = useRef(false);
   const responder = useMemo(
     () =>
       PanResponder.create({
@@ -877,6 +892,8 @@ export function AakashGocharSky({
         onPanResponderGrant: (e) => {
           gestureStart.current = { ...view.current, pinch: 0 };
           pinchSpan.current = 0;
+          multiTouch.current = false;
+          notePickDebug({ gesture: null, travel: 0, multiTouch: false, selected: null, candidates: [] });
           dragOrigin.current = { dx: 0, dy: 0 };
           const { locationX, locationY } = e.nativeEvent;
           pressPoint.current =
@@ -901,6 +918,8 @@ export function AakashGocharSky({
              event. That alternation *is* the stutter: the sky jerks between
              zooming and panning several times a second. */
           if (g.numberActiveTouches >= 2) {
+            multiTouch.current = true;
+            notePickDebug({ multiTouch: true });
             if (touches.length < 2) return;
             const [a, b] = touches;
             const raw = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
@@ -1046,12 +1065,25 @@ export function AakashGocharSky({
         onPanResponderRelease: (_e, g) => {
           const at = pressPoint.current;
           pressPoint.current = null;
+          const travel = Math.hypot(g.dx, g.dy);
+          notePickDebug({
+            travel,
+            slop: DRAG_SLOP,
+            multiTouch: multiTouch.current,
+            pixelRatio: PixelRatio.get(),
+            gesture: sensorModeRef.current
+              ? "sensor"
+              : multiTouch.current
+                ? "pinch"
+                : travel > DRAG_SLOP
+                  ? "drag"
+                  : "tap",
+          });
           if (sensorModeRef.current) return;
-          /* A pinch is never a press. `pinchSpan` is the live one — the old
-             `gestureStart.pinch` stopped being written when the zoom went
-             incremental, so this check had quietly become a no-op. */
-          if (pinchSpan.current) return;
-          if (Math.hypot(g.dx, g.dy) > DRAG_SLOP) return;
+          /* A pinch is never a press — including the tail of one, after the
+             second finger has already come up. See {@link multiTouch}. */
+          if (multiTouch.current) return;
+          if (travel > DRAG_SLOP) return;
           if (!at) return;
           pressRef.current?.(at.x, at.y);
         },
@@ -1922,6 +1954,9 @@ export function AakashGocharSky({
           bottom={compassBottom}
           visible={mode === "horizon"}
         />
+
+        {/* Dev-only readout of what the picker saw on the last press. */}
+        <PickDebugOverlay />
 
         {/* क्षितिज's field of view — named only while it is actually moving,
             the same "flashes then fades" pattern the सङ्क्रान्ति banner uses.

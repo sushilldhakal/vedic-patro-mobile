@@ -123,6 +123,12 @@ import {
   injectHorizonFisheyeIn,
   projectHorizon,
 } from "@/lib/sky3d/horizon-projection";
+import {
+  notePickDebug,
+  pickDebug,
+  trimPickCandidates,
+  type PickDebugCandidate,
+} from "@/lib/sky3d/pick-debug";
 import { buildGridLabels } from "@/lib/sky3d/grid-labels";
 import {
   makeMoonMaterial,
@@ -2956,6 +2962,26 @@ export function AakashGocharScene({
       | null => {
       const field = fovForZoom("horizon", view.current.distance);
       rightAxis.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      /* Dev-only: every candidate this pick weighed, for the on-screen
+         readout. Costs nothing in production — `pickDebug.enabled` is
+         `__DEV__` — and runs once per press either way, never per frame. */
+      const seen: PickDebugCandidate[] = [];
+      const note = (
+        label: string,
+        centre: { x: number; y: number },
+        d: number,
+        radius: number,
+      ) => {
+        if (!pickDebug.enabled) return;
+        seen.push({ label, x: centre.x, y: centre.y, distance: d, radius, hit: d < radius });
+      };
+      const report = () => {
+        notePickDebug({
+          touch: { x: px, y: py },
+          viewport: { w: rect.width, h: rect.height },
+          candidates: trimPickCandidates(seen),
+        });
+      };
       let best: GrahaKey | null = null;
       let bestD = Infinity;
       for (const key of GEO_BODY_ORDER) {
@@ -2970,12 +2996,16 @@ export function AakashGocharScene({
         const edgeHit = project(edge, field, scratchEdge);
         const apparentPx = edgeHit ? Math.hypot(edgeHit.x - centre.x, edgeHit.y - centre.y) : 0;
         const radius = Math.max(GRAHA_PICK_RADIUS, apparentPx * 1.15);
+        note(key, centre, d, radius);
         if (d < radius && d < bestD) {
           bestD = d;
           best = key;
         }
       }
-      if (best) return { kind: "graha", key: best };
+      if (best) {
+        report();
+        return { kind: "graha", key: best };
+      }
       /* यम/वरुण/अरुण — decorative, so checked after every real graha (one
          must never steal a press meant for something that actually belongs
          to the chart) but before stars/नेबुला, the same priority a graha
@@ -2996,13 +3026,17 @@ export function AakashGocharScene({
           const edgeHit = project(edge, field, scratchEdge);
           const apparentPx = edgeHit ? Math.hypot(edgeHit.x - centre.x, edgeHit.y - centre.y) : 0;
           const radius = Math.max(GRAHA_PICK_RADIUS, apparentPx * 1.15);
+          note(key, centre, d, radius);
           if (d < radius && d < bestD) {
             bestD = d;
             bestOuter = key;
           }
         }
       }
-      if (bestOuter) return { kind: "outerplanet", key: bestOuter };
+      if (bestOuter) {
+        report();
+        return { kind: "outerplanet", key: bestOuter };
+      }
       let starKind: "vedicstar" | "skystar" | "nebula" | null = null;
       let starIndex = -1;
       const nVedic = vedicPickCount.current;
@@ -3011,6 +3045,7 @@ export function AakashGocharScene({
         const centre = project(hit.world, field, scratchPick);
         if (!centre) continue;
         const d = Math.hypot(centre.x - px, centre.y - py);
+        note(vedicStarsRef.current?.[hit.index]?.en ?? `vedic:${hit.index}`, centre, d, PICK_RADIUS);
         if (d < PICK_RADIUS && d < bestD) {
           bestD = d;
           starKind = "vedicstar";
@@ -3023,6 +3058,7 @@ export function AakashGocharScene({
         const centre = project(hit.world, field, scratchPick);
         if (!centre) continue;
         const d = Math.hypot(centre.x - px, centre.y - py);
+        note(starField.stars[hit.index]?.name ?? `star:${hit.index}`, centre, d, PICK_RADIUS);
         if (d < PICK_RADIUS && d < bestD) {
           bestD = d;
           starKind = "skystar";
@@ -3046,12 +3082,19 @@ export function AakashGocharScene({
         const edgeHit = project(edge, field, scratchEdge);
         const apparentPx = edgeHit ? Math.hypot(edgeHit.x - centre.x, edgeHit.y - centre.y) : 0;
         const radius = Math.max(PICK_RADIUS, apparentPx);
+        note(
+          nebulaField[nebulaMarkers[hit.index]?.nebulaIndex]?.nebula.en ?? `nebula:${hit.index}`,
+          centre,
+          d,
+          radius,
+        );
         if (d < radius && d < bestD) {
           bestD = d;
           starKind = "nebula";
           starIndex = hit.index;
         }
       }
+      report();
       if (starKind && starIndex >= 0) return { kind: starKind, index: starIndex };
       return null;
     };
@@ -3059,9 +3102,16 @@ export function AakashGocharScene({
     const handlePress = (px: number, py: number) => {
       const hit = pick(px, py);
       if (!hit) {
+        notePickDebug({ selected: null });
         onEmptyPressRef.current?.();
         return;
       }
+      notePickDebug({
+        selected:
+          hit.kind === "graha" || hit.kind === "outerplanet"
+            ? `${hit.kind}:${hit.key}`
+            : `${hit.kind}:${hit.index}`,
+      });
 
       /* One press marks it where it stands; a second press on the *same*
          thing inside {@link DOUBLE_MS} rides it — a graha under
@@ -5173,6 +5223,8 @@ export function AakashGocharScene({
      * that answers a press of केन्द्रविन्दु.
      */
     const holdCentre = trackAt != null && (s.playing || recentre.current);
+    /** Whether *this* frame is the one a press asked to be centred on. */
+    const justAsked = recentre.current;
     if (holdCentre) recentre.current = false;
     if (horizon) {
       /* Equidistant fisheye: screen radius is angle from the look direction.
@@ -5196,6 +5248,7 @@ export function AakashGocharScene({
         const len = Math.hypot(trackAt.x, trackAt.y, trackAt.z) || 1;
         const aimPitch = -Math.asin(Math.max(-1, Math.min(1, trackAt.y / len)));
         const aimYaw = -Math.atan2(trackAt.x, -trackAt.z);
+<<<<<<< HEAD
         if (s.playing) {
           /* Following a moving body with the clock running — snap, every
              frame. An ease here would simply lag behind the thing it is
@@ -5212,15 +5265,53 @@ export function AakashGocharScene({
           let dYaw = aimYaw - v.yaw;
           while (dYaw > Math.PI) dYaw -= 2 * Math.PI;
           while (dYaw < -Math.PI) dYaw += 2 * Math.PI;
+=======
+        /* The yaw target, unwrapped to the short way round from wherever the
+           ease starts — so centring something just west of north never takes
+           the camera the long way through south. */
+        const shortYaw = (from: number) => {
+          let d = aimYaw - from;
+          while (d > Math.PI) d -= 2 * Math.PI;
+          while (d < -Math.PI) d += 2 * Math.PI;
+          return from + d;
+        };
+        if (justAsked) {
+          /* The frame a double press (or केन्द्रविन्दु) landed on: turn to it
+             over {@link CENTRE_MS} rather than arriving there instantly.
+             Started even when the clock is running — the ease retargets a
+             moving body below, so following still ends up exact. Without
+             this, a double press on a graha while the sky was playing went
+             straight down the tracking path and teleported, which is most of
+             the time: the clock runs by default. */
+>>>>>>> 1debe15 (feat(sky3d): smooth double-tap centring, and two gesture-state fixes)
           centreAnim.current = {
             t0: performance.now(),
             yaw0: v.yaw,
             pitch0: v.pitch,
+<<<<<<< HEAD
             yaw1: v.yaw + dYaw,
+=======
+            yaw1: shortYaw(v.yaw),
+>>>>>>> 1debe15 (feat(sky3d): smooth double-tap centring, and two gesture-state fixes)
             pitch1: aimPitch,
             wroteYaw: v.yaw,
             wrotePitch: v.pitch,
           };
+<<<<<<< HEAD
+=======
+        } else if (centreAnim.current) {
+          /* Mid-ease onto something that is itself moving — walk the endpoint
+             along with it, so the turn lands on where the body actually is
+             rather than where it was when the finger lifted. */
+          centreAnim.current.yaw1 = shortYaw(centreAnim.current.yaw0);
+          centreAnim.current.pitch1 = aimPitch;
+        } else {
+          /* Holding a body in the middle with the clock running: snap, every
+             frame. That is tracking, and an ease here would only lag behind
+             the thing it is meant to be nailed to. */
+          v.pitch = aimPitch;
+          v.yaw = aimYaw;
+>>>>>>> 1debe15 (feat(sky3d): smooth double-tap centring, and two gesture-state fixes)
         }
         target.current.copy(trackAt);
       }
