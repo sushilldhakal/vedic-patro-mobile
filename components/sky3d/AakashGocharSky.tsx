@@ -2058,6 +2058,24 @@ export function AakashGocharSky({
         {showCamera ? (
           <CameraView style={{ position: "absolute", inset: 0 }} facing="back" />
         ) : null}
+        {/* The GL surface, made untouchable.
+         *
+         * It is a native view of its own, and it claims the touch the moment a
+         * finger lands on it — so the gesture recogniser on the parent was
+         * never asked at touch-down. It only ever got the gesture later, once
+         * a finger had *moved* far enough for the move-phase hook to take it
+         * back. That is exactly the observed behaviour: dragging the sky
+         * worked in all three views, and a tap — a finger that goes down and
+         * comes up without moving — produced no grant, no release, no pick,
+         * and no way for any of the code downstream of it to run.
+         *
+         * Nothing in the scene wants touches anyway: picking is done by hand
+         * against the projected positions (`pressRef`), and the raycaster is
+         * deliberately disabled everywhere ({@link NO_RAYCAST}). So the
+         * surface can pass every touch straight through to the recogniser,
+         * which is the one thing that should be reading them. The controls
+         * layered over it are siblings, not children, and keep their own. */}
+        <View pointerEvents="none" style={{ position: "absolute", inset: 0 }}>
         <Canvas
           camera={{ position: [0, 14, 22], fov: 50, near: 0.05, far: 1200 }}
           gl={{ antialias: true, alpha: true }}
@@ -2094,6 +2112,7 @@ export function AakashGocharSky({
             />
           </Suspense>
         </Canvas>
+        </View>
 
         {/* Bottom-centre, over the canvas: drag it to turn the sky, tap it to
             hand the sky to the phone and then to the lens. See
