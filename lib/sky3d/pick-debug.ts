@@ -31,8 +31,18 @@ export type PickDebugCandidate = {
 export type PickDebugState = {
   /** Off in production, always. Nothing below is written when this is false. */
   enabled: boolean;
-  /** How the gesture recogniser classified the touch that just ended. */
-  gesture: "tap" | "drag" | "pinch" | "sensor" | null;
+  /** How the gesture recogniser classified the touch that just ended.
+   *
+   * `tap` and `doubleTap` are one-finger DOWN→UP presses — the second one
+   * being the second such press on the same object inside the double window.
+   * `multiTouch` is any gesture a second finger joined, whether it pinched or
+   * merely rested there; it never picks and never counts as a tap.
+   */
+  gesture: "tap" | "doubleTap" | "drag" | "multiTouch" | "sensor" | null;
+  /** Most fingers down at once during the gesture. */
+  fingerCount: number;
+  /** 0 for anything that was not a pick, 1 for a single tap, 2 for a double. */
+  tapCount: number;
   /** Total finger travel for that gesture, px, against the tap slop. */
   travel: number;
   slop: number;
@@ -53,6 +63,8 @@ export type PickDebugState = {
 export const pickDebug: PickDebugState = {
   enabled: __DEV__,
   gesture: null,
+  fingerCount: 0,
+  tapCount: 0,
   travel: 0,
   slop: 0,
   multiTouch: false,

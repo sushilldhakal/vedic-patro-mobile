@@ -52,13 +52,16 @@ export function PickDebugOverlay() {
         paddingVertical: 6,
       }}
     >
-      {line(`GESTURE  ${d.gesture ?? "—"}   travel ${n(d.travel)} / slop ${n(d.slop)}`)}
-      {line(`multiTouch ${d.multiTouch ? "YES" : "no"}   dpr ${d.pixelRatio}`)}
+      {line(`fingerCount  ${d.fingerCount}`)}
+      {line(`gesture      ${d.gesture ?? "—"}`)}
+      {line(`tapCount     ${d.tapCount}`)}
+      {line(`multiTouch   ${d.multiTouch ? "YES" : "no"}   dpr ${d.pixelRatio}`)}
+      {line(`travel ${n(d.travel)} / slop ${n(d.slop)}`)}
       {line(
         `TOUCH  x ${d.touch ? n(d.touch.x) : "—"}  y ${d.touch ? n(d.touch.y) : "—"}` +
           `   viewport ${n(d.viewport.w)}x${n(d.viewport.h)}`,
       )}
-      {line(`SELECTED  ${d.selected ?? "(none)"}`)}
+      {line(`selectedObject  ${d.selected ?? "none"}`)}
       {d.candidates.length === 0
         ? line("(no candidates projected on screen)")
         : d.candidates.map((c, i) => (

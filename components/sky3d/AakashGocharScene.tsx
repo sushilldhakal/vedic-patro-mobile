@@ -3102,7 +3102,7 @@ export function AakashGocharScene({
     const handlePress = (px: number, py: number) => {
       const hit = pick(px, py);
       if (!hit) {
-        notePickDebug({ selected: null });
+        notePickDebug({ selected: null, gesture: "tap", tapCount: 1 });
         onEmptyPressRef.current?.();
         return;
       }
@@ -3129,9 +3129,15 @@ export function AakashGocharScene({
                 ? `nebula:${hit.index}`
                 : `skystar:${hit.index}`;
       const now = performance.now();
+      /* Two *separate* one-finger presses on the same object inside the
+         window. Each `handlePress` is already one complete DOWN→UP gesture —
+         a gesture a second finger joined never reaches here at all, the
+         `multiTouch` latch in the shell returns first — so this counts taps,
+         never fingers. */
       const again = thisKey === lastKey && now - lastAt < DOUBLE_MS;
       lastKey = again ? null : thisKey;
       lastAt = now;
+      notePickDebug({ gesture: again ? "doubleTap" : "tap", tapCount: again ? 2 : 1 });
 
       if (hit.kind === "outerplanet") {
         /* Identify-only, on purpose — see {@link OUTER_PLANET_ORDER}'s own

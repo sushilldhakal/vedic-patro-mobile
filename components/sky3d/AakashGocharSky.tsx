@@ -871,6 +871,8 @@ export function AakashGocharSky({
    * this a pinch."
    */
   const multiTouch = useRef(false);
+  /** Most fingers down at once this gesture — reported, never decided on. */
+  const maxFingers = useRef(0);
   const responder = useMemo(
     () =>
       PanResponder.create({
@@ -893,7 +895,16 @@ export function AakashGocharSky({
           gestureStart.current = { ...view.current, pinch: 0 };
           pinchSpan.current = 0;
           multiTouch.current = false;
-          notePickDebug({ gesture: null, travel: 0, multiTouch: false, selected: null, candidates: [] });
+          maxFingers.current = Math.max(1, e.nativeEvent.touches?.length ?? 1);
+          notePickDebug({
+            gesture: null,
+            travel: 0,
+            tapCount: 0,
+            fingerCount: maxFingers.current,
+            multiTouch: false,
+            selected: null,
+            candidates: [],
+          });
           dragOrigin.current = { dx: 0, dy: 0 };
           const { locationX, locationY } = e.nativeEvent;
           pressPoint.current =
@@ -919,7 +930,13 @@ export function AakashGocharSky({
              zooming and panning several times a second. */
           if (g.numberActiveTouches >= 2) {
             multiTouch.current = true;
-            notePickDebug({ multiTouch: true });
+            maxFingers.current = Math.max(maxFingers.current, g.numberActiveTouches);
+            notePickDebug({
+              multiTouch: true,
+              fingerCount: maxFingers.current,
+              gesture: "multiTouch",
+              tapCount: 0,
+            });
             if (touches.length < 2) return;
             const [a, b] = touches;
             const raw = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
@@ -1066,18 +1083,25 @@ export function AakashGocharSky({
           const at = pressPoint.current;
           pressPoint.current = null;
           const travel = Math.hypot(g.dx, g.dy);
+          /* `multiTouch` first, and unconditionally: a gesture a second
+             finger ever joined is a multi-touch one for its whole life, even
+             if it ended with one finger sitting still on a graha. It is never
+             a tap, so it is never half of a double tap either — the double is
+             two separate one-finger presses, counted in the scene. */
           notePickDebug({
             travel,
             slop: DRAG_SLOP,
             multiTouch: multiTouch.current,
+            fingerCount: maxFingers.current,
             pixelRatio: PixelRatio.get(),
-            gesture: sensorModeRef.current
-              ? "sensor"
-              : multiTouch.current
-                ? "pinch"
+            gesture: multiTouch.current
+              ? "multiTouch"
+              : sensorModeRef.current
+                ? "sensor"
                 : travel > DRAG_SLOP
                   ? "drag"
                   : "tap",
+            tapCount: 0,
           });
           if (sensorModeRef.current) return;
           /* A pinch is never a press — including the tail of one, after the
