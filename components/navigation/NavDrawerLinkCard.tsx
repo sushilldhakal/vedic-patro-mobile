@@ -23,8 +23,23 @@ export function NavDrawerLinkCard({
   return (
     <Pressable
       onPress={onPress}
+      /* A fixed height, not `aspect-square`.
+       *
+       * The tile used to be `aspect-square w-[calc((100%-0.75rem)/3)]`, which
+       * ties its width to its own content height: a label that needs a third
+       * line makes the tile taller, and `aspectRatio: 1` then makes it just as
+       * much wider. So one long name blew a tile up to several times the size
+       * of its neighbours, the row overflowed, and tiles from other rows were
+       * drawn across each other — which is what raising the label size set
+       * off. (`calc()` is web CSS and does not resolve reliably on native
+       * either, so the widths were never dependable to begin with.)
+       *
+       * Height fixed and width a flat percentage, the grid is the same three
+       * columns whatever the labels say, and the text wraps inside a box that
+       * cannot grow. */
+      style={{ width: "31.5%", height: 88 }}
       className={cn(
-        "aspect-square w-[calc((100%-0.75rem)/3)] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-1 py-2 active:opacity-90",
+        "shrink-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-1 py-2 active:opacity-90",
         active ? "border-secondary/40 bg-secondary/10" : "border-border bg-card",
       )}
     >
@@ -34,7 +49,7 @@ export function NavDrawerLinkCard({
           "w-full text-center text-[12px] font-bold leading-tight text-foreground",
           active && "text-secondary",
         )}
-        numberOfLines={3}
+        numberOfLines={2}
         style={nepaliTextStyle(11)}
       >
         {label}
