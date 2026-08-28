@@ -6,6 +6,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   fetchPanchanga,
   locationCacheKey,
+  fetchCivilTimeline,
   panchangaKeys,
 } from "@/lib/api";
 import { adToBS } from "@/lib/bs-calendar";
@@ -103,6 +104,17 @@ export default function PanchangaScreen() {
     queryFn: () => fetchEphemerisPanchangaDay(atTimeDatetime, adDateStr, location.params),
     enabled: ready,
     staleTime: 1000 * 60 * 5,
+    placeholderData: keepPreviousData,
+  });
+
+  /* Midnight→midnight is its own timeline from the server, fetched only when
+     the reader actually switches to it. Without this the दिन-रात toggle moved
+     a piece of state nothing downstream read — see `DayTimeline`'s `mode`. */
+  const civilQuery = useQuery({
+    queryKey: panchangaKeys.civil(adDateStr, location.params),
+    queryFn: () => fetchCivilTimeline(adDateStr, "ad", location.params),
+    enabled: ready && dayCycleMode === "Calendar Day",
+    staleTime: 1000 * 60 * 30,
     placeholderData: keepPreviousData,
   });
 
@@ -231,6 +243,9 @@ export default function PanchangaScreen() {
               timezone={effectiveTimezone}
               needleClock={clockUserAdjusted ? clock : undefined}
               showNeedle={clockUserAdjusted || isToday}
+              mode={dayCycleMode}
+              civil={civilQuery.data}
+              civilLoading={civilQuery.isLoading}
             />
           ) : null}
         </View>

@@ -29,7 +29,7 @@ export function tableHeaderLineHeight(fontSize: number): number {
  * Opt out with `{ dense: true }` — for map labels over the sky, where the
  * constraint is how many names fit around a star, not comfortable reading.
  */
-export const MIN_NEPALI_FONT_SIZE = 12;
+export const MIN_NEPALI_FONT_SIZE = 13;
 
 export type NepaliTextOptions = {
   /** Skip {@link MIN_NEPALI_FONT_SIZE}. Overlay labels only. */

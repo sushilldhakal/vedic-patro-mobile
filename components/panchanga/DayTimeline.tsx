@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ScrollView, View, type LayoutChangeEvent } from "react-native"
 import { Text } from "@/components/ui/Text"
 import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
-import type { PanchangaDay } from "@/lib/api";
+import type { CivilTimeline, PanchangaDay } from "@/lib/api";
+import type { DayCycleMode } from "@/components/panchanga/DayCycleToggle";
 import { Card } from "@/components/ui/Card";
 import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
 import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
@@ -20,6 +21,7 @@ import {
   getSunriseLagnaRow,
 } from "@/lib/panchanga-format";
 import {
+  buildCivilTimelineData,
   buildDayTimelineData,
   CHOGHADIYA_EN,
   dualTimeAtGhati,
@@ -45,11 +47,14 @@ const W = 1000;
  * with it because 768 px there is a desktop column; on a phone the chart is
  * a horizontal scroll either way.
  *
- * Drawing at 1:1 makes every number in this file mean screen pixels, and
- * grows the marks and the text together — so nothing inside the chart can
- * collide as a result of it.
+ * Drawing at 1:1 made every number in here mean screen pixels; the 1.25
+ * beyond that is a straight enlargement on top, because 1:1 still left the
+ * band labels at 9-10 px. Scaling the whole viewBox rather than reaching in
+ * and raising each `fontSize` is what keeps it safe: the cells grow with the
+ * text, so a wider word cannot overflow a band it used to fit. It costs
+ * horizontal scrolling, which this chart has either way.
  */
-const MIN_CHART_WIDTH = W;
+const MIN_CHART_WIDTH = Math.round(W * 1.25);
 const X0 = 70;
 const X1 = 994;
 const RULER_H = 58;
@@ -229,6 +234,14 @@ type Props = {
   timezone?: string;
   needleClock?: string;
   showNeedle?: boolean;
+  /** Day boundary: "Day-Night" = sunrise→sunrise (default), "Calendar Day" =
+   *  midnight→midnight. The toggle in the page header was wired to state that
+   *  nothing downstream read, so switching it did nothing on native — the
+   *  whole civil branch existed only in the `.web` timeline. */
+  mode?: DayCycleMode;
+  /** Civil (midnight→midnight) timeline — only used in Calendar Day mode. */
+  civil?: CivilTimeline;
+  civilLoading?: boolean;
 };
 
 function minutesOnVedicChart(
@@ -330,12 +343,19 @@ export function DayTimeline({
   timezone,
   needleClock,
   showNeedle = true,
+  mode = "Day-Night",
+  civil,
+  civilLoading = false,
 }: Props) {
   const { pick, digits, lang } = useLocale();
   const { width: windowWidth } = useBreakpoint();
   const [containerWidth, setContainerWidth] = useState(0);
   const C = useTimelineColors();
-  const data = useMemo(() => (p ? buildDayTimelineData(p, dateAd) : null), [p, dateAd]);
+  const isCivil = mode === "Calendar Day";
+  const data = useMemo(() => {
+    if (isCivil) return civil ? buildCivilTimelineData(civil, p) : null;
+    return p ? buildDayTimelineData(p, dateAd) : null;
+  }, [isCivil, civil, p, dateAd]);
   const planets = useMemo(() => {
     if (!p) return [];
     const rows = getPlanetRows(p);
@@ -351,7 +371,7 @@ export function DayTimeline({
     return () => clearInterval(id);
   }, [isToday]);
 
-  const busy = loading || !p || !data;
+  const busy = loading || (isCivil ? civilLoading || !civil : !p) || !data;
 
   if (busy) {
     return (
@@ -359,7 +379,9 @@ export function DayTimeline({
         <View className="border-b border-border px-4 py-2.5">
           <Text className="text-sm font-bold text-foreground">{pick("दिन-चक्र", "Day cycle")}</Text>
           <Text className="text-xs text-muted-foreground">
-            {pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
+            {isCivil
+              ? pick("पूर्ण पञ्चाङ्ग रेखा · मध्यरातदेखि मध्यरात", "Full panchanga timeline · midnight to midnight")
+              : pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
           </Text>
         </View>
         <SkeletonPulse className="mx-3 my-3 h-[320px] rounded-lg bg-muted/40" />
@@ -442,8 +464,12 @@ export function DayTimeline({
   }
 
   const trackY = (i: number) => T0 + i * TRACK;
-  const nightBands = [[data.dayG, 60]] as Array<[number, number]>;
-  const hairlineGs = [0, data.dayG, 60];
+  /* Midnight→midnight puts the night at both ends and sunrise/sunset inside
+     the frame, instead of a single night band running off the right. */
+  const nightBands = (data.nightBands ?? [[data.dayG, 60]]) as Array<[number, number]>;
+  const sunriseG = isCivil ? (data.sunriseG ?? 0) : 0;
+  const sunsetG = isCivil ? (data.sunsetG ?? data.dayG) : data.dayG;
+  const hairlineGs = isCivil ? [sunriseG, sunsetG] : [0, data.dayG, 60];
 
   const chartContent = (
     <>
@@ -451,12 +477,16 @@ export function DayTimeline({
         <Rect key={`night-${i}`} x={gx(a)} y={RULER_H - 8} width={Math.max(0, gx(b) - gx(a))} height={H - RULER_H + 2} fill={C.night} />
       ))}
 
-      <SvgText x={X0 - 10} y={20} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end">
+      <SvgText x={X0 - 10} y={isCivil ? 34 : 20} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end">
         {pick("घण्टा", "Hour")}
       </SvgText>
-      <SvgText x={X0 - 10} y={47} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end" opacity={0.75}>
-        {pick("घडी", "Ghati")}
-      </SvgText>
+      {/* घडी counts from sunrise, so it means nothing on a midnight-anchored
+          chart — web drops the row there and so does this. */}
+      {!isCivil && (
+        <SvgText x={X0 - 10} y={47} fill={C.muted} fontSize={11} fontFamily={FONT} textAnchor="end" opacity={0.75}>
+          {pick("घडी", "Ghati")}
+        </SvgText>
+      )}
       <Line x1={X0} y1={30} x2={X1} y2={30} stroke={C.axis} strokeWidth={1.2} />
 
       {data.civilHourTicks.map(({ hour, g }) => (
@@ -468,7 +498,7 @@ export function DayTimeline({
         </G>
       ))}
 
-      {GHATI_TICKS.map((g) => (
+      {!isCivil && GHATI_TICKS.map((g) => (
         <G key={`g-${g}`}>
           <Line x1={gx(g)} y1={30} x2={gx(g)} y2={36} stroke={C.tick} strokeWidth={1} />
           <SvgText x={gx(g)} y={48} fill={C.muted} fontSize={10} fontFamily={FONT_SM} textAnchor="middle">
@@ -480,15 +510,17 @@ export function DayTimeline({
       <Line x1={X0} y1={SUNLINE_Y} x2={X1} y2={SUNLINE_Y} stroke={C.sunLine} strokeWidth={1} />
       <Line x1={X0} y1={T0 - 1} x2={X1} y2={T0 - 1} stroke={C.moonLine} strokeWidth={1} strokeDasharray="3,5" opacity={0.7} />
 
-      <EventMarker g={0} sunriseMin={data.sunriseMin} kind="sunrise" anchor="start" digits={digits} C={C} />
-      <EventMarker g={data.dayG} sunriseMin={data.sunriseMin} kind="sunset" anchor="middle" digits={digits} C={C} />
+      <EventMarker g={sunriseG} sunriseMin={data.sunriseMin} kind="sunrise" anchor={isCivil ? "middle" : "start"} digits={digits} C={C} />
+      <EventMarker g={sunsetG} sunriseMin={data.sunriseMin} kind="sunset" anchor="middle" digits={digits} C={C} />
       {data.moonsetG != null && (
         <EventMarker g={data.moonsetG} sunriseMin={data.sunriseMin} kind="moonset" anchor="middle" digits={digits} C={C} />
       )}
       {data.moonriseG != null && (
         <EventMarker g={data.moonriseG} sunriseMin={data.sunriseMin} kind="moonrise" anchor="middle" digits={digits} C={C} />
       )}
-      <EventMarker g={60} sunriseMin={data.sunriseMin} kind="next-sunrise" anchor="end" digits={digits} C={C} />
+      {!isCivil && (
+        <EventMarker g={60} sunriseMin={data.sunriseMin} kind="next-sunrise" anchor="end" digits={digits} C={C} />
+      )}
 
       {hairlineGs.map((g) => (
         <Line key={`hair-${g}`} x1={gx(g)} y1={T0} x2={gx(g)} y2={H - 4} stroke={C.hair} strokeWidth={1} strokeDasharray="2,4" opacity={0.55} />
@@ -648,7 +680,9 @@ export function DayTimeline({
       <View className="border-b border-border px-4 py-2.5">
         <Text className="text-sm font-bold text-foreground">{pick("दिन-चक्र", "Day cycle")}</Text>
         <Text className="text-xs text-muted-foreground">
-          {pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
+          {isCivil
+              ? pick("पूर्ण पञ्चाङ्ग रेखा · मध्यरातदेखि मध्यरात", "Full panchanga timeline · midnight to midnight")
+              : pick("पूर्ण पञ्चाङ्ग रेखा · सूर्योदयदेखि सूर्योदय", "Full panchanga timeline · sunrise to sunrise")}
         </Text>
         <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
           <LegendDot color="rgba(46,160,120,0.55)" label={pick("शुभ", "Good")} />
