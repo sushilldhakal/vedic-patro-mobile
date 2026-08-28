@@ -9,6 +9,7 @@ import type { PanchangaDay } from "@/lib/api";
 import { fetchPanchangaAtTime, panchangaKeys } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
+import { nepaliLineHeight } from "@/lib/nepali-text";
 import { useLocale } from "@/lib/i18n";
 import { getPanchangaDetail } from "@/lib/panchanga-format";
 import { BS_MONTHS_NE, BS_MONTH_NAMES } from "@/lib/bs-calendar";

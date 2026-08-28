@@ -5307,24 +5307,6 @@ export function AakashGocharScene({
         const len = Math.hypot(trackAt.x, trackAt.y, trackAt.z) || 1;
         const aimPitch = -Math.asin(Math.max(-1, Math.min(1, trackAt.y / len)));
         const aimYaw = -Math.atan2(trackAt.x, -trackAt.z);
-<<<<<<< HEAD
-        if (s.playing) {
-          /* Following a moving body with the clock running — snap, every
-             frame. An ease here would simply lag behind the thing it is
-             supposed to be nailed to. */
-          centreAnim.current = null;
-          v.pitch = aimPitch;
-          v.yaw = aimYaw;
-        } else {
-          /* A double press, or केन्द्रविन्दु, on a still sky: turn to it over
-             {@link CENTRE_MS} instead of arriving there instantly. The yaw
-             delta is unwrapped to the short way round, so centring something
-             just west of north never takes the camera the long way through
-             south. */
-          let dYaw = aimYaw - v.yaw;
-          while (dYaw > Math.PI) dYaw -= 2 * Math.PI;
-          while (dYaw < -Math.PI) dYaw += 2 * Math.PI;
-=======
         /* The yaw target, unwrapped to the short way round from wherever the
            ease starts — so centring something just west of north never takes
            the camera the long way through south. */
@@ -5342,22 +5324,15 @@ export function AakashGocharScene({
              this, a double press on a graha while the sky was playing went
              straight down the tracking path and teleported, which is most of
              the time: the clock runs by default. */
->>>>>>> 1debe15 (feat(sky3d): smooth double-tap centring, and two gesture-state fixes)
           centreAnim.current = {
             t0: performance.now(),
             yaw0: v.yaw,
             pitch0: v.pitch,
-<<<<<<< HEAD
-            yaw1: v.yaw + dYaw,
-=======
             yaw1: shortYaw(v.yaw),
->>>>>>> 1debe15 (feat(sky3d): smooth double-tap centring, and two gesture-state fixes)
             pitch1: aimPitch,
             wroteYaw: v.yaw,
             wrotePitch: v.pitch,
           };
-<<<<<<< HEAD
-=======
         } else if (centreAnim.current) {
           /* Mid-ease onto something that is itself moving — walk the endpoint
              along with it, so the turn lands on where the body actually is
@@ -5370,7 +5345,6 @@ export function AakashGocharScene({
              the thing it is meant to be nailed to. */
           v.pitch = aimPitch;
           v.yaw = aimYaw;
->>>>>>> 1debe15 (feat(sky3d): smooth double-tap centring, and two gesture-state fixes)
         }
         target.current.copy(trackAt);
       }
