@@ -65,7 +65,8 @@ const headTitleStyle = {
   color: W_INK,
   fontSize: 18,
   fontWeight: "700" as const,
-  lineHeight: 24,
+  /* Devanagari line box, not a Latin one — 24 for 18 px cropped the matras. */
+  lineHeight: nepaliLineHeight(18),
   marginTop: 4,
 };
 const headSubStyle = {
@@ -550,7 +551,12 @@ function WheelBody({
       ? { ...headEyebrowStyle, fontSize: 10, letterSpacing: 1.2 }
       : headEyebrowStyle;
     const title = compactHead
-      ? { ...headTitleStyle, fontSize: fullscreen ? 14 : 15, lineHeight: 19, marginTop: 2 }
+      ? {
+          ...headTitleStyle,
+          fontSize: fullscreen ? 14 : 15,
+          lineHeight: nepaliLineHeight(fullscreen ? 14 : 15),
+          marginTop: 2,
+        }
       : headTitleStyle;
     const sub = compactHead
       ? { ...headSubStyle, fontSize: 12, marginTop: 2 }

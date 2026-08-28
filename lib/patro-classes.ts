@@ -1,5 +1,6 @@
 import type { TextStyle, ViewStyle } from "react-native";
 import { NOTO_DEVANAGARI_REGULAR } from "./fonts";
+import { nepaliLineHeight } from "./nepali-text";
 import { cn } from "./utils";
 
 /** Tabular monospace numerals (replaces legacy `.mono`). */
@@ -103,12 +104,16 @@ export function patroMonthChipHeadLabelStyle(
   useNepaliFont: boolean,
   narrow?: boolean,
 ): TextStyle {
+  const fontSize = narrow ? 12 : 14;
   return {
-    fontSize: narrow ? 12 : 14,
-    lineHeight: narrow ? 16 : 20,
+    fontSize,
+    /* Devanagari gets its own line box and keeps the font's padding — that
+       padding is exactly what reserves room for the matras, and switching it
+       off (which this did for both scripts) is what let them be sliced. */
+    lineHeight: useNepaliFont ? nepaliLineHeight(fontSize) : narrow ? 16 : 20,
     textAlign: "center",
     ...(useNepaliFont
-      ? { fontFamily: NOTO_DEVANAGARI_REGULAR, includeFontPadding: false }
+      ? { fontFamily: NOTO_DEVANAGARI_REGULAR, includeFontPadding: true }
       : { includeFontPadding: false }),
   };
 }
