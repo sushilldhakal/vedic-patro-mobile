@@ -203,6 +203,8 @@ interface WheelChartProps {
   onZoom: (z: number) => void;
   pan: { x: number; y: number };
   onPan: (x: number, y: number) => void;
+  lineTarget?: number;
+  onLineTargetChange?: (index: number) => void;
 }
 
 function WheelChartImpl({
@@ -221,6 +223,8 @@ function WheelChartImpl({
   onZoom,
   pan,
   onPan,
+  lineTarget: lineTargetProp,
+  onLineTargetChange,
 }: WheelChartProps) {
   const dragRef = useRef<
     | { mode: "r"; a: number; spin0: number; moved: boolean }
@@ -236,7 +240,12 @@ function WheelChartImpl({
    * the Moon; tapping a planet moves the needle to it so you can read which
    * rashi / nakshatra that planet falls in.
    */
-  const [lineTarget, setLineTarget] = useState(1);
+  const [innerTarget, setInnerTarget] = useState(1);
+  const lineTarget = lineTargetProp ?? innerTarget;
+  const setLineTarget = (index: number) => {
+    if (lineTargetProp === undefined) setInnerTarget(index);
+    onLineTargetChange?.(index);
+  };
 
   const pol = useCallback(
     (L: number, r: number): [number, number] => {
@@ -258,7 +267,7 @@ function WheelChartImpl({
     [pol]
   );
 
-  const { moonLon, moonNak, planetLons, sunLon } = markers;
+  const { moonLon, planetLons, sunLon } = markers;
 
   // The static rings \u2014 nakshatra / rashi / pada arcs, day ticks, hit targets and
   // the Gregorian month labels \u2014 depend only on the wheel's geometry (spin),
@@ -430,30 +439,9 @@ function WheelChartImpl({
   // pan) from rebuilding them, and isolates the work done per day while scrubbing.
   const dataLayers = useMemo(() => {
     const sunRashiIdx = Math.floor(normDeg(sunLon) / 30);
-    const moonRashiIdx = Math.floor(normDeg(moonLon) / 30);
 
     const markerNodes: React.ReactNode[] = [];
     if (tw.show_today) {
-    const L0 = moonNak * (360 / 27);
-    const L1 = (moonNak + 1) * (360 / 27);
-    markerNodes.push(
-      <path
-        key="nowwedge"
-        d={arcSeg(L0, L1, R.nakIn, R.nakOut)}
-        className={wSegNow}
-        style={{ pointerEvents: "none" }}
-      />
-    );
-    const rL0 = moonRashiIdx * 30;
-    const rL1 = rL0 + 30;
-    markerNodes.push(
-      <path
-        key="nowwedge-rashi"
-        d={arcSeg(rL0, rL1, R.rashiIn, R.rashiOut)}
-        className={wSegNow}
-        style={{ pointerEvents: "none" }}
-      />
-    );
     const mL0 = sunRashiIdx * 30;
     const mL1 = mL0 + 30;
     markerNodes.push(
@@ -525,16 +513,9 @@ function WheelChartImpl({
         <path
           key={`yog${y}`}
           d={arcSeg(L0, L1, R_YOGA_I, R_YOGA_O)}
-          fill={
-            isCur
-              ? "color-mix(in srgb, #a07de8 38%, #10063a)"
-              : y % 2
-              ? "color-mix(in srgb, #7c5cbf 22%, #08041a)"
-              : "color-mix(in srgb, #6448a8 16%, #06031a)"
-          }
-          stroke={isCur ? "#c4a8f0" : "rgba(100,72,168,.25)"}
+          fill={isCur ? "rgba(160,125,232,0.20)" : "transparent"}
+          stroke={isCur ? "#c4a8f0" : "rgba(169,212,212,0.28)"}
           strokeWidth={isCur ? 1.6 : 0.4}
-          opacity={isCur ? 1 : 0.82}
         />
       );
       innerRings.push(
@@ -565,9 +546,9 @@ function WheelChartImpl({
         <path
           key={`kar${k}`}
           d={arcSeg(L0, L1, R_KAR_I, R_KAR_O)}
-          className={wSegRashi({ alt: k % 2 === 1, sel: isCur })}
-          stroke={isCur ? "var(--w-accent)" : undefined}
-          strokeWidth={isCur ? 1.7 : undefined}
+          fill={isCur ? "rgba(198,40,40,0.16)" : "transparent"}
+          stroke={isCur ? "var(--w-accent)" : "rgba(169,212,212,0.28)"}
+          strokeWidth={isCur ? 1.7 : 0.4}
         />
       );
       innerRings.push(
@@ -767,12 +748,19 @@ function WheelChartImpl({
           r={planetHitRadius(i)}
           fill="transparent"
           style={{ cursor: "pointer" }}
-          onPointerDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setLineTarget(i);
+          }}
           onPointerUp={(e) => {
             e.stopPropagation();
             setLineTarget(i);
           }}
-          onClick={() => setLineTarget(i)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setLineTarget(i);
+          }}
         >
           <title>{g.ne}</title>
         </circle>
@@ -803,7 +791,7 @@ function WheelChartImpl({
       : [];
 
     return { markerNodes, innerRings, core, bsLabels };
-  }, [markers, det, spin, tw, moonNak, moonLon, sunLon, planetLons, lineTarget, pol, arcSeg]);
+  }, [markers, det, spin, tw, moonLon, sunLon, planetLons, lineTarget, pol, arcSeg]);
 
   const angleAt = (e: React.PointerEvent) => {
     const r = wrapRef.current!.getBoundingClientRect();

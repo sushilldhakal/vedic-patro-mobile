@@ -10,7 +10,7 @@ import {
   fetchCivilTimeline,
   panchangaKeys,
 } from "@/lib/api";
-import { adToBS } from "@/lib/bs-calendar";
+import { adToBS, bsToAD } from "@/lib/bs-calendar";
 import {
   buildAtTimeDatetime,
   chartDateAd,
@@ -285,6 +285,18 @@ export default function PanchangaScreen() {
               isToday={isToday}
               timezone={effectiveTimezone}
               locationLabel={locationLabel}
+              clock={clock}
+              calendarPick={{
+                year: bs.year,
+                month: bs.month,
+                day: bs.day,
+                clock,
+                todayAd,
+                onCommit: (year, month, day, nextClock) => {
+                  setDate(bsToAD(year, month, day));
+                  handleClockChange(nextClock);
+                },
+              }}
             />
             {wheelData ? (
               <Pressable

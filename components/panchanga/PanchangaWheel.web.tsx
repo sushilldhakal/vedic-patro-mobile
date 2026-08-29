@@ -23,6 +23,7 @@ import {
   buildWheelDetail,
   buildWheelMarkers,
   buildWheelMarkersAtTime,
+  buildWheelMarkersFromDetail,
   DEFAULT_WHEEL_TWEAKS,
   gClock,
   scrubGToDatetime,
@@ -33,6 +34,9 @@ import { NAKSHATRA_ICONS } from "@/lib/nakshatra-icons";
 import type { YearWheelScrub } from "@/lib/wheel-year-scrub";
 import { WheelChart, type WheelHover, type WheelPick } from "./WheelChart";
 import { WheelPanel } from "./WheelPanel";
+import { PlanetSelectMenu } from "./PlanetSelectMenu";
+import { BsDateTimePicker } from "./BsDateTimePicker";
+import { windowedBrowseYears } from "@/lib/patro-browse-years";
 import { useLocale } from "@/lib/i18n";
 import { patroSkel, patroWheelShell } from "@/lib/patro-classes";
 import {
@@ -74,6 +78,8 @@ function bsMonthEnOf(ne: string): string {
 }
 
 const wheelDockIcon = "h-3.5 w-3.5 max-[480px]:h-3 max-[480px]:w-3";
+const wheelCornerBtn =
+  "flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(143,191,193,0.32)] bg-[rgba(11,20,22,0.96)] text-[var(--w-ink)] shadow-[0_8px_20px_rgba(0,0,0,0.4)] transition-colors hover:border-[var(--w-accent)] max-[480px]:h-8 max-[480px]:w-8";
 
 export type { YearWheelScrub };
 
@@ -168,7 +174,15 @@ interface Props {
   yearScrub?: YearWheelScrub;
   /** "HH:MM" — where the needle sits when the wheel has no time slider of its own. */
   clock?: string;
-  /** Fullscreen-only calendar button; opens whatever `fullscreenOverlay` renders. */
+  calendarPick?: {
+    year: number;
+    month: number;
+    day: number;
+    clock: string;
+    todayAd?: string;
+    onCommit: (year: number, month: number, day: number, clock: string) => void;
+  };
+  /** @deprecated Prefer {@link calendarPick}. */
   onOpenDatePicker?: () => void;
   /** Rendered inside the fullscreen view so a picker can sit above the wheel. */
   fullscreenOverlay?: ReactNode;
@@ -220,6 +234,7 @@ function PanchangaWheelBody({
   atTimeScrubOnly = false,
   yearScrub,
   clock,
+  calendarPick,
   onOpenDatePicker,
   fullscreenOverlay,
 }: WheelBodyProps & { atTimeScrubOnly?: boolean; yearScrub?: YearWheelScrub }) {
@@ -232,13 +247,16 @@ function PanchangaWheelBody({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [picked, setPicked] = useState<WheelPick | null>(null);
   const [hover, setHover] = useState<WheelHover | null>(null);
+  const [lineTarget, setLineTarget] = useState(1);
   const [tip, setTip] = useState({ x: 0, y: 0 });
   const [scrubPinned, setScrubPinned] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const expandedHistoryRef = useRef(false);
   const ignorePopRef = useRef(false);
 
   const setExpandedMode = useCallback((next: boolean) => {
+    setPicked(null);
     if (next) {
       if (!expandedHistoryRef.current) {
         window.history.pushState({ panchangaWheelExpanded: true }, "");
@@ -375,10 +393,17 @@ function PanchangaWheelBody({
   const atTimeData =
     needsAtTime && !scrubQ.isPlaceholderData ? scrubQ.data : undefined;
 
-  const markers = useMemo(
-    () => (atTimeData ? buildWheelMarkersAtTime(atTimeData) : buildWheelMarkers(p, det, effectiveG)),
-    [atTimeData, p, det, effectiveG]
-  );
+  const markers = useMemo(() => {
+    if (atTimeData) return buildWheelMarkersAtTime(atTimeData);
+    /* Year playback steps a day at a time. Each payload already has that day's
+       sunrise graha longitudes. Feeding `effectiveG` (from the page clock)
+       through `moonLonAtG` then extrapolates another half-day of motion on top
+       — and when the clock later snaps to the new sunrise, the moon jumps
+       back. At 2×/4×/8× that reads as planets circling, then reversing. Use
+       the day's own snapshot so they only ever advance along the orbit. */
+    if (rangeMode) return buildWheelMarkersFromDetail(det);
+    return buildWheelMarkers(p, det, effectiveG);
+  }, [atTimeData, p, det, effectiveG, rangeMode]);
 
   const handleScrubChange = useCallback((g: number) => {
     setScrubG(g);
@@ -465,6 +490,47 @@ function PanchangaWheelBody({
   const tithiNe = scrubTithi?.name_ne ?? det.tithi2[0]?.ne ?? "—";
   const tithiEn = scrubTithi?.name ?? det.tithi2[0]?.en ?? tithiNe;
   const locLabel = locationLabel ?? p.location?.name ?? pick("काठमाडौं", "Kathmandu");
+  const pickerYear = calendarPick?.year ?? bsYear;
+  const pickerMonth = calendarPick?.month ?? (BS_MONTHS_NE.indexOf(bsMonthNe) + 1 || 1);
+  const pickerDay = calendarPick?.day ?? bsDay;
+  const pickerClock = calendarPick?.clock ?? clock ?? scrubClock;
+  const pickerYears = useMemo(() => windowedBrowseYears("bs", pickerYear), [pickerYear]);
+  const calendarDraftRef = useRef({
+    year: pickerYear,
+    month: pickerMonth,
+    day: pickerDay,
+    clock: pickerClock,
+  });
+
+  const openCalendar = useCallback(() => {
+    yearScrub?.onPause();
+    if (onOpenDatePicker && !calendarPick) {
+      onOpenDatePicker();
+      return;
+    }
+    calendarDraftRef.current = {
+      year: pickerYear,
+      month: pickerMonth,
+      day: pickerDay,
+      clock: pickerClock,
+    };
+    setCalendarOpen(true);
+  }, [calendarPick, onOpenDatePicker, pickerClock, pickerDay, pickerMonth, pickerYear, yearScrub]);
+
+  const handleCalendarCommit = useCallback(
+    (year: number, month: number, day: number, nextClock: string) => {
+      if (!rangeMode) {
+        const [h, m] = nextClock.split(":").map(Number);
+        let g = ((h ?? 0) * 60 + (m ?? 0) - det.sunriseMin) / 24;
+        if (g < 0) g += 60;
+        setScrubG(Math.max(0, Math.min(60, g)));
+        setScrubPinned(true);
+      }
+      calendarPick?.onCommit(year, month, day, nextClock);
+      setCalendarOpen(false);
+    },
+    [calendarPick, det.sunriseMin, rangeMode],
+  );
 
   const onStageMove = (e: React.MouseEvent) => {
     const r = stageRef.current?.getBoundingClientRect();
@@ -533,6 +599,49 @@ function PanchangaWheelBody({
           }
         />
 
+        <div className="pointer-events-auto absolute top-4 right-3 z-30 flex items-center gap-1.5">
+          <button
+            type="button"
+            className={wheelCornerBtn}
+            title={pick("मिति र समय", "Date and time")}
+            aria-label={pick("मिति र समय", "Date and time")}
+            onClick={openCalendar}
+          >
+            <CalendarDays className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={wheelCornerBtn}
+            title={pick("रिलोड · जुम रिसेट · सूर्योदय", "Reload · reset zoom · sunrise")}
+            aria-label={pick("रिलोड", "Reload")}
+            onClick={resetToSunrise}
+          >
+            <RotateCcw className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={wheelCornerBtn}
+            title={
+              expanded
+                ? pick("सामान्य दृश्य", "Exit full width")
+                : pick("पूर्ण चौडाइ", "Full width view")
+            }
+            aria-label={
+              expanded
+                ? pick("सामान्य दृश्य", "Exit full width")
+                : pick("पूर्ण चौडाइ", "Full width view")
+            }
+            aria-pressed={expanded}
+            onClick={toggleExpanded}
+          >
+            {expanded ? (
+              <Minimize2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+            ) : (
+              <Fullscreen className="h-4 w-4" strokeWidth={2} aria-hidden />
+            )}
+          </button>
+        </div>
+
         <WheelChart
           det={det}
           markers={markers}
@@ -549,6 +658,8 @@ function PanchangaWheelBody({
           onZoom={handleZoom}
           pan={pan}
           onPan={handlePan}
+          lineTarget={lineTarget}
+          onLineTargetChange={setLineTarget}
         />
 
         {tipNode}
@@ -580,9 +691,6 @@ function PanchangaWheelBody({
 
         <div className={wheelDock}>
           {yearScrub ? (
-            /* The range wheel's whole control set: playback, where you are in
-               the window, and — in fullscreen — the date-time picker. No time
-               slider, no reset, no zoom: the page's date chrome owns all that. */
             <>
               <WheelYearPlayback scrub={yearScrub} />
               <div className={wheelDockSep} />
@@ -596,33 +704,13 @@ function PanchangaWheelBody({
               </div>
               <div className={wheelDockSep} />
               <div className={cn(wheelDockGrp, "shrink-0")}>
-                {expanded && onOpenDatePicker ? (
-                  <button
-                    type="button"
-                    className={wheelIconBtn}
-                    title={pick("मिति र समय", "Date and time")}
-                    onClick={onOpenDatePicker}
-                  >
-                    <CalendarDays className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                  </button>
-                ) : null}
-                <button
-                  type="button"
+                <PlanetSelectMenu
+                  grahas={det.grahas}
+                  selected={lineTarget}
+                  onSelect={setLineTarget}
                   className={wheelIconBtn}
-                  title={
-                    expanded
-                      ? pick("सामान्य दृश्य", "Exit full width")
-                      : pick("पूर्ण चौडाइ", "Full width view")
-                  }
-                  aria-pressed={expanded}
-                  onClick={toggleExpanded}
-                >
-                  {expanded ? (
-                    <Minimize2 className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                  ) : (
-                    <Fullscreen className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                  )}
-                </button>
+                  iconSize={18}
+                />
               </div>
             </>
           ) : (
@@ -653,31 +741,13 @@ function PanchangaWheelBody({
                     {pick("आज", "Now")}
                   </button>
                 )}
-                <button
-                  type="button"
+                <PlanetSelectMenu
+                  grahas={det.grahas}
+                  selected={lineTarget}
+                  onSelect={setLineTarget}
                   className={wheelIconBtn}
-                  title={pick("उत्तर सिधा · जुम रिसेट · सूर्योदय", "North up · reset zoom · sunrise")}
-                  onClick={resetToSunrise}
-                >
-                  ⟳
-                </button>
-                <button
-                  type="button"
-                  className={wheelIconBtn}
-                  title={
-                    expanded
-                      ? pick("सामान्य दृश्य", "Exit full width")
-                      : pick("पूर्ण चौडाइ", "Full width view")
-                  }
-                  aria-pressed={expanded}
-                  onClick={toggleExpanded}
-                >
-                  {expanded ? (
-                    <Minimize2 className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                  ) : (
-                    <Fullscreen className={wheelDockIcon} strokeWidth={2} aria-hidden />
-                  )}
-                </button>
+                  iconSize={18}
+                />
               </div>
             </>
           )}
@@ -686,16 +756,66 @@ function PanchangaWheelBody({
     </div>
   );
 
+  const calendarDialog = calendarOpen ? (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4">
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        aria-label={pick("बन्द गर्नुहोस्", "Close")}
+        onClick={() => setCalendarOpen(false)}
+      />
+      <div className="relative z-[141] w-full max-w-[22rem] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between px-4 pt-3.5 pb-1">
+          <h2 className="text-base font-bold text-foreground">{pick("मिति र समय", "Date and time")}</h2>
+          <button
+            type="button"
+            className="text-sm text-muted-foreground"
+            onClick={() => setCalendarOpen(false)}
+          >
+            {pick("बन्द", "Close")}
+          </button>
+        </div>
+        <BsDateTimePicker
+          year={pickerYear}
+          month={pickerMonth}
+          day={pickerDay}
+          yearOptions={pickerYears}
+          todayAd={calendarPick?.todayAd}
+          onSelectDate={(y, m, d) => {
+            calendarDraftRef.current = { ...calendarDraftRef.current, year: y, month: m, day: d };
+          }}
+          monthAriaLabel={pick("महिना", "Month")}
+          yearAriaLabel={pick("वर्ष", "Year")}
+          clock={pickerClock}
+          onClockChange={(next) => {
+            calendarDraftRef.current = { ...calendarDraftRef.current, clock: next };
+          }}
+          hourAriaLabel={pick("घण्टा", "Hour")}
+          minuteAriaLabel={pick("मिनेट", "Minute")}
+          showTime
+          onDone={() => {
+            const next = calendarDraftRef.current;
+            handleCalendarCommit(next.year, next.month, next.day, next.clock);
+          }}
+        />
+      </div>
+    </div>
+  ) : null;
+
   const withOverlay = (
     <>
       {wheelNode}
-      {/* Rendered with the fullscreen node so the picker sits above it, rather
-          than behind a portal the page mounted elsewhere. */}
       {expanded ? fullscreenOverlay : null}
+      {calendarDialog}
     </>
   );
 
-  return expanded ? createPortal(withOverlay, document.body) : wheelNode;
+  return expanded ? createPortal(withOverlay, document.body) : (
+    <>
+      {wheelNode}
+      {calendarDialog}
+    </>
+  );
 }
 
 function PanchangaWheelImpl(props: Props) {

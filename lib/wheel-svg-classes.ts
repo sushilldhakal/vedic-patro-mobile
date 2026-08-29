@@ -105,15 +105,15 @@ export const wTwPaksha =
 
 export function wKarLbl(sel?: boolean) {
   return cn(
-    "fill-[#ffffff] text-sm font-semibold [font-family:var(--pn-font)]",
-    sel && "fill-[var(--w-accent)]",
+    "fill-white text-sm font-bold [font-family:var(--pn-font)]",
+    sel && "fill-white",
   );
 }
 
 export function wYogaLbl(sel?: boolean) {
   return cn(
-    "fill-[#b09dd4] text-sm font-semibold [font-family:var(--pn-font)]",
-    sel && "fill-[#e0d0ff]",
+    "fill-white text-sm font-semibold [font-family:var(--pn-font)]",
+    sel && "fill-white",
   );
 }
 

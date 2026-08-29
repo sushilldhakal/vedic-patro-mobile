@@ -1,7 +1,7 @@
 import { cn } from "./utils";
 
 export const wheelHead =
-  "pointer-events-none absolute top-4 left-4 z-20";
+  "pointer-events-none absolute top-4 left-4 right-32 z-20";
 
 export const wheelHeadEyebrow =
   "text-sm font-semibold uppercase tracking-[0.16em] text-[var(--w-ink-faint)]";

@@ -5,8 +5,6 @@ import { AppShell } from "@/components/AppShell";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
 import { LocationSelector } from "@/components/panchanga/LocationSelector";
 import { PanchangaWheel } from "@/components/panchanga/PanchangaWheel";
-import { PatroDateSheet } from "@/components/patro-date/PatroDateSheet";
-import { usePatroDateSheet } from "@/components/patro-date/use-patro-date-sheet";
 import { Text } from "@/components/ui/Text";
 import {
   defaultClockForTimezone,
@@ -140,8 +138,7 @@ export default function PanchangaYearScreen() {
      centred on, and only a date the user picks moves it. That is what lets the
      window grow and slide underneath without tugging the needle. */
   const foundIndex = yearWheelIndexOfAdDate(days, dayAd);
-  const clamped = foundIndex ?? 1;
-  const foundRow = days[clamped - 1];
+  const foundRow = foundIndex !== null ? days[foundIndex - 1] : undefined;
   /* `foundIndex` comes back null for one render whenever `days` is
    * mid-rebuild (window growing/sliding, or briefly at high playback speed)
    * and doesn't yet contain `dayAd`. Falling back to `days[0]` used to mean
@@ -160,6 +157,7 @@ export default function PanchangaYearScreen() {
   const lastGoodRowRef = useRef<YearWheelDay | undefined>(undefined);
   const current = foundIndex !== null ? foundRow : lastGoodRowRef.current;
   if (current) lastGoodRowRef.current = current;
+  const clamped = foundIndex ?? (current ? yearWheelIndexOfAdDate(days, current.dateAd) : null) ?? 1;
   const wheelData = current?.p;
 
   const scrubbingRef = useRef(false);
@@ -310,6 +308,7 @@ export default function PanchangaYearScreen() {
      handleDateChange). */
 
   useEffect(() => {
+    if (play.dir !== 0) return;
     const syncKey = `${adDateStr}|${locationCacheKey(location.params)}`;
     if (clockSyncedKeyRef.current === syncKey) return;
     if (clockUserAdjusted) return;
@@ -324,45 +323,10 @@ export default function PanchangaYearScreen() {
     if (!sunriseClock) return;
     clockSyncedKeyRef.current = syncKey;
     setClock(sunriseClock);
-  }, [adDateStr, location.params, isToday, tz, clockUserAdjusted, wheelData, setClock]);
+  }, [play.dir, adDateStr, location.params, isToday, tz, clockUserAdjusted, wheelData, setClock]);
 
   const monthNe = current ? (BS_MONTHS_NE[current.bsMonth - 1] ?? "") : "";
   const locationLabel = displayLocationLabel(location, current?.p?.location?.name);
-
-  const dateSheet = usePatroDateSheet();
-  const monthOptions = useMemo(
-    () =>
-      BS_MONTHS_NE.map((ne, i) => ({
-        value: i + 1,
-        label: pick(ne, BS_MONTH_NAMES[i] ?? ne),
-      })),
-    [pick],
-  );
-
-  /* Lives inside the wheel's fullscreen modal — a sheet mounted out here would
-     open behind it, and leaving fullscreen to pick a date is what the wheel's
-     calendar button exists to avoid. */
-  const fullscreenDateSheet = (
-    <PatroDateSheet
-      sheet={dateSheet}
-      mode="year-month-time"
-      era="bs"
-      year={current?.bsYear ?? bsYear}
-      month={current?.bsMonth ?? 1}
-      day={current?.bsDay ?? 1}
-      clock={clock}
-      monthOptions={monthOptions}
-      todayAd={todayAd}
-      showTime
-      location={location}
-      onLocationChange={setLocation}
-      onCommit={(draft) => {
-        const day = Math.min(draft.day, getBSMonthLength(draft.year, draft.month));
-        handleDateChange(bsToAD(draft.year, draft.month, day));
-        handleClockChange(draft.clock);
-      }}
-    />
-  );
 
   const windowLabel = useMemo(() => {
     const from = adToBS(parseAdStr(bounds.startAd));
@@ -406,8 +370,18 @@ export default function PanchangaYearScreen() {
           timezone={tz}
           locationLabel={locationLabel}
           clock={clock}
-          onOpenDatePicker={dateSheet.openDate}
-          fullscreenOverlay={fullscreenDateSheet}
+          calendarPick={{
+            year: current?.bsYear ?? bsYear,
+            month: current?.bsMonth ?? 1,
+            day: current?.bsDay ?? 1,
+            clock,
+            todayAd,
+            onCommit: (year, month, day, nextClock) => {
+              const nextDay = Math.min(day, getBSMonthLength(year, month));
+              handleDateChange(bsToAD(year, month, nextDay));
+              handleClockChange(nextClock);
+            },
+          }}
           yearScrub={{
             day: clamped,
             totalDays: total || 1,
