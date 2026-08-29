@@ -141,16 +141,21 @@ function WheelHead({
   eyebrow,
   title,
   sub,
+  playRate,
 }: {
   eyebrow: React.ReactNode;
   title: React.ReactNode;
   sub: React.ReactNode;
+  playRate?: React.ReactNode;
 }) {
   return (
     <div className={wheelHead}>
       <div className={wheelHeadEyebrow}>{eyebrow}</div>
       <div className={wheelHeadTitle}>{title}</div>
       <div className={wheelHeadSub}>{sub}</div>
+      {playRate ? (
+        <div className="mt-1 text-sm font-bold tabular-nums text-[#f9c800]">{playRate}</div>
+      ) : null}
     </div>
   );
 }
@@ -587,19 +592,29 @@ function PanchangaWheelBody({
           title={
             <>
               {isToday && !scrubPinned ? pick("आजको", "Today's") : ""}{" "}
-              {pick("ग्रह–नक्षत्र · तिथि–करण चक्र", "Graha–Nakshatra · Tithi–Karana wheel")}{" "}
-              <span className="yr">{num(bsYear)}</span>
+              {pick("ग्रह–नक्षत्र · तिथि–करण चक्र", "Graha–Nakshatra · Tithi–Karana wheel")}
             </>
           }
           sub={
             <>
-              {pick(det.weekday.ne, det.weekday.en)}, {pick(bsMonthNe, bsMonthEnOf(bsMonthNe))}{" "}
-              {num(bsDay)} · {pick(tithiNe, tithiEn)} · {locLabel}
+              {pick(bsMonthNe, bsMonthEnOf(bsMonthNe))} {num(bsDay)}, {num(bsYear)} · {num(pickerClock)}
+              {" · "}
+              {pick(det.weekday.ne, det.weekday.en)}
+              {" · "}
+              {pick(tithiNe, tithiEn)}
             </>
+          }
+          playRate={
+            yearScrub?.playbackRateLabel && yearScrub.direction !== 0 ? (
+              <>
+                {yearScrub.playbackRateLabel}
+                <span className="text-[var(--w-ink)]"> · {num(yearScrub.speed)}×</span>
+              </>
+            ) : undefined
           }
         />
 
-        <div className="pointer-events-auto absolute top-4 right-3 z-30 flex items-center gap-1.5">
+        <div className="pointer-events-auto absolute top-4 right-3 z-[40] flex items-center gap-1.5">
           <button
             type="button"
             className={wheelCornerBtn}
@@ -674,7 +689,7 @@ function PanchangaWheelBody({
         <div className={wheelLegend}>
           <div className={wheelLegendRow}>
             <span className={wheelLegendDot} style={{ background: "var(--w-accent)" }} />
-            {pick("लग्न · वर्तमान नक्षत्र · तिथि", "Lagna · current nakshatra · tithi")}
+            {pick("वर्तमान नक्षत्र · तिथि", "Current nakshatra · tithi")}
           </div>
           <div className={wheelLegendRow}>
             <span className={wheelLegendDot} style={{ background: "#f2a81d" }} />

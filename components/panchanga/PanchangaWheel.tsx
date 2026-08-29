@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Modal, Pressable, StatusBar, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StatusBar, View } from "react-native";
 import { Text } from "@/components/ui/Text"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
@@ -8,6 +8,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { PanchangaDay } from "@/lib/api";
 import { fetchPanchangaAtTime, panchangaKeys } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
+import { BottomSheetModal } from "@/components/ui/BottomSheetModal";
 import { SkeletonPulse } from "@/components/ui/SkeletonPulse";
 import { nepaliLineHeight } from "@/lib/nepali-text";
 import { useLocale } from "@/lib/i18n";
@@ -135,6 +136,8 @@ type Props = {
   onOpenDatePicker?: () => void;
   /** Rendered inside the fullscreen modal so a picker can sit above the wheel. */
   fullscreenOverlay?: ReactNode;
+  /** Override the inline stage height (year page fills the remaining viewport). */
+  stageHeight?: number;
 };
 
 
@@ -194,71 +197,59 @@ function WheelCalendarModal({
   }, [open, year, month, day, clock]);
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.72)" }}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+    <BottomSheetModal visible={open} onClose={onClose} variant="center" maxHeight="92%">
+      <View style={{ backgroundColor: colors.card }}>
         <View
           style={{
-            marginHorizontal: 16,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.card,
-            overflow: "hidden",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            paddingTop: 14,
+            paddingBottom: 8,
           }}
         >
-          <View
+          <Text
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 16,
-              paddingTop: 14,
-              paddingBottom: 8,
+              color: colors.foreground,
+              fontSize: 16,
+              fontWeight: "700",
+              lineHeight: nepaliLineHeight(16),
             }}
           >
-            <Text
-              style={{
-                color: colors.foreground,
-                fontSize: 16,
-                fontWeight: "700",
-                lineHeight: nepaliLineHeight(16),
-              }}
-            >
-              {pick("मिति र समय", "Date and time")}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={pick("बन्द गर्नुहोस्", "Close")}>
-              <Ionicons name="close" size={20} color={colors.foreground} />
-            </Pressable>
-          </View>
-          <BsDateTimePicker
-            key={`${year}-${month}-${day}-${clock}-${open}`}
-            year={year}
-            month={month}
-            day={day}
-            yearOptions={yearOptions}
-            todayAd={todayAd}
-            onSelectDate={(y, m, d) => {
-              draftRef.current = { ...draftRef.current, year: y, month: m, day: d };
-            }}
-            monthAriaLabel={pick("महिना", "Month")}
-            yearAriaLabel={pick("वर्ष", "Year")}
-            clock={clock}
-            onClockChange={(next) => {
-              draftRef.current = { ...draftRef.current, clock: next };
-            }}
-            hourAriaLabel={pick("घण्टा", "Hour")}
-            minuteAriaLabel={pick("मिनेट", "Minute")}
-            showTime
-            onDone={() => {
-              const next = draftRef.current;
-              onCommit(next.year, next.month, next.day, next.clock);
-              onClose();
-            }}
-          />
+            {pick("मिति र समय", "Date and time")}
+          </Text>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={pick("बन्द गर्नुहोस्", "Close")}>
+            <Ionicons name="close" size={20} color={colors.foreground} />
+          </Pressable>
         </View>
+        <BsDateTimePicker
+          key={`${year}-${month}-${day}-${clock}-${open}`}
+          year={year}
+          month={month}
+          day={day}
+          yearOptions={yearOptions}
+          todayAd={todayAd}
+          onSelectDate={(y, m, d) => {
+            draftRef.current = { ...draftRef.current, year: y, month: m, day: d };
+          }}
+          monthAriaLabel={pick("महिना", "Month")}
+          yearAriaLabel={pick("वर्ष", "Year")}
+          clock={clock}
+          onClockChange={(next) => {
+            draftRef.current = { ...draftRef.current, clock: next };
+          }}
+          hourAriaLabel={pick("घण्टा", "Hour")}
+          minuteAriaLabel={pick("मिनेट", "Minute")}
+          showTime
+          onDone={() => {
+            const next = draftRef.current;
+            onCommit(next.year, next.month, next.day, next.clock);
+            onClose();
+          }}
+        />
       </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -284,7 +275,7 @@ function WheelChrome({
         position: "absolute",
         top,
         right: 12,
-        zIndex: 30,
+        zIndex: 40,
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
@@ -529,18 +520,21 @@ function WheelBody({
   calendarPick,
   onOpenDatePicker,
   fullscreenOverlay,
+  stageHeight,
 }: Omit<Props, "loading" | "p"> & { p: PanchangaDay }) {
   const { pick, digits } = useLocale();
   const { width: screenW, height: screenH, isTablet, isLandscape } = useBreakpoint();
   const insets = useSafeAreaInsets();
   const [containerWidth, setContainerWidth] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const inlineStageSize = computeInlineWheelStageSize({
-    containerWidth,
-    screenW,
-    screenH,
-    safeAreaTop: insets.top,
-  });
+  const inlineStageSize =
+    stageHeight ??
+    computeInlineWheelStageSize({
+      containerWidth,
+      screenW,
+      screenH,
+      safeAreaTop: insets.top,
+    });
   const fullscreenStageHeight = computeFullscreenWheelHeight(screenH);
   const compactHead = isTablet || isLandscape;
   const scrubTrackWidth = isTablet ? (isLandscape ? 120 : 168) : Math.min(120, Math.max(88, screenW * 0.22));
@@ -730,7 +724,6 @@ function WheelBody({
     : undefined;
   const tithiNe = scrubTithi?.name_ne ?? det.tithi2[0]?.ne ?? "—";
   const tithiEn = scrubTithi?.name ?? det.tithi2[0]?.en ?? tithiNe;
-  const locLabel = locationLabel ?? p.location?.name ?? pick("काठमाडौं", "Kathmandu");
   const pickerYear = calendarPick?.year ?? bsYear;
   const pickerMonth = calendarPick?.month ?? (BS_MONTHS_NE.indexOf(bsMonthNe) + 1 || 1);
   const pickerDay = calendarPick?.day ?? bsDay;
@@ -792,13 +785,28 @@ function WheelBody({
         ) : null}
         <Text style={title}>
           {isToday && !scrubPinned ? `${pick("आजको", "Today's")} ` : ""}
-          {pick("ग्रह–नक्षत्र · तिथि–करण चक्र", "Graha–Nakshatra · Tithi–Karana wheel")}{" "}
-          <Text style={{ color: W_ACCENT }}>{digits(bsYear)}</Text>
+          {pick("ग्रह–नक्षत्र · तिथि–करण चक्र", "Graha–Nakshatra · Tithi–Karana wheel")}
         </Text>
-        <Text style={sub} numberOfLines={compactHead ? 1 : 2}>
-          {pick(det.weekday.ne, det.weekday.en)}, {pick(bsMonthNe, bsMonthEnOf(bsMonthNe))} {digits(bsDay)} ·{" "}
-          {pick(tithiNe, tithiEn)} · {locLabel}
+        <Text style={sub} numberOfLines={compactHead ? 2 : 3}>
+          {pick(bsMonthNe, bsMonthEnOf(bsMonthNe))} {digits(bsDay)}, {digits(bsYear)} · {digits(pickerClock)}
+          {" · "}
+          {pick(det.weekday.ne, det.weekday.en)}
+          {" · "}
+          {pick(tithiNe, tithiEn)}
         </Text>
+        {yearScrub?.playbackRateLabel && yearScrub.direction !== 0 ? (
+          <Text
+            style={{
+              color: "#f9c800",
+              fontSize: 14,
+              fontWeight: "700",
+              marginTop: 4,
+            }}
+          >
+            {yearScrub.playbackRateLabel}
+            <Text style={{ color: W_INK }}> · {digits(yearScrub.speed)}×</Text>
+          </Text>
+        ) : null}
       </View>
     );
   };
@@ -825,14 +833,6 @@ function WheelBody({
       }}
     >
       {renderHeader(fullscreen)}
-      <WheelChrome
-        pick={pick}
-        top={fullscreen ? insets.top + 6 : compactHead ? 8 : 10}
-        expanded={fullscreen}
-        onReset={resetToSunrise}
-        onToggleFullscreen={toggleExpanded}
-        onOpenDatePicker={openCalendar}
-      />
       <View className="flex-1">
         <WheelChart
           det={det}
@@ -854,6 +854,14 @@ function WheelBody({
           onLineTargetChange={setLineTarget}
         />
       </View>
+      <WheelChrome
+        pick={pick}
+        top={fullscreen ? insets.top + 6 : compactHead ? 8 : 10}
+        expanded={fullscreen}
+        onReset={resetToSunrise}
+        onToggleFullscreen={toggleExpanded}
+        onOpenDatePicker={openCalendar}
+      />
 
       <View
         pointerEvents="none"
@@ -870,7 +878,7 @@ function WheelBody({
         <View className={`${wheelLegendRow} flex-row items-center gap-1.5`}>
           <View className={wheelLegendDot} style={{ backgroundColor: W_ACCENT }} />
           <Text style={{ fontSize: 13, color: W_INK_DIM }}>
-            {pick("लग्न · वर्तमान नक्षत्र · तिथि", "Lagna · current nakshatra · tithi")}
+            {pick("वर्तमान नक्षत्र · तिथि", "Current nakshatra · tithi")}
           </Text>
         </View>
         {!isTablet && !fullscreen ? (
@@ -998,6 +1006,7 @@ function PanchangaWheelImpl({
   calendarPick,
   onOpenDatePicker,
   fullscreenOverlay,
+  stageHeight,
 }: Props) {
   if (loading || !p) {
     return <WheelSkeleton bsYear={bsYear} bsMonthNe={bsMonthNe} bsDay={bsDay} locationLabel={locationLabel} />;
@@ -1017,6 +1026,7 @@ function PanchangaWheelImpl({
       calendarPick={calendarPick}
       onOpenDatePicker={onOpenDatePicker}
       fullscreenOverlay={fullscreenOverlay}
+      stageHeight={stageHeight}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
+import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
 
 /** AppHeader inner bar (`h-16`) — safe-area top is added separately. */
 export const APP_HEADER_BAR_HEIGHT = 64;
@@ -27,7 +27,9 @@ type InlineWheelSizeOpts = {
   safeAreaTop: number;
 };
 
-/** Square stage size — capped so the card fits one viewport below the sticky header. */
+const DAY_WHEEL_MIN_HEIGHT = 520;
+
+/** Daily-page stage: taller than a width-capped square so the wheel reads larger. */
 export function computeInlineWheelStageSize({
   containerWidth,
   screenW,
@@ -37,5 +39,34 @@ export function computeInlineWheelStageSize({
   const fallbackWidth = Math.max(screenW - PAGE_HORIZONTAL_PADDING * 2, 280);
   const widthCap = Math.max(containerWidth || fallbackWidth, 280);
   const maxCardH = computeMaxWheelCardHeight(screenH, safeAreaTop);
-  return Math.max(280, Math.min(widthCap, maxCardH));
+  const preferred = Math.max(DAY_WHEEL_MIN_HEIGHT, widthCap * 1.5);
+  return Math.max(DAY_WHEEL_MIN_HEIGHT, Math.min(preferred, Math.max(maxCardH, DAY_WHEEL_MIN_HEIGHT)));
+}
+
+const YEAR_WHEEL_MIN_HEIGHT = 500;
+/** Page padding above the date nav + gap under it + window-label strip. */
+const YEAR_WHEEL_CHROME_GAP = 48;
+
+/**
+ * Year-page inline stage: remaining viewport after the app header, date nav,
+ * and floating tab bar. Never shorter than 500px so landscape does not crush it.
+ */
+export function computeYearWheelStageHeight({
+  screenH,
+  safeAreaTop,
+  dateNavHeight,
+  isTablet,
+}: {
+  screenH: number;
+  safeAreaTop: number;
+  dateNavHeight: number;
+  isTablet: boolean;
+}): number {
+  const leftover =
+    screenH -
+    appHeaderTotalHeight(safeAreaTop) -
+    Math.max(dateNavHeight, 72) -
+    floatingNavBottomPadding(isTablet) -
+    YEAR_WHEEL_CHROME_GAP;
+  return Math.max(YEAR_WHEEL_MIN_HEIGHT, leftover);
 }

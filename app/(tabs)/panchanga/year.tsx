@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { PanchangaDateNav } from "@/components/panchanga/PanchangaDateNav";
@@ -31,6 +32,8 @@ import {
   type YearWheelDay,
 } from "@/lib/panchanga-year-wheel";
 import { useBreakpoint } from "@/lib/responsive";
+import { computeYearWheelStageHeight } from "@/lib/wheel-layout";
+import { formatWheelPlaybackRate } from "@/lib/wheel-year-playback";
 import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { resolveTimeZone, todayAdStringInTimezone } from "@/lib/zoned-time";
 
@@ -70,7 +73,10 @@ function shiftAnchorMonths(centre: Date, delta: number): Date {
  */
 export default function PanchangaYearScreen() {
   const { pick, digits } = useLocale();
-  const { isCompact } = useBreakpoint();
+  const { isCompact, isTablet, height: screenH } = useBreakpoint();
+  const insets = useSafeAreaInsets();
+  const [dateNavHeight, setDateNavHeight] = useState(88);
+  const [bodyHeight, setBodyHeight] = useState(0);
   const { location, setLocation, ready } = usePanchangaLocation();
 
   const [date, setDate] = useState(() => new Date());
@@ -327,6 +333,17 @@ export default function PanchangaYearScreen() {
 
   const monthNe = current ? (BS_MONTHS_NE[current.bsMonth - 1] ?? "") : "";
   const locationLabel = displayLocationLabel(location, current?.p?.location?.name);
+  const playbackRateLabel = useMemo(() => {
+    if (play.dir === 0) return undefined;
+    return formatWheelPlaybackRate(play.speed, (n) => String(digits(n)), pick);
+  }, [play.dir, play.speed, digits, pick]);
+  const fallbackStageHeight = computeYearWheelStageHeight({
+    screenH,
+    safeAreaTop: insets.top,
+    dateNavHeight,
+    isTablet,
+  });
+  const stageHeight = Math.max(500, bodyHeight > 80 ? bodyHeight - 32 : fallbackStageHeight);
 
   const windowLabel = useMemo(() => {
     const from = adToBS(parseAdStr(bounds.startAd));
@@ -344,22 +361,29 @@ export default function PanchangaYearScreen() {
   ) : undefined;
 
   return (
-    <AppShell title="" showHeader={false}>
-      <PanchangaDateNav
-        date={date}
-        onDateChange={handleDateChange}
-        todayAd={todayAd}
-        adDateStr={adDateStr}
-        wheelData={wheelData}
-        clock={clock}
-        onClockChange={handleClockChange}
-        location={location}
-        onLocationChange={setLocation}
-        toolbar={headerToolbar}
-        hideNavLocation={!isCompact}
-      />
+    <AppShell title="" showHeader={false} scroll={false}>
+      <View
+        onLayout={(e) => setDateNavHeight(e.nativeEvent.layout.height)}
+      >
+        <PanchangaDateNav
+          date={date}
+          onDateChange={handleDateChange}
+          todayAd={todayAd}
+          adDateStr={adDateStr}
+          wheelData={wheelData}
+          clock={clock}
+          onClockChange={handleClockChange}
+          location={location}
+          onLocationChange={setLocation}
+          toolbar={headerToolbar}
+          hideNavLocation={!isCompact}
+        />
+      </View>
 
-      <View className="gap-3">
+      <View
+        className="min-h-0 flex-1 gap-3"
+        onLayout={(e) => setBodyHeight(e.nativeEvent.layout.height)}
+      >
         <PanchangaWheel
           p={current?.p}
           loading={windowLoading || !current}
@@ -370,6 +394,7 @@ export default function PanchangaYearScreen() {
           timezone={tz}
           locationLabel={locationLabel}
           clock={clock}
+          stageHeight={stageHeight}
           calendarPick={{
             year: current?.bsYear ?? bsYear,
             month: current?.bsMonth ?? 1,
@@ -405,6 +430,7 @@ export default function PanchangaYearScreen() {
             onScrubEnd: () => {
               scrubbingRef.current = false;
             },
+            playbackRateLabel,
           }}
         />
 

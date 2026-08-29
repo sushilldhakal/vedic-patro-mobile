@@ -29,4 +29,6 @@ export type YearWheelScrub = {
   yearLabel?: string;
   dayInYear?: number;
   daysInYear?: number;
+  /** Live HUD while playing, e.g. "1.1 days / 1 sec". */
+  playbackRateLabel?: string;
 };
