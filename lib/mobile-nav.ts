@@ -3,13 +3,22 @@ import type { Ionicons } from "@expo/vector-icons";
 
 export type MobileNavIcon = ComponentProps<typeof Ionicons>["name"];
 
-/** Primary floating bottom nav — matches web header sections. */
+/**
+ * Primary floating bottom nav — matches web header sections, सिकाइ last.
+ *
+ * Labels here are the short forms, not the page titles: six tabs share the
+ * pill, so "सूर्य पञ्चाङ्ग" and "दैनिक क्रान्ति" were already arriving as
+ * "पञ्चाङ्ग" and "दैनिक क्रा…" once the ellipsis had done its work. Naming
+ * them short says the same thing without the truncation, and matches the web
+ * bottom nav, which has always used these.
+ */
 export const FLOATING_NAV = [
   { href: "/", ne: "गृह", en: "Home", icon: "home-outline" as MobileNavIcon },
-  { href: "/panchanga", ne: "सूर्य पञ्चाङ्ग", en: "Panchanga", icon: "sunny-outline" as MobileNavIcon },
+  { href: "/panchanga", ne: "पञ्चाङ्ग", en: "Panchanga", icon: "sunny-outline" as MobileNavIcon },
   { href: "/kundali", ne: "कुण्डली", en: "Kundali", icon: "sparkles-outline" as MobileNavIcon },
+  { href: "/dainikkranti", ne: "दैनिक", en: "Transit", icon: "moon-outline" as MobileNavIcon },
+  { href: "/vastu", ne: "वास्तु", en: "Vastu", icon: "compass-outline" as MobileNavIcon },
   { href: "/learn", ne: "सिकाइ", en: "Learn", icon: "book-outline" as MobileNavIcon },
-  { href: "/dainikkranti", ne: "दैनिक क्रान्ति", en: "Transit", icon: "moon-outline" as MobileNavIcon },
 ] as const;
 
 /** Secondary links — header drawer only. */

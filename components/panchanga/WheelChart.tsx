@@ -559,15 +559,28 @@ function WheelChartImpl({
   const wheelPan = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: (evt) => {
-          if (evt.nativeEvent.touches.length >= 2) return true;
+        /* Always claim on touch-start — including over a planet.
+         *
+         * This used to yield here (`pickPlanetAt(...) < 0`) so a tap on a
+         * planet would fall through to that graha's own SVG `<Circle
+         * onPress>` instead. `PanResponder` and react-native-svg's own touch
+         * handling are two different gesture systems sharing one touch
+         * stream, and which of them actually wins the capture phase for a
+         * given tap is not consistent across platforms — the practical
+         * result was taps on a planet going to neither: not to the circle
+         * (this responder intermittently won capture anyway), and not to
+         * this responder's own selection logic (it had already yielded, so
+         * `onPanResponderRelease` below — which does correctly hit-test
+         * planets — never ran). Claiming unconditionally makes this the only
+         * path a tap can take, and its release handler already re-checks
+         * `pickPlanetAt` with a generous slop before falling back to
+         * nakshatra/rashi selection, so nothing here needs the SVG circle's
+         * cooperation to work. */
+        onStartShouldSetPanResponder: () => {
           syncLayout();
-          return pickPlanetAt(touchFromEvent(evt).x, touchFromEvent(evt).y) < 0;
+          return true;
         },
-        onStartShouldSetPanResponderCapture: (evt) => {
-          if (evt.nativeEvent.touches.length >= 2) return true;
-          return pickPlanetAt(touchFromEvent(evt).x, touchFromEvent(evt).y) < 0;
-        },
+        onStartShouldSetPanResponderCapture: () => true,
         onMoveShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponderCapture: () => false,
         onPanResponderTerminationRequest: () => false,

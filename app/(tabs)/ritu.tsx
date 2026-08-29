@@ -35,7 +35,7 @@ export default function RituScreen() {
 
       <RituSeasons location={location} />
 
-      <LearnMoreCard className="mt-7" slugs={["ritu-drift"]} />
+      <LearnMoreCard className="mt-7" slugs={["sidereal-vs-tropical"]} />
     </AppShell>
   );
 }

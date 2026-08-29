@@ -80,6 +80,7 @@ export function getMobileDrawerSections(): DrawerNavSection[] {
 export const DRAWER_MAIN_LINKS: DrawerNavItem[] = [
   { id: "home", href: "/", labelNe: "गृह", labelEn: "Home", icon: resolveDrawerIcon("main", "home") },
   { id: "panchanga", href: "/panchanga", labelNe: "सूर्य पञ्चाङ्ग", labelEn: "Panchanga", icon: resolveDrawerIcon("main", "panchanga") },
+  { id: "vastu", href: "/vastu", labelNe: "वास्तु", labelEn: "Vastu", icon: resolveDrawerIcon("main", "vastu") },
   { id: "learn", href: "/learn", labelNe: "सिकाइ", labelEn: "Learn", icon: resolveDrawerIcon("main", "learn") },
   { id: "shanti", href: "/shanti-vidhi", labelNe: "शान्ति विधि", labelEn: "Shanti vidhi", icon: resolveDrawerIcon("main", "shanti") },
   { id: "more", href: "/more", labelNe: "थप", labelEn: "More", icon: resolveDrawerIcon("main", "more") },

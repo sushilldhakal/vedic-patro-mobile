@@ -1,17 +1,17 @@
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
-import { AppNavIcon } from "@/components/icons/AppNavIcon";
+import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
-import { LEARN_TOPIC_METAS, type LearnTopicMeta } from "@/lib/learn/learn-topics-meta";
+import { LEARN_LIBRARY_BY_SLUG, type LibraryTopic } from "@/lib/learn/learn-library";
 import { hrefForLearnSlug } from "@/lib/learn/learn-href";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
-import { learnTopicDrawerIcon } from "@/lib/drawer-icons";
 import { useThemeColors } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
 
-function topicForSlug(slug: string): LearnTopicMeta | undefined {
-  return LEARN_TOPIC_METAS.find((t) => t.slug === slug);
+function topicForSlug(slug: string): LibraryTopic | undefined {
+  const topic = LEARN_LIBRARY_BY_SLUG[slug];
+  return topic?.status === "published" ? topic : undefined;
 }
 
 /** Contextual learn links — web `LearnMoreCard`. */
@@ -28,7 +28,7 @@ export function LearnMoreCard({
   const { pick } = useLocale();
   const colors = useThemeColors();
   const resolvedHeading = heading ?? pick("थप जान्नुहोस्", "Learn more");
-  const topics = slugs.map(topicForSlug).filter((t): t is LearnTopicMeta => Boolean(t));
+  const topics = slugs.map(topicForSlug).filter((t): t is LibraryTopic => Boolean(t));
 
   if (topics.length === 0) return null;
 
@@ -38,7 +38,7 @@ export function LearnMoreCard({
       className={cn("rounded-2xl border bg-card/40 p-4 sm:p-5", className)}
     >
       <View className="mb-3 flex-row items-center gap-2">
-        <AppNavIcon name="book-open" size={16} color={colors.secondary} />
+        <Ionicons name="book-outline" size={16} color={colors.secondary} />
         <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
           {resolvedHeading}
         </Text>
@@ -56,16 +56,16 @@ export function LearnMoreCard({
               style={{ backgroundColor: `${colors.secondary}1a` }}
               className="h-7 w-7 shrink-0 items-center justify-center rounded-lg"
             >
-              <AppNavIcon name={learnTopicDrawerIcon(topic.icon)} size={16} color={colors.secondary} />
+              <Ionicons name={topic.icon} size={16} color={colors.secondary} />
             </View>
             <Text
               numberOfLines={1}
               className="min-w-0 flex-1 text-sm text-foreground"
               style={nepaliTextStyle(14)}
             >
-              {pick(topic.titleNe, topic.titleEn)}
+              {pick(topic.title.ne, topic.title.en)}
             </Text>
-            <AppNavIcon name="chevron-right" size={14} color={colors.mutedForeground} />
+            <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} />
           </Pressable>
         ))}
       </View>

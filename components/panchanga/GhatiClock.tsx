@@ -37,7 +37,10 @@ export function GhatiClock({ sunrise, sunset, timezone }: Props) {
   const timeZone = timezone || "Asia/Kathmandu";
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 200);
+    /* The display only ever shows whole seconds (both clocks read down to
+       :ss), so anything faster than 1s was re-rendering 5x more often than a
+       digit on screen could actually change. */
+    const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 

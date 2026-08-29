@@ -264,11 +264,27 @@ function PanchangaWheelBody({
     [expanded, setExpandedMode],
   );
 
-  const handleZoom = useCallback((z: number) => {
-    const next = Math.max(0.55, Math.min(14, z));
-    setZoom(next);
-    if (next <= 1) setPan({ x: 0, y: 0 });
-  }, []);
+  const handleZoom = useCallback(
+    (z: number) => {
+      const next = Math.max(0.55, Math.min(14, z));
+      if (next <= 1) {
+        setZoom(next);
+        setPan({ x: 0, y: 0 });
+        return;
+      }
+      /* Scaling happens around the view's own center (transformOrigin:
+       * center), so leaving pan untouched pulls the image back toward the
+       * wheel's absolute center on every zoom step instead of holding what's
+       * currently on screen in place — scale it by the same ratio as the
+       * zoom change to compensate. The pinch/drag path also calls this, but
+       * follows up with its own handlePan in the same tick, which overwrites
+       * this with its focal-anchored value. */
+      const ratio = next / zoom;
+      setZoom(next);
+      setPan((p) => ({ x: p.x * ratio, y: p.y * ratio }));
+    },
+    [zoom],
+  );
 
   const handlePan = useCallback((x: number, y: number) => setPan({ x, y }), []);
 
@@ -387,7 +403,10 @@ function PanchangaWheelBody({
 
   useEffect(() => {
     if (!isToday) return;
-    const id = setInterval(() => setNow(new Date()), 1000);
+    /* Re-renders the whole chart body, not just the needle — see the native
+       PanchangaWheel.tsx for the on-device jank this caused at 1s. The needle
+       only needs to look live, not be to-the-second accurate. */
+    const id = setInterval(() => setNow(new Date()), 20000);
     return () => clearInterval(id);
   }, [isToday]);
 
@@ -641,22 +660,6 @@ function PanchangaWheelBody({
                   onClick={resetToSunrise}
                 >
                   ⟳
-                </button>
-                <button
-                  type="button"
-                  className={wheelIconBtn}
-                  title={pick("जुम इन", "Zoom in")}
-                  onClick={() => handleZoom(zoom * 1.4)}
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  className={wheelIconBtn}
-                  title={pick("जुम आउट", "Zoom out")}
-                  onClick={() => handleZoom(zoom / 1.4)}
-                >
-                  −
                 </button>
                 <button
                   type="button"

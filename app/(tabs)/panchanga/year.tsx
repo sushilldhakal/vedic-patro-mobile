@@ -30,6 +30,7 @@ import {
   wheelWindowAtLimit,
   wheelWindowBounds,
   yearWheelIndexOfAdDate,
+  type YearWheelDay,
 } from "@/lib/panchanga-year-wheel";
 import { useBreakpoint } from "@/lib/responsive";
 import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
@@ -140,7 +141,25 @@ export default function PanchangaYearScreen() {
      window grow and slide underneath without tugging the needle. */
   const foundIndex = yearWheelIndexOfAdDate(days, dayAd);
   const clamped = foundIndex ?? 1;
-  const current = days[clamped - 1];
+  const foundRow = days[clamped - 1];
+  /* `foundIndex` comes back null for one render whenever `days` is
+   * mid-rebuild (window growing/sliding, or briefly at high playback speed)
+   * and doesn't yet contain `dayAd`. Falling back to `days[0]` used to mean
+   * that render showed whatever day sits at the *start* of the window
+   * instead — a completely different day's planets, tithi, everything — for
+   * however many renders the miss lasted. At speed that reads as the chart
+   * flickering, and every graha moves at once because the whole snapshot is a
+   * different day's, not one thing drawn wrong. It also fed the date-sync
+   * effect below, so `date` itself briefly jumped to that wrong day too.
+   *
+   * Caching the last row that *did* resolve — not just its index — means a
+   * miss repeats the last good frame outright. Caching the index instead
+   * would not be enough: `days` can reshape (grow, or renumber after a
+   * window slide) in the same render that produces the miss, so the same
+   * index could already point at a different day by the time it's read. */
+  const lastGoodRowRef = useRef<YearWheelDay | undefined>(undefined);
+  const current = foundIndex !== null ? foundRow : lastGoodRowRef.current;
+  if (current) lastGoodRowRef.current = current;
   const wheelData = current?.p;
 
   const scrubbingRef = useRef(false);
@@ -159,7 +178,21 @@ export default function PanchangaYearScreen() {
     const id = setInterval(() => {
       setDayAd((ad) => {
         const i = days.findIndex((d) => d.dateAd === ad);
-        const next = (i < 0 ? 0 : i) + play.dir;
+        /* `i < 0` used to fall back to treating the current day as index 0,
+           so a single missed lookup sent playback to whatever date sits at
+           the *start* of the currently-materialised window — near the
+           opposite end from where it actually was. That is the forward-then-
+           snap-back stutter: the window-growth effect below only asks for
+           more days once we're within EXTEND_MARGIN of an edge, and at high
+           speed (or during a stall on the JS thread, which queues this timer
+           up and fires several ticks back-to-back once it resumes) playback
+           can outrun that growth and land on a day the window hasn't
+           re-sliced in yet, right as `days` is mid-rebuild. Holding position
+           until the next tick's `days` has caught up is a stall, same as
+           running off the end already does below — not a jump to a
+           different part of the year. */
+        if (i < 0) return ad;
+        const next = i + play.dir;
         /* Sitting still at the edge is the pause while the next stretch loads —
            the growth effect below has already asked for it. */
         return days[next]?.dateAd ?? ad;
@@ -176,15 +209,45 @@ export default function PanchangaYearScreen() {
   useEffect(() => {
     if (play.dir === 0 || !total || windowFetching) return;
 
-    if (play.dir === 1 && total - clamped <= EXTEND_MARGIN && !atLimit.end) {
+    /* `foundIndex === null` means `dayAd` has already run past whichever edge
+     * of the window play is heading toward — `clamped`'s own fallback to `1`
+     * would otherwise read as "at the start," the opposite edge, and the
+     * checks below would ask for more room on the wrong side (or see
+     * `total - 1` and think there's plenty of room left, when the real
+     * position ran out of window a render ago). Growing unconditionally here,
+     * ahead of the margin check, is the recovery: it does not fix the render
+     * that already showed the held-over last-good frame, but it gets the
+     * window to include `dayAd` again as fast as this effect can act. */
+    if (foundIndex === null) {
+      if (play.dir === 1 && !atLimit.end) {
+        if (monthsFwd < MAX_MONTHS_EACH) setMonthsFwd((m) => m + 1);
+        else setAnchor((a) => shiftAnchorMonths(a, 1));
+      }
+      if (play.dir === -1 && !atLimit.start) {
+        if (monthsBack < MAX_MONTHS_EACH) setMonthsBack((m) => m + 1);
+        else setAnchor((a) => shiftAnchorMonths(a, -1));
+      }
+      return;
+    }
+
+    /* A fixed 7-day margin is fine at 1×, but at 32× the tick fires every
+       33ms — about 30 days a second — and burns through 7 days in ~230ms.
+       That's not much runway for a state update to land and `days` to
+       re-slice before playback reaches a day the window hasn't grown to
+       cover yet (the recovery above catches it when it happens, but better to
+       not need it). Scaling the margin with speed keeps roughly the same
+       time-to-edge at every speed instead of a shrinking one. */
+    const margin = Math.max(EXTEND_MARGIN, play.speed);
+
+    if (play.dir === 1 && total - clamped <= margin && !atLimit.end) {
       if (monthsFwd < MAX_MONTHS_EACH) setMonthsFwd((m) => m + 1);
       else setAnchor((a) => shiftAnchorMonths(a, 1));
     }
-    if (play.dir === -1 && clamped <= EXTEND_MARGIN && !atLimit.start) {
+    if (play.dir === -1 && clamped <= margin && !atLimit.start) {
       if (monthsBack < MAX_MONTHS_EACH) setMonthsBack((m) => m + 1);
       else setAnchor((a) => shiftAnchorMonths(a, -1));
     }
-  }, [play.dir, clamped, total, windowFetching, atLimit, monthsBack, monthsFwd]);
+  }, [play.dir, play.speed, foundIndex, clamped, total, windowFetching, atLimit, monthsBack, monthsFwd]);
 
   const pausePlay = useCallback(() => setPlay({ dir: 0, speed: 1 }), []);
 

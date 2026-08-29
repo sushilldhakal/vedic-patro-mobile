@@ -19,6 +19,10 @@ function themedTextColor(className: string | undefined, colors: ThemeColors): st
   if (/\btext-secondary\b/.test(className)) return colors.secondary;
   if (/\btext-primary\b/.test(className)) return colors.primary;
   if (/\btext-destructive\b/.test(className)) return colors.destructive;
+  /* Without this, `text-danger` fell through to the foreground default below
+     and the class did nothing — the style prop this returns wins over the
+     compiled className. */
+  if (/\btext-danger\b/.test(className)) return colors.danger;
   if (/\btext-accent\b/.test(className)) return colors.accent;
   if (/\btext-success\b/.test(className)) return colors.accent;
   if (/\btext-white\b/.test(className)) return "#ffffff";

@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useInPanchangaTabsShell, usePanchangaTabsShellScrollHost } from "@/components/panchanga/PanchangaTabsShell";
 import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING } from "@/lib/mobile-nav";
@@ -11,6 +12,7 @@ export function AppShell({
   headerRight,
   scroll = true,
   showHeader = true,
+  scrollRef,
 }: {
   title: string;
   subtitle?: string;
@@ -18,6 +20,9 @@ export function AppShell({
   headerRight?: React.ReactNode;
   scroll?: boolean;
   showHeader?: boolean;
+  /** Exposes the internal ScrollView for callers that need to scroll to a
+   *  measured child (e.g. a chapter jump-list on a merged Learn page). */
+  scrollRef?: RefObject<ScrollView | null>;
   /** @deprecated Sidebar comes from `PanchangaTabsShell` for shell routes. */
   panchangaSidebar?: boolean;
 }) {
@@ -75,6 +80,7 @@ export function AppShell({
 
   return (
     <ScrollView
+      ref={scrollRef}
       className="flex-1 bg-background"
       contentContainerClassName="mx-auto w-full max-w-[1400px]"
       contentContainerStyle={{

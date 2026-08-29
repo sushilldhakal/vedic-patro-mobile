@@ -11,6 +11,7 @@ export type DrawerIconName =
   | "home"
   | "star"
   | "book-open"
+  | "compass"
   | "party-popper"
   | "arrow-left-right"
   | "sunrise"
@@ -89,6 +90,7 @@ const MAIN: Record<string, DrawerIconName> = {
   home: "home",
   panchanga: "star",
   learn: "book-open",
+  vastu: "compass",
   shanti: "flower-2",
   more: "ellipsis",
 };
@@ -110,6 +112,7 @@ export const DRAWER_IONICONS: Record<DrawerIconName, IoniconName> = {
   home: "home-outline",
   star: "star-outline",
   "book-open": "book-outline",
+  compass: "compass-outline",
   "party-popper": "gift-outline",
   "arrow-left-right": "swap-horizontal-outline",
   sunrise: "sunny-outline",

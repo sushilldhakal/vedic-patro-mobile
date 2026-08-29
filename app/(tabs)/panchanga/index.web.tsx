@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   fetchCivilTimeline,
@@ -42,6 +43,7 @@ import {
 } from "@/components/panchanga/use-panchanga-mode";
 import { displayLocationLabel, usePanchangaLocation } from "@/lib/use-panchanga-location";
 import { useLocale } from "@/lib/i18n";
+import { useThemeColors } from "@/lib/theme-context";
 import { floatingNavBottomPadding, PAGE_HORIZONTAL_PADDING, PANCHANGA_SIDEBAR_SPLIT, PANCHANGA_SIDEBAR_WIDTH } from "@/lib/mobile-nav";
 import { useBreakpoint } from "@/lib/responsive";
 
@@ -58,7 +60,9 @@ function parseAdStr(s: string): Date {
 }
 
 export default function PanchangaScreen() {
-  const { pick } = useLocale();
+  const { pick, t } = useLocale();
+  const colors = useThemeColors();
+  const router = useRouter();
   const { width, isTablet, isCompact } = useBreakpoint();
   const splitSidebar = width >= PANCHANGA_SIDEBAR_SPLIT;
   const params = useLocalSearchParams<{ date?: string }>();
@@ -237,16 +241,29 @@ export default function PanchangaScreen() {
 
       <View className="mt-4 gap-4">
         {wheelData || showWheelSkeleton ? (
-          <PanchangaWheel
-            p={wheelData}
-            loading={showWheelSkeleton}
-            bsYear={bs.year}
-            bsMonthNe={bs.monthName}
-            bsDay={bs.day}
-            isToday={isToday}
-            timezone={effectiveTimezone}
-            locationLabel={locationLabel}
-          />
+          <>
+            <PanchangaWheel
+              p={wheelData}
+              loading={showWheelSkeleton}
+              bsYear={bs.year}
+              bsMonthNe={bs.monthName}
+              bsDay={bs.day}
+              isToday={isToday}
+              timezone={effectiveTimezone}
+              locationLabel={locationLabel}
+            />
+            {wheelData ? (
+              <Pressable
+                onPress={() => router.push("/panchanga/year")}
+                className="h-9 flex-row items-center gap-2 self-start rounded-xl border border-border bg-card px-4 active:bg-muted"
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.foreground} />
+                <Text className="text-sm font-semibold text-foreground">
+                  {t("panchanga.year_link")}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
         ) : null}
 
         {isError ? (

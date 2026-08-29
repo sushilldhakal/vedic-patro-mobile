@@ -16,7 +16,7 @@ import {
   type SitemapRoute,
 } from "@/lib/sitemap-routes";
 import { CEREMONY_META, ELEMENT_BY_ID } from "@/lib/panchanga-elements";
-import { LEARN_TOPIC_METAS } from "@/lib/learn/learn-topics-meta";
+import { LEARN_LIBRARY_BY_SLUG } from "@/lib/learn/learn-library";
 import {
   learnTopicDrawerIcon,
   resolveDrawerIcon,
@@ -65,11 +65,11 @@ export default function MoreScreen() {
   const { isTablet } = useBreakpoint();
 
   const learnExtra = SITEMAP_LEARN_SLUGS.map((slug) => {
-    const meta = LEARN_TOPIC_METAS.find((t) => t.slug === slug);
+    const topic = LEARN_LIBRARY_BY_SLUG[slug];
     return {
       path: `/learn/${slug}`,
-      label: meta ? pick(meta.titleNe, meta.titleEn) : slug,
-      icon: learnTopicDrawerIcon(meta?.icon),
+      label: topic ? pick(topic.title.ne, topic.title.en) : slug,
+      icon: learnTopicDrawerIcon(topic?.icon),
     };
   });
 

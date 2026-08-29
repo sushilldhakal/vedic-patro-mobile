@@ -1,10 +1,12 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, View } from "react-native";
+import { useRef } from "react";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppShell } from "@/components/AppShell";
 import { LearnArticleView } from "@/components/learn/LearnArticleView";
 import { Text } from "@/components/ui/Text";
-import { LEARN_SLUGS, LEARN_TOPIC_METAS } from "@/lib/learn/learn-topics-meta";
+import { LEARN_LIBRARY_BY_SLUG } from "@/lib/learn/learn-library";
+import { RETIRED_SLUG_REDIRECTS } from "@/lib/learn/merged-pages";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
 
@@ -17,15 +19,24 @@ function resolveSlug(raw: string | string[] | undefined): string | undefined {
 export default function LearnArticleScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const params = useLocalSearchParams<{ slug: string | string[] }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const params = useLocalSearchParams<{ slug: string | string[]; chapter?: string }>();
   const slug = resolveSlug(params.slug);
   const { pick } = useLocale();
-  const meta = slug ? LEARN_TOPIC_METAS.find((t) => t.slug === slug) : undefined;
-  const valid = Boolean(slug && LEARN_SLUGS.has(slug) && slug !== "history");
+
+  const retiredTo = slug ? RETIRED_SLUG_REDIRECTS[slug] : undefined;
+  if (retiredTo) {
+    const [to, chapter] = retiredTo.split("#");
+    return <Redirect href={chapter ? `/learn/${to}?chapter=${chapter}` : `/learn/${to}`} />;
+  }
+
+  const topic = slug ? LEARN_LIBRARY_BY_SLUG[slug] : undefined;
+  const valid = Boolean(topic && topic.status === "published");
 
   return (
     <AppShell
       scroll
+      scrollRef={scrollRef}
       headerRight={
         <Pressable
           onPress={() => router.back()}
@@ -36,11 +47,11 @@ export default function LearnArticleScreen() {
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </Pressable>
       }
-      title={meta ? pick(meta.titleNe, meta.titleEn) : pick("सिकाइ", "Learn")}
+      title={topic ? pick(topic.title.ne, topic.title.en) : pick("सिकाइ", "Learn")}
       subtitle={pick("वैदिक पात्रो — मोबाइल लेख", "Vedic Patro — native article")}
     >
       {valid && slug ? (
-        <LearnArticleView slug={slug} />
+        <LearnArticleView slug={slug} scrollRef={scrollRef} initialChapter={params.chapter} />
       ) : (
         <View className="items-center justify-center py-12">
           <Text className="text-center text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
 
-/** Legacy path `/history` → learn history. */
+/** Legacy path `/history` → the history chapter of `calendar-differences`. */
 export default function HistoryAlias() {
-  return <Redirect href="/learn/history" />;
+  return <Redirect href="/learn/calendar-differences" />;
 }

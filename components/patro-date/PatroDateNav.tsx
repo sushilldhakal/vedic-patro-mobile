@@ -113,10 +113,14 @@ function LocationChip({
     <Pressable
       onPress={onPress}
       accessibilityLabel={pick("स्थान बदल्नुहोस्", "Change location")}
-      className="h-[30px] max-w-[7.5rem] shrink flex-row items-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted"
+      /* Fixed width, not a max: as a content-sized chip the city name was the
+         thing being measured, and it came back short — "Kathman…" inside a box
+         that had room for the whole word. 108dp keeps the phone nav row inside
+         360dp (25 + 104 + 25 steppers/chip + gaps + 108). */
+      className="h-[30px] w-[6.75rem] shrink-0 flex-row items-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted"
     >
       <Ionicons name="location-outline" size={13} color={colors.secondary} />
-      <Text numberOfLines={1} className="text-sm font-medium text-foreground">
+      <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium text-foreground">
         {label}
       </Text>
     </Pressable>
@@ -333,15 +337,41 @@ export function PatroDateNav(props: PatroDateNavProps) {
   const headlineCompact = headlineMeta(true);
   const headlineTablet = headlineMeta(false);
 
+  /**
+   * A floor per mode, and a label that fills it.
+   *
+   * The label used to be the flex item that carried the chip's width, so it
+   * was measured against whatever the row had left — and Android kept that
+   * cramped measurement, drawing "भ…" in a box with 30dp of blank space on
+   * either side of it. Sizing the chip first (`minWidth`) and letting the
+   * label take the remainder (`flex-1`) means the label's box is definite
+   * before it is measured, which is what the today-chip labels beside it
+   * already do.
+   */
+  const dateChipMinWidth =
+    mode === "year"
+      ? 88
+      : mode === "year-month"
+        ? 104
+        : isCompact
+          ? 132
+          : 176;
+
   const dateChip = (
     <Pressable
       onPress={sheet.openDate}
-      className="h-[30px] min-w-0 max-w-[11rem] shrink flex-row items-center justify-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted"
+      style={{ minWidth: dateChipMinWidth }}
+      className="h-[30px] max-w-[13rem] shrink-0 flex-row items-center justify-center gap-1 rounded-lg border border-border bg-card px-2 active:bg-muted"
     >
       {mode === "year-month-time" ? (
         <Ionicons name="calendar-outline" size={14} color={colors.secondary} />
       ) : null}
-      <Text numberOfLines={1} className="min-w-0 shrink font-num text-sm font-semibold text-foreground">
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        className="min-w-0 flex-1 text-center font-num text-sm font-semibold text-foreground"
+      >
         {isCompact && mode === "year-month-time" ? dateChipLabelCompact : dateChipLabel}
       </Text>
       <Ionicons name="chevron-down" size={12} color={colors.mutedForeground} />

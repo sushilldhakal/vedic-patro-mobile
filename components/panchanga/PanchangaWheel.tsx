@@ -262,8 +262,6 @@ function WheelDock({
   onScrubChange,
   onSnapNow,
   onReset,
-  onZoomIn,
-  onZoomOut,
   onToggleFullscreen,
   expanded,
   scrubTrackWidth,
@@ -277,8 +275,6 @@ function WheelDock({
   onScrubChange: (g: number) => void;
   onSnapNow: () => void;
   onReset: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
   onToggleFullscreen: () => void;
   expanded: boolean;
   scrubTrackWidth: number;
@@ -348,20 +344,6 @@ function WheelDock({
             accessibilityLabel={pick("रिलोड · जुम रिसेट · सूर्योदय", "Reload · reset zoom · sunrise")}
           >
             <Ionicons name="refresh-outline" size={16} color={W_INK} />
-          </Pressable>
-          <Pressable
-            onPress={onZoomIn}
-            style={wheelDockIconStyle}
-            accessibilityLabel={pick("जुम इन", "Zoom in")}
-          >
-            <Ionicons name="add-outline" size={18} color={W_INK} />
-          </Pressable>
-          <Pressable
-            onPress={onZoomOut}
-            style={wheelDockIconStyle}
-            accessibilityLabel={pick("जुम आउट", "Zoom out")}
-          >
-            <Ionicons name="remove-outline" size={18} color={W_INK} />
           </Pressable>
           <Pressable
             onPress={onToggleFullscreen}
@@ -512,17 +494,47 @@ function WheelBody({
   const handleLeave = useCallback(() => setHover(null), []);
   const handlePick = useCallback((next: WheelPick) => setPicked(next), []);
 
-  const handleZoom = useCallback((next: number) => {
-    const z = Math.max(0.55, Math.min(14, next));
-    setZoom(z);
-    if (z <= 1) setPan({ x: 0, y: 0 });
-  }, []);
+  const handleZoom = useCallback(
+    (next: number) => {
+      const z = Math.max(0.55, Math.min(14, next));
+      if (z <= 1) {
+        setZoom(z);
+        setPan({ x: 0, y: 0 });
+        return;
+      }
+      /* The chart scales around the view's own center (a plain RN
+       * `transform: [translate, translate, scale]`, no focal point of its
+       * own), so leaving `pan` untouched doesn't hold the current view in
+       * place — it was pulling the image back toward the wheel's absolute
+       * center on every zoom step, which is what "zoom only ever points at
+       * the middle" was: with pan fixed, the point rendering at screen-center
+       * is `cx - pan/zoom`, and that converges on the wheel's own center `cx`
+       * as zoom grows, wherever you'd panned to. Scaling `pan` by the same
+       * ratio as the zoom change keeps whatever's on screen exactly where it
+       * is — the standard "zoom about the viewport center" a +/- button
+       * should do. (The pinch gesture is unaffected: it calls this too, but
+       * always follows up with its own `onPan` in the same frame, which
+       * overwrites this with its focal-anchored value.) */
+      const ratio = z / zoom;
+      setZoom(z);
+      setPan((p) => ({ x: p.x * ratio, y: p.y * ratio }));
+    },
+    [zoom],
+  );
 
   const toggleExpanded = useCallback(() => setExpanded((v) => !v), []);
 
   useEffect(() => {
     if (!isToday) return;
-    const id = setInterval(() => setNow(new Date()), 1000);
+    /* This re-renders the whole chart body (~350 lines of SVG), not just the
+       needle — confirmed on device via logcat: "Skipped 298 frames" / "Davey!
+       duration=8790ms" once a second while this screen sits open. A 1s tick
+       was pegging the JS thread badly enough that taps anywhere on the page
+       (not just on the wheel) were getting lost or misdirected during the
+       stall. The needle only needs to look live, not be to-the-second
+       accurate, so 20s cuts the render frequency 20x without a visible
+       difference in the marker's position. */
+    const id = setInterval(() => setNow(new Date()), 20000);
     return () => clearInterval(id);
   }, [isToday]);
 
@@ -690,8 +702,6 @@ function WheelBody({
           onScrubChange={handleScrubChange}
           onSnapNow={snapToNow}
           onReset={resetToSunrise}
-          onZoomIn={() => handleZoom(zoom * 1.4)}
-          onZoomOut={() => handleZoom(zoom / 1.4)}
           onToggleFullscreen={toggleExpanded}
           expanded={fullscreen}
           scrubTrackWidth={scrubTrackWidth}
