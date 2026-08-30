@@ -55,7 +55,9 @@ import {
   TithiReferenceTable,
   YogaReferenceTable,
   KaranaReferenceTable,
+  ComputationReferenceDiagram,
 } from "@/components/learn/diagrams/ReferenceTables";
+import { ServerPipelineDiagram } from "@/components/learn/diagrams/ServerPipelineDiagram";
 import {
   SunEarthMoonDiagram,
   AyanamshaDiagram,
@@ -130,8 +132,8 @@ export const LEARN_DIAGRAMS: Record<string, ComponentType> = {
 
   /* "How we calculate" chapter — no matching id in web's 45-slot registry
      either (these sit outside it, directly embedded in HowWeCalculateStudy) */
-  "server-pipeline": DiagramPlaceholder,
-  "computation-reference": DiagramPlaceholder,
+  "server-pipeline": ServerPipelineDiagram,
+  "computation-reference": ComputationReferenceDiagram,
 
   /* Reference tables */
   "table-rashi": RashiReferenceTable,

@@ -74,6 +74,20 @@ export function GrahaReferenceTable() {
   );
 }
 
+/**
+ * Rashi + nakshatra tables together — native port of web's
+ * `ComputationReferenceTables` (used in the "how we calculate" chapter's
+ * foundation section, right after the observer/civil-day/Julian-day keys).
+ */
+export function ComputationReferenceDiagram() {
+  return (
+    <View className="gap-6">
+      <RashiReferenceTable />
+      <NakshatraReferenceTable />
+    </View>
+  );
+}
+
 export function NakshatraReferenceTable() {
   const { pick, digits } = useLocale();
   return (
