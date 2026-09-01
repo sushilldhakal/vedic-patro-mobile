@@ -14,6 +14,8 @@ import {
   VASTU_DIRECTIONS,
   VASTU_DOSHAS,
   VASTU_ELEMENT_COLOR,
+  VASTU_GUNA_COLOR,
+  VASTU_INK,
   VASTU_ROOMS,
   VASTU_WHEEL_DIRECTIONS,
   vastuDirection,
@@ -157,11 +159,13 @@ function DirectionDetail({ id }: { id: VastuDirectionId }) {
   const { t } = useLocale();
   const dir = vastuDirection(id);
   const color = VASTU_ELEMENT_COLOR[dir.element];
+  const gunaColor = VASTU_GUNA_COLOR[dir.guna];
+  const gunaFg = dir.guna === "tamas" ? VASTU_INK.background : gunaColor;
 
   const row = (label: string, value: string, danger?: boolean) => (
     <View className="flex-row gap-3">
       <Text
-        className="w-[76px] shrink-0 text-sm font-semibold text-muted-foreground"
+        className="w-[88px] shrink-0 text-sm font-semibold text-muted-foreground"
         style={nepaliTextStyle(13)}
       >
         {label}
@@ -176,20 +180,35 @@ function DirectionDetail({ id }: { id: VastuDirectionId }) {
   );
 
   return (
-    <View className="rounded-2xl border border-border bg-card p-4">
+    <View className="rounded-2xl border bg-card p-4" style={{ borderColor: `${color}66` }}>
       <View className="flex-row flex-wrap items-center gap-2">
         <Text className="text-xl font-bold text-foreground" style={nepaliTextStyle(20)}>
           {t(`vastu.dir.${id}.name`)}
         </Text>
-        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${color}26` }}>
+        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${color}33` }}>
           <Text className="text-xs font-semibold" style={[nepaliTextStyle(12), { color }]}>
             {t(`vastu.element.${dir.element}`)}
           </Text>
         </View>
+        <View
+          className="rounded-full px-2.5 py-1"
+          style={{ backgroundColor: dir.guna === "tamas" ? gunaColor : `${gunaColor}33` }}
+        >
+          <Text className="text-xs font-semibold" style={[nepaliTextStyle(12), { color: gunaFg }]}>
+            {t(`vastu.wheel.organ.${dir.guna}`)}
+          </Text>
+        </View>
       </View>
+
+      <Text className="mt-3 text-sm leading-6 text-foreground" style={nepaliTextStyle(13)}>
+        {t(`vastu.dir.${id}.importance`)}
+      </Text>
 
       <View className="mt-3 gap-2.5">
         {row(t("vastu.labels.deity"), t(`vastu.dir.${id}.deity`))}
+        {dir.innerDeity
+          ? row(t("vastu.labels.inner_deity"), t(`vastu.pada.${dir.innerDeity}.name`))
+          : null}
         {row(t("vastu.labels.best"), t(`vastu.dir.${id}.best`))}
         {row(t("vastu.labels.avoid"), t(`vastu.dir.${id}.avoid`), true)}
       </View>
