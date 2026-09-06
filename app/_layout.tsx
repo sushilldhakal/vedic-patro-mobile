@@ -94,7 +94,7 @@ function RootShell({ loaded }: { loaded: boolean }) {
       {!loaded ? (
         <View
           pointerEvents="none"
-          style={[StyleSheet.absoluteFillObject, styles.fontGate, { backgroundColor: colors.background }]}
+          style={[StyleSheet.absoluteFill, styles.fontGate, { backgroundColor: colors.background }]}
         >
           <VedicPatroLoader />
         </View>

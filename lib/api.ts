@@ -1823,6 +1823,21 @@ export const saitPersonalizeKey = (
     gender ?? "",
   ] as const;
 
+export interface JanmaRashi {
+  janma_nakshatra: number;
+  janma_rashi: number;
+}
+
+/**
+ * A saved profile's janma (birth Moon) rashi — 1..12, matching
+ * {@link RashifalSignBlock.id}. Send the stored era + civil parts; the API
+ * resolves the instant.
+ */
+export function fetchJanmaRashi(moment: InstantQuery, birthTz: string) {
+  const qs = appendBirthInstantParams(new URLSearchParams({ birth_tz: birthTz }), moment).toString();
+  return get<JanmaRashi>(`/panchanga/rashifal/janma?${qs}`);
+}
+
 /** Annotate the year's general dates with a native verdict from a birth moment. */
 export const fetchSaitPersonalize = (
   year: number,

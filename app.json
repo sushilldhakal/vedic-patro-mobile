@@ -17,11 +17,6 @@
       "en": "./store/locales/en.json",
       "ne": "./store/locales/ne.json"
     },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#073f43"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vedicpatro.mobile",
@@ -214,6 +209,8 @@
       "expo-router",
       "expo-dev-client",
       "expo-font",
+      "expo-asset",
+      "expo-status-bar",
       "expo-apple-authentication",
       [
         "expo-splash-screen",
@@ -249,7 +246,8 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "reactCompiler": true
     },
     "extra": {
       "apiBaseUrl": "https://www.vedicpatro.com/api",

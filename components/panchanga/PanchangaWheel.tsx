@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FC, type ReactNode } from "react";
 import { Modal, Pressable, StatusBar, View } from "react-native";
 import { Text } from "@/components/ui/Text"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -112,7 +112,7 @@ function bsMonthEnOf(ne: string): string {
   return i >= 0 ? BS_MONTH_NAMES[i]! : ne;
 }
 
-type Props = {
+type PanchangaWheelProps = {
   p?: PanchangaDay;
   loading?: boolean;
   bsYear: number;
@@ -521,7 +521,7 @@ function WheelBody({
   onOpenDatePicker,
   fullscreenOverlay,
   stageHeight,
-}: Omit<Props, "loading" | "p"> & { p: PanchangaDay }) {
+}: Omit<PanchangaWheelProps, "loading" | "p"> & { p: PanchangaDay }) {
   const { pick, digits } = useLocale();
   const { width: screenW, height: screenH, isTablet, isLandscape } = useBreakpoint();
   const insets = useSafeAreaInsets();
@@ -980,7 +980,7 @@ function WheelSkeleton({
   bsMonthNe,
   bsDay,
   locationLabel,
-}: Pick<Props, "bsYear" | "bsMonthNe" | "bsDay" | "locationLabel">) {
+}: Pick<PanchangaWheelProps, "bsYear" | "bsMonthNe" | "bsDay" | "locationLabel">) {
   const { pick, digits } = useLocale();
   const locLabel = locationLabel ?? pick("काठमाडौं", "Kathmandu");
 
@@ -1007,7 +1007,7 @@ function PanchangaWheelImpl({
   onOpenDatePicker,
   fullscreenOverlay,
   stageHeight,
-}: Props) {
+}: PanchangaWheelProps) {
   if (loading || !p) {
     return <WheelSkeleton bsYear={bsYear} bsMonthNe={bsMonthNe} bsDay={bsDay} locationLabel={locationLabel} />;
   }
@@ -1031,4 +1031,4 @@ function PanchangaWheelImpl({
   );
 }
 
-export const PanchangaWheel = memo(PanchangaWheelImpl);
+export const PanchangaWheel: FC<PanchangaWheelProps> = memo(PanchangaWheelImpl);

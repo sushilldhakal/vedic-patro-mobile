@@ -66,7 +66,7 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onApple, onError, di
       if (idToken) onGoogle(idToken);
       else onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
     } else if (googleResponse.type === "error") {
-      const err = googleResponse.error?.message ?? "";
+      const err = String(googleResponse.error ?? "");
       if (/redirect_uri_mismatch/i.test(err)) {
         onError?.(googleSignInSetupMessage());
       } else {

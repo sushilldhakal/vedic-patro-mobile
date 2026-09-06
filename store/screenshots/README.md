@@ -4,8 +4,8 @@ Generated automatically (`npm run icons`):
 
 | File | Use |
 | --- | --- |
-| `store/assets/icon-1024.png` | Apple 1024×1024 marketing icon (opaque, square corners) |
-| `store/assets/play-icon-512.png` | Play high-res icon |
+| `store/assets/icon-1024.png` | Apple only — 1024×1024. Play rejects this size. |
+| `store/assets/play-icon-512.png` | **Play app icon** — 512×512, 32-bit PNG, sRGB |
 | `store/assets/feature-graphic.png` | Play feature graphic 1024×500 (**required**) |
 | `assets/icon.png` | App icon |
 | `assets/adaptive-icon.png` | Android adaptive (66% safe zone) |

@@ -191,6 +191,8 @@ interface Props {
   onOpenDatePicker?: () => void;
   /** Rendered inside the fullscreen view so a picker can sit above the wheel. */
   fullscreenOverlay?: ReactNode;
+  /** Override the inline stage height (native year page). Ignored on web. */
+  stageHeight?: number;
 }
 
 function PanchangaWheelSkeleton({

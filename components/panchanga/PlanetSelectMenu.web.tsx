@@ -11,9 +11,19 @@ type Props = {
   onSelect: (index: number) => void;
   className?: string;
   iconSize?: number;
+  /** Match the native dock icon buttons. */
+  compact?: boolean;
 };
 
-export function PlanetSelectMenu({ grahas, selected, onSelect, className, iconSize = 22 }: Props) {
+export function PlanetSelectMenu({
+  grahas,
+  selected,
+  onSelect,
+  className,
+  iconSize,
+  compact = false,
+}: Props) {
+  const resolvedIconSize = iconSize ?? (compact ? 18 : 22);
   const { pick } = useLocale();
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top?: number; bottom?: number; right: number }>({ right: 8 });
@@ -59,7 +69,7 @@ export function PlanetSelectMenu({ grahas, selected, onSelect, className, iconSi
           "flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(143,191,193,0.32)] bg-[rgba(11,20,22,0.96)] shadow-[0_8px_20px_rgba(0,0,0,0.4)]"
         }
       >
-        <GrahaPlanetIcon graha={selectedKey} size={iconSize} />
+        <GrahaPlanetIcon graha={selectedKey} size={resolvedIconSize} />
       </button>
 
       {open

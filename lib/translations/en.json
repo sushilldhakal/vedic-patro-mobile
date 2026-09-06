@@ -659,7 +659,7 @@
     "caution": "Caution",
     "inauspicious": "Inauspicious",
     "present": "Present",
-    "yoga_reference_catalog_162_combinations": "Yoga reference catalog (162 combinations)",
+    "yoga_reference_catalog_162_combinations": "Yoga reference catalog (300 combinations)",
     "could_not_load_the_reference_catalog": "Could not load the reference catalog.",
     "loading": "Loading…",
     "rule": "Rule",
@@ -784,7 +784,16 @@
       "stree_janma_phala_caption": "Strījanmakundalyāṃ tanvādibhāvasthagrahāṇāṃ jātakoktaṃ phalam",
       "strength_ratio": "Strength Ratio",
       "yoga_catalog_search_placeholder": "Search by name, rule or result…",
-      "yoga_catalog_source": "B. V. Raman's “Three Hundred Important Combinations”, Part I"
+      "yoga_catalog_source": "B. V. Raman's “Three Hundred Important Combinations”, Parts I–II"
+    },
+    "sources": {
+      "heading": "Classical sources",
+      "blurb": "Calculations follow each treatise's traditional author and the Bikram Sambat year of the original text. The second line is the translator and editor's printed edition in BS.",
+      "bphs": {
+        "credit": "Brihat Parashara Hora Shastra - Maharishi Parashara",
+        "edition": "Translator & Editor Pandit Ganesh Dutt Pathak BS 2029 (preface); revised edition BS 2058. Savitri Thakur Prakashan, Rathyatra, Varanasi.",
+        "used": "The rules and results of yogas formed in the birth chart."
+      }
     }
   },
   "milan": {
@@ -1188,6 +1197,45 @@
       "count_label_bs": "{{count}} strict vivāha days in BS {{year}}",
       "count_label_ad": "{{count}} strict vivāha days in {{year}}"
     },
+    "sources": {
+      "heading": "Classical sources",
+      "blurb": "Calculations follow each treatise's traditional author and the Bikram Sambat year of the original text. The second line is the translator and editor's printed edition in BS.",
+      "brihat_samhita": {
+        "credit": "Brihat Samhita - Acharya Varahamihira, about BS 562",
+        "edition": "Translators Panditabhashana V. Subrahmanya Sastri and Vidwan M. Ramakrishna Bhat BS 2003. V. B. Soobbiah & Sons, Bangalore City.",
+        "used": {
+          "vivah": "The prohibition of krūra weekdays (Tuesday and Saturday) for marriage.",
+          "bratabandha": "The prohibition of krūra weekdays (Tuesday and Saturday) for Upanayana.",
+          "griha-aarambha": "The prohibition of krūra weekdays (Tuesday and Saturday) for starting a house.",
+          "byaparik-pratisthan": "The prohibition of krūra weekdays (Sunday, Tuesday and Saturday) for opening a business."
+        }
+      },
+      "dharma_sindhu": {
+        "credit": "Dharma Sindhu - Kashinath Upadhyay BS 1847",
+        "edition": "Hindi commentator Mahamahopadhyaya Pandit Shri Mihir Chandra BS 2018. Khemraj Shrikrishnadass (Shri Venkateshwar Steam Press), Bombay.",
+        "used": {
+          "vivah": "Jupiter and Venus combust, infant or aged; marriage barred for the whole Simhastha-Guru transit.",
+          "bratabandha": "Jupiter and Venus combust, infant or aged; Upanayana barred for the whole Simhastha-Guru transit.",
+          "griha-aarambha": "Vāstu karma barred in Malmāsa; Jupiter and Venus combust, infant or aged.",
+          "griha-pravesh": "Jupiter and Venus combust, infant or aged (applied to vāstu karma).",
+          "rudri-jurne": "The Śiva-vāsa formula and its fruits; Amāvasyā barred."
+        }
+      },
+      "muhurta_chintamani": {
+        "credit": "Muhurta Chintamani - Shri Rama Daivajna BS 1655",
+        "edition": "Sanskrit commentator Govinda Daivajna (Piyushadhara); Hindi translator Acharya Kedar Datt Joshi (Pitambara). D.P.B. Publications, Delhi.",
+        "used": {
+          "vivah": "Marriage months, solar months, tithi, nakṣatra, yoga, karaṇa, Latta doṣa and kṣaya-pakṣa.",
+          "bratabandha": "Uttarāyaṇa and months, tithi, Galagraha, nakṣatra, pre-noon timing, yoga, karaṇa, eclipse and Latta/Dagdha doṣa.",
+          "griha-aarambha": "Sun-sign, tithi, nakṣatra, daytime window, fixed/dual lagna, lagna strength, yoga, karaṇa, eclipse and Dur-muhūrta.",
+          "griha-pravesh": "Housewarming months, Surya Bala, tithi, nakṣatra, yoga/karaṇa, lagna, eclipse and doṣa.",
+          "byaparik-pratisthan": "Month, tithi, nakṣatra, lagna, yoga/karaṇa, eclipse and Dur-muhūrta; the reading that Guru/Śukra udaya is not mandatory.",
+          "rudri-jurne": "The Agni-vāsa formula, tithi-lords, mahā-doṣa and Bhadrā.",
+          "agni-jurne": "The Agni-vāsa formula, remainder-fruits (Earth/Heaven/Pātāla) and the Nitya–Naimittika exception.",
+          "annaprasan": "Age-month, tithi, nakṣatra, vāra, lagna-śuddhi, the asta exception, janma-tārā and safeguard doṣas."
+        }
+      }
+    },
     "tithi": "Tithi",
     "nak_atra": "Nakṣatra",
     "yoga": "Yoga",
@@ -1581,15 +1629,8 @@
         "acceptable": "acceptable zone",
         "shared": "shared zone"
       },
-      "view": {
-        "2d": "2D",
-        "3d": "3D",
-        "3d_hint": "Drag to rotate, scroll to zoom."
-      },
       "layout_heading": "Rough house layout",
-      "loading": "Working out the layout...",
-      "load_failed": "Couldn't compute the layout. Please try again.",
-      "layout_blurb": "A preliminary plan from the classical rules: auspicious pada for the door, empty Brahmasthan, passage around the court, bath in the east, latrine in WNW or SSW.",
+      "layout_blurb": "A rough sketch of the classical courtyard house: the Brahmasthan open in the middle, the alindra gallery around it, and each room in its own compass zone.",
       "legend": {
         "hall": "Passage / hall",
         "door": "Door",
@@ -1740,6 +1781,20 @@
         "bad": "unfavorable",
         "worst": "very unfavorable"
       }
+    },
+    "sketch": {
+      "aria": "Rough house zoning sketch",
+      "brahmasthan": "Brahmasthan",
+      "open_to_sky": "Open to the sky",
+      "door_pada": "Main door — pada {{n}} ({{pada}}) of the {{wall}} wall",
+      "legend_court": "Brahmasthan (open court)",
+      "legend_alindra": "Alindra (gallery)",
+      "legend_flow": "Clockwise movement",
+      "rule_court": "Brahmasthana: the centre stays open to the sky as a courtyard — nothing is built in it [Samarangana Sutradhara 13:22].",
+      "rule_alindra": "Alindra: a covered gallery rings the court on all four sides, so every room is reached without crossing it [Mayamata 26:15].",
+      "rule_flow": "Pradakshina: the red arrows show the auspicious clockwise path around the court.",
+      "rule_door": "The main door stands in an auspicious pada of the facing wall, and each room sits in its own classical zone.",
+      "disclaimer": "A rough zoning sketch, not a floor plan. It shows which compass zone each room belongs in and keeps the centre open — where the internal walls, doors and passages actually go is for an architect to draw."
     },
     "dosha": {
       "heading": "Vastu dosha & remedies",

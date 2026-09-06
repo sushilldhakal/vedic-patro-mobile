@@ -1,0 +1,384 @@
+/**
+ * The plot, the house requirements, and the sketch they produce.
+ *
+ * Native counterpart of the web app's
+ * `src/components/vastu/PlotPlanner.tsx` — same inputs, same Āyādi panel,
+ * same per-storey sketches. Two differences, both forced by the platform:
+ * the saved plot/plan arrive asynchronously from `@/lib/vastu-storage` (so
+ * the first frame shows the defaults and is replaced once storage answers),
+ * and the sketch needs an explicit pixel size where the web version simply
+ * fills its container.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { TextInput, View } from "react-native";
+import { NativeStringSelect } from "@/components/ui/NativeStringSelect";
+import { Text } from "@/components/ui/Text";
+import { useLocale } from "@/lib/i18n";
+import { nepaliTextStyle } from "@/lib/nepali-text";
+import { useBreakpoint } from "@/lib/responsive";
+import { useThemeColors } from "@/lib/theme-context";
+import {
+  CARDINAL_WALLS,
+  ENTRANCE_PREFERRED_CORNER,
+  HASTA_METERS,
+  ayadiAuspicious,
+  ayadiRemainder,
+  metersToHasta,
+  nearestAuspiciousWidthHasta,
+  type CardinalWall,
+} from "@/lib/vastu";
+import {
+  assignVastuSpaces,
+  assignmentsOnStorey,
+  clampStoreys,
+  kindCounts,
+  storeyPref,
+  type HousePlan,
+  type StoreyId,
+} from "@/lib/vastu-plan";
+import {
+  DEFAULT_PLOT_STATE,
+  readStoredHousePlan,
+  readStoredPlot,
+  writeStoredHousePlan,
+  writeStoredPlot,
+  type PlotState,
+} from "@/lib/vastu-storage";
+import { DEFAULT_HOUSE_PLAN } from "@/lib/vastu-plan";
+import { HouseRequirementsForm } from "./HouseRequirementsForm";
+import { HouseSketch } from "./HouseSketch";
+import { OwnerCompatibility } from "./OwnerCompatibility";
+import { cn } from "@/lib/utils";
+
+const MIN_M = 3;
+const MAX_M = 100;
+/** Widest the sketch is ever drawn, matching the web copy's max-w-[900px]. */
+const MAX_SKETCH = 900;
+/** Page padding + card padding the sketch sits inside. */
+const SKETCH_CHROME = 56;
+
+function parseDimension(raw: string): number | null {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(Math.max(n, min), max);
+}
+
+function DimensionInput({
+  label,
+  value,
+  onChangeText,
+  invalid,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  invalid: boolean;
+}) {
+  const colors = useThemeColors();
+  return (
+    <View className="min-w-0 flex-1">
+      <Text className="mb-1 text-xs font-semibold text-muted-foreground" style={nepaliTextStyle(12)}>
+        {label}
+      </Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType="numeric"
+        accessibilityLabel={label}
+        placeholderTextColor={colors.mutedForeground}
+        className={cn(
+          "rounded-lg border bg-card px-3 py-2.5 text-sm text-foreground",
+          invalid ? "border-danger" : "border-border",
+        )}
+        style={nepaliTextStyle(14)}
+      />
+    </View>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="flex-row justify-between gap-2">
+      <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+        {label}
+      </Text>
+      <Text className="shrink text-right text-sm text-foreground" style={nepaliTextStyle(13)}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+export function PlotPlanner() {
+  const { t, digits } = useLocale();
+  const { width } = useBreakpoint();
+  const [plot, setPlot] = useState<PlotState>(DEFAULT_PLOT_STATE);
+  const [house, setHouse] = useState<HousePlan>(DEFAULT_HOUSE_PLAN);
+
+  // SecureStore is async, so the saved values replace the defaults a frame
+  // later rather than seeding useState the way the web app's localStorage
+  // read does.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [storedPlot, storedHouse] = await Promise.all([readStoredPlot(), readStoredHousePlan()]);
+      if (cancelled) return;
+      setPlot(storedPlot);
+      setHouse(storedHouse);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function updateHouse(next: HousePlan) {
+    setHouse(next);
+    writeStoredHousePlan(next);
+  }
+
+  const storeys = clampStoreys(house.storeys);
+
+  function update(next: Partial<PlotState>) {
+    setPlot((prev) => {
+      const merged = { ...prev, ...next };
+      writeStoredPlot(merged);
+      return merged;
+    });
+  }
+
+  const parsed = {
+    length: parseDimension(plot.length),
+    breadth: parseDimension(plot.breadth),
+  };
+  const errors = {
+    length: parsed.length === null || parsed.length < MIN_M || parsed.length > MAX_M,
+    breadth: parsed.breadth === null || parsed.breadth < MIN_M || parsed.breadth > MAX_M,
+  };
+  const hasError = errors.length || errors.breadth;
+
+  const lengthM = clamp(parsed.length ?? Number(DEFAULT_PLOT_STATE.length), MIN_M, MAX_M);
+  const breadthM = clamp(parsed.breadth ?? Number(DEFAULT_PLOT_STATE.breadth), MIN_M, MAX_M);
+
+  const footprint = useMemo(() => ({ width: breadthM, height: lengthM }), [breadthM, lengthM]);
+
+  // No server round-trip and no placement solver: each requested room is
+  // dropped into its own classical compass zone (SPACE_ZONE_RULES), which is
+  // all a rough sketch is claiming to show. `leftover` is what the zones
+  // genuinely can't seat at a usable size on this plot.
+  const { assignments, leftover } = useMemo(
+    () => assignVastuSpaces(house, footprint),
+    [house, footprint],
+  );
+  const counts = useMemo(() => kindCounts(leftover), [leftover]);
+
+  const ayadi = useMemo(() => {
+    const lengthHasta = metersToHasta(footprint.height);
+    const widthHasta = metersToHasta(footprint.width);
+    const remainder = ayadiRemainder(widthHasta);
+    const auspicious = ayadiAuspicious(remainder);
+    const suggestedHasta = auspicious ? null : nearestAuspiciousWidthHasta(widthHasta);
+    return {
+      lengthHasta,
+      widthHasta,
+      remainder,
+      auspicious,
+      suggestedHasta,
+      suggestedMeters: suggestedHasta === null ? null : suggestedHasta * HASTA_METERS,
+    };
+  }, [footprint]);
+
+  const preferredCorner = ENTRANCE_PREFERRED_CORNER[plot.facing];
+  const sketchSize = Math.min(MAX_SKETCH, Math.max(240, width - SKETCH_CHROME));
+
+  return (
+    <View className="overflow-hidden rounded-2xl border border-border">
+      <View className="border-b border-border px-4 py-3">
+        <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
+          {t("vastu.plot.heading")}
+        </Text>
+      </View>
+
+      <View className="gap-4 p-4">
+        <Text className="text-sm text-foreground" style={nepaliTextStyle(13)}>
+          {t("vastu.plot.blurb")}
+        </Text>
+
+        <OwnerCompatibility />
+
+        <View className="flex-row gap-3">
+          <DimensionInput
+            label={t("vastu.plot.length_label")}
+            value={plot.length}
+            onChangeText={(v) => update({ length: v })}
+            invalid={errors.length}
+          />
+          <DimensionInput
+            label={t("vastu.plot.breadth_label")}
+            value={plot.breadth}
+            onChangeText={(v) => update({ breadth: v })}
+            invalid={errors.breadth}
+          />
+        </View>
+
+        <View>
+          <Text
+            className="mb-1 text-xs font-semibold text-muted-foreground"
+            style={nepaliTextStyle(12)}
+          >
+            {t("vastu.plot.facing_label")}
+          </Text>
+          <NativeStringSelect
+            value={plot.facing}
+            ariaLabel={t("vastu.plot.facing_label")}
+            options={CARDINAL_WALLS.map((wall) => ({
+              value: wall,
+              label: t(`vastu.dir.${wall}.name`),
+            }))}
+            onChange={(v) => update({ facing: v as CardinalWall })}
+          />
+        </View>
+
+        {hasError && (
+          <Text className="text-sm text-danger" style={nepaliTextStyle(13)}>
+            {t("vastu.plot.range_error", { min: digits(MIN_M), max: digits(MAX_M) })}
+          </Text>
+        )}
+
+        <HouseRequirementsForm plan={house} onChange={updateHouse} />
+
+        <View className="rounded-xl border border-border bg-card p-3.5">
+          <Text className="text-base font-semibold text-foreground" style={nepaliTextStyle(15)}>
+            {t("vastu.plan.layout_heading")}
+          </Text>
+          <Text className="mb-4 mt-1 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            {t("vastu.plan.layout_blurb")}
+          </Text>
+
+          {leftover.length > 0 && (
+            <View className="mb-4 rounded-lg border border-border bg-background px-3 py-2.5">
+              <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(13)}>
+                {t("vastu.plan.cannot_fit_heading")}
+              </Text>
+              <Text className="mt-1 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+                {t("vastu.plan.cannot_fit_blurb")}
+              </Text>
+              <View className="mt-2 flex-row flex-wrap gap-1.5">
+                {leftover.map((row) => {
+                  const many = (counts.get(row.kind) ?? 0) > 1 && row.kind !== "staircase";
+                  const name =
+                    many && row.index != null
+                      ? t(`vastu.plan.space.${row.kind}_n`, { n: digits(row.index) })
+                      : t(`vastu.plan.space.${row.kind}`);
+                  return (
+                    <View key={row.id} className="rounded-md border border-border px-2 py-0.5">
+                      <Text
+                        className="text-xs font-semibold text-foreground"
+                        style={nepaliTextStyle(12)}
+                      >
+                        {name}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          <View className="gap-8">
+            {Array.from({ length: storeys }, (_, i) => i as StoreyId).map((storey) => (
+              <View key={storey} className="min-w-0">
+                {storeys > 1 && (
+                  <Text
+                    className="mb-2 text-sm font-semibold text-foreground"
+                    style={nepaliTextStyle(13)}
+                  >
+                    {t(`vastu.plan.floor.${storeyPref(storey)}`)}
+                  </Text>
+                )}
+                <HouseSketch
+                  size={sketchSize}
+                  plot={footprint}
+                  facing={plot.facing}
+                  assignments={assignmentsOnStorey(assignments, storey)}
+                />
+              </View>
+            ))}
+          </View>
+
+          <Text className="mt-4 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            {t("vastu.sketch.disclaimer")}
+          </Text>
+          <Text className="mt-4 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            {t("vastu.plot.buffer_note")}
+          </Text>
+          <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            {t("vastu.plot.marma_note")}
+          </Text>
+        </View>
+
+        <View className="gap-3">
+          <View className="rounded-xl border border-border bg-card p-3.5">
+            <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
+              {t("vastu.plot.ayadi_heading")}
+            </Text>
+            <View className="mt-2 gap-1.5">
+              <InfoRow
+                label={t("vastu.plot.footprint_length_label")}
+                value={`${digits(footprint.height.toFixed(1))} ${t("vastu.plot.unit_m")} · ${digits(ayadi.lengthHasta.toFixed(1))} ${t("vastu.plot.unit_hasta")}`}
+              />
+              <InfoRow
+                label={t("vastu.plot.footprint_width_label")}
+                value={`${digits(footprint.width.toFixed(1))} ${t("vastu.plot.unit_m")} · ${digits(ayadi.widthHasta.toFixed(1))} ${t("vastu.plot.unit_hasta")}`}
+              />
+              <InfoRow
+                label={t("vastu.plot.ayadi_remainder_label")}
+                value={String(digits(ayadi.remainder))}
+              />
+            </View>
+            <Text
+              className={cn(
+                "mt-2 text-sm font-semibold",
+                ayadi.auspicious ? "text-emerald-600 dark:text-emerald-400" : "text-danger",
+              )}
+              style={nepaliTextStyle(13)}
+            >
+              {t(ayadi.auspicious ? "vastu.plot.ayadi_auspicious" : "vastu.plot.ayadi_inauspicious")}
+            </Text>
+            {ayadi.suggestedHasta !== null && ayadi.suggestedMeters !== null && (
+              <Text className="mt-1 text-sm text-foreground" style={nepaliTextStyle(13)}>
+                {t("vastu.plot.ayadi_suggestion", {
+                  hasta: digits(ayadi.suggestedHasta),
+                  meters: digits(ayadi.suggestedMeters.toFixed(1)),
+                })}
+              </Text>
+            )}
+            <Text className="mt-2 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+              {t("vastu.plot.ayadi_disclaimer")}
+            </Text>
+          </View>
+
+          <View className="rounded-xl border border-border bg-card p-3.5">
+            <Text className="text-sm font-semibold text-foreground" style={nepaliTextStyle(14)}>
+              {t("vastu.plot.entrance_heading")}
+            </Text>
+            <Text className="mt-2 text-sm text-foreground" style={nepaliTextStyle(13)}>
+              {t("vastu.plot.entrance_note", {
+                wall: t(`vastu.dir.${plot.facing}.name`),
+                corner: t(`vastu.dir.${preferredCorner}.name`),
+              })}
+            </Text>
+            <Text className="mt-2 text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+              {t("vastu.plot.entrance_disclaimer")}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export default PlotPlanner;

@@ -49,7 +49,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const resolvedTheme = resolveTheme(preference, systemScheme);
+  const resolvedTheme = resolveTheme(
+    preference,
+    systemScheme === "light" || systemScheme === "dark" ? systemScheme : null,
+  );
   const colors = resolvedTheme === "dark" ? darkTheme : lightTheme;
 
   useEffect(() => {

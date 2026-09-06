@@ -104,10 +104,10 @@ export function BottomSheetModal({
     <View style={[styles.root, isCenter && styles.rootCenter]}>
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFillObject, styles.backdrop, { opacity: backdropOpacity }]}
+        style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]}
       />
       <Pressable
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         onPress={onClose}
         accessibilityRole="button"
         accessibilityLabel="Close"

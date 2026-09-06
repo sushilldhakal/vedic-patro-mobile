@@ -14,7 +14,7 @@ const W_DOCK_BORDER = "rgba(143, 191, 193, 0.32)";
 const W_ROW_HOT = "rgba(198, 40, 40, 0.28)";
 const MENU_W = 228;
 
-type Props = {
+type PlanetSelectMenuProps = {
   grahas: WheelGraha[];
   selected: number;
   onSelect: (index: number) => void;
@@ -22,7 +22,12 @@ type Props = {
   compact?: boolean;
 };
 
-export function PlanetSelectMenu({ grahas, selected, onSelect, compact = false }: Props) {
+export function PlanetSelectMenu({
+  grahas,
+  selected,
+  onSelect,
+  compact = false,
+}: PlanetSelectMenuProps) {
   const { pick } = useLocale();
   const { width: sw, height: sh } = useWindowDimensions();
   const [open, setOpen] = useState(false);
