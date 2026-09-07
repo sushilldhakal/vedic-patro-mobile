@@ -2,6 +2,7 @@ import { useState } from "react";
 import { adToBS, getCurrentBs } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
 import { clampBrowseYear, isValidBrowseYear } from "@/lib/patro-browse-years";
+import { getCachedCalendarEraPreference } from "@/lib/patro-era-preference";
 import {
   defaultBrowseEraForLang,
   patroBrowseTodayEra,
@@ -32,11 +33,10 @@ function defaultMonthBrowseParts(era: PatroBrowseEra): { year: number; month: nu
 export function usePatroMonthBrowse() {
   const { lang } = useLocale();
   const baseEra = readCalendarEraForLang(lang);
-  const defaults = defaultMonthBrowseParts(baseEra);
 
-  const [era, setEraState] = useState<PatroBrowseEra>(() => baseEra);
-  const [year, setYearState] = useState(() => defaults.year);
-  const [month, setMonthState] = useState(() => defaults.month);
+  const [era, setEraState] = useState<PatroBrowseEra>(() => getCachedCalendarEraPreference() ?? baseEra);
+  const [year, setYearState] = useState(() => defaultMonthBrowseParts(era).year);
+  const [month, setMonthState] = useState(() => defaultMonthBrowseParts(era).month);
   const [syncedLang, setSyncedLang] = useState(lang);
 
   if (lang !== syncedLang) {

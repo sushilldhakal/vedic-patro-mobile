@@ -16,13 +16,16 @@ import {
 } from "@expo-google-fonts/noto-sans-devanagari";
 import { FiraCode_400Regular, FiraCode_700Bold } from "@expo-google-fonts/fira-code";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LocaleProvider } from "@/lib/i18n";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { OfflineDataProvider } from "@/lib/offline/OfflineDataContext";
+import { OnboardingScreen } from "@/components/onboarding/OnboardingScreen";
+import { isOnboardingComplete } from "@/lib/onboarding-storage";
+import { loadCalendarEraPreference } from "@/lib/patro-era-preference";
 import { VedicPatroLoader } from "@/components/branding/VedicPatroLoader";
 import { usePatroCapabilities } from "@/lib/use-patro-capabilities";
 
@@ -77,15 +80,33 @@ export default function RootLayout() {
     ...Ionicons.font,
   });
 
+  // "checking" until we know whether this install has been through onboarding
+  // (theme/language/calendar/offline-or-online) — resolved once, before the
+  // splash screen hides, so the very first thing shown is either onboarding
+  // or the real app, never a flash of one then the other.
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+
   useEffect(() => {
-    if (!loaded) return;
+    let active = true;
+    Promise.all([isOnboardingComplete(), loadCalendarEraPreference()]).then(([done]) => {
+      if (active) setOnboarded(done);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const ready = loaded && onboarded !== null;
+
+  useEffect(() => {
+    if (!ready) return;
     if (Platform.OS === "web") {
       window.__hideVedicPatroBootSplash?.();
     }
     void SplashScreen.hideAsync().catch(() => {
       /* Already hidden or unavailable (common in Expo Go). */
     });
-  }, [loaded]);
+  }, [ready]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }} className="flex-1 bg-background">
@@ -102,7 +123,7 @@ export default function RootLayout() {
             >
               <OfflineDataProvider>
                 <AuthProvider>
-                  <RootShell loaded={loaded} />
+                  <RootShell ready={ready} onboarded={onboarded} onOnboarded={() => setOnboarded(true)} />
                 </AuthProvider>
               </OfflineDataProvider>
             </PersistQueryClientProvider>
@@ -113,20 +134,32 @@ export default function RootLayout() {
   );
 }
 
-function RootShell({ loaded }: { loaded: boolean }) {
+function RootShell({
+  ready,
+  onboarded,
+  onOnboarded,
+}: {
+  ready: boolean;
+  onboarded: boolean | null;
+  onOnboarded: () => void;
+}) {
   const { colors } = useTheme();
   usePatroCapabilities();
 
   return (
     <>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
-      {loaded ? <ThemedStatusBar /> : null}
-      {!loaded ? (
+      {ready && onboarded === false ? (
+        <OnboardingScreen onComplete={onOnboarded} />
+      ) : (
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+      )}
+      {ready ? <ThemedStatusBar /> : null}
+      {!ready ? (
         <View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, styles.fontGate, { backgroundColor: colors.background }]}

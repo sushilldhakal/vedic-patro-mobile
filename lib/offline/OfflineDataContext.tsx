@@ -10,6 +10,7 @@ import {
   type DownloadedYearsSummary,
 } from "@/lib/offline/offline-store";
 import { computeDefaultInstallRange, type YearRange } from "@/lib/offline/offline-range";
+import { getStoredDataMode } from "@/lib/onboarding-storage";
 import { usePanchangaLocation } from "@/lib/use-panchanga-location";
 
 const INSTALL_STATE_KEY = "install_prefetch_v1";
@@ -57,15 +58,25 @@ interface OfflineDataContextValue {
     range: YearRange,
     onProgress?: (progress: DownloadRangeProgress) => void,
   ) => Promise<DownloadRangeProgress>;
+  /**
+   * Kicks off the default install-range download. Downloading offline data is
+   * the user's choice, not something the app does on its own — this is only
+   * called from the onboarding screen once someone picks "offline", and is
+   * auto-resumed on later launches solely to finish a download that specific
+   * choice started (see the effect below), never for someone who chose online.
+   */
+  startInstallDownload: () => Promise<void>;
   clearOfflineData: () => Promise<void>;
 }
 
 const OfflineDataContext = createContext<OfflineDataContextValue | null>(null);
 
 /**
- * Owns the on-disk BS-year calendar cache: kicks off (and resumes) the default
- * 80-year install download once online, and exposes the read/write API the
- * calendar screens and the Offline Data settings screen use.
+ * Owns the on-disk BS-year calendar cache and exposes the read/write API the
+ * calendar screens, the onboarding screen, and the Offline Data settings
+ * screen use. Never downloads anything on its own — `startInstallDownload`
+ * only runs when the onboarding screen calls it (the user chose "offline"),
+ * or to resume that same choice's download after an interruption.
  *
  * Tracks its own `usePanchangaLocation()` instance, matching how every other
  * screen in the app reads that location independently from SecureStore — so a
@@ -107,7 +118,7 @@ export function OfflineDataProvider({ children }: { children: React.ReactNode })
     void writeJsonMeta(WIFI_ONLY_PREF_KEY, value);
   }, []);
 
-  const runInitialDownload = useCallback(async () => {
+  const startInstallDownload = useCallback(async () => {
     if (runningRef.current || installDoneRef.current) return;
     runningRef.current = true;
     try {
@@ -138,11 +149,19 @@ export function OfflineDataProvider({ children }: { children: React.ReactNode })
     }
   }, [wifiOnly, refreshSummary]);
 
+  // Resumes an in-progress download only for someone who already opted into
+  // offline mode at onboarding — never starts one on its own for anyone else.
   useEffect(() => {
     if (!isOnline) return;
     if (wifiOnly && !isWifi) return;
-    void runInitialDownload();
-  }, [isOnline, isWifi, wifiOnly, runInitialDownload]);
+    let cancelled = false;
+    getStoredDataMode().then((mode) => {
+      if (!cancelled && mode === "offline") void startInstallDownload();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOnline, isWifi, wifiOnly, startInstallDownload]);
 
   useEffect(
     () => () => {
@@ -194,6 +213,7 @@ export function OfflineDataProvider({ children }: { children: React.ReactNode })
       refreshSummary,
       downloadYear,
       downloadRange,
+      startInstallDownload,
       clearOfflineData,
     }),
     [
@@ -208,6 +228,7 @@ export function OfflineDataProvider({ children }: { children: React.ReactNode })
       refreshSummary,
       downloadYear,
       downloadRange,
+      startInstallDownload,
       clearOfflineData,
     ],
   );

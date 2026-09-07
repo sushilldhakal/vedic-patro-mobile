@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getCurrentBs } from "@/lib/bs-calendar";
 import { useLocale } from "@/lib/i18n";
+import { getCachedCalendarEraPreference } from "@/lib/patro-era-preference";
 import { defaultBrowseEraForLang, type PatroBrowseEra } from "@/lib/patro-era";
 
 /** Year the browse opens on for an era — BS/BBS count in BS, AD/BC in Gregorian. */
@@ -19,7 +20,9 @@ function defaultBrowseYear(era: PatroBrowseEra): number {
  */
 export function usePatroYearBrowse(initialYear?: number) {
   const { lang } = useLocale();
-  const [era, setEra] = useState<PatroBrowseEra>(() => defaultBrowseEraForLang(lang));
+  const [era, setEra] = useState<PatroBrowseEra>(
+    () => getCachedCalendarEraPreference() ?? defaultBrowseEraForLang(lang),
+  );
   const [year, setYear] = useState(initialYear ?? getCurrentBs().year);
   const [syncedLang, setSyncedLang] = useState(lang);
 

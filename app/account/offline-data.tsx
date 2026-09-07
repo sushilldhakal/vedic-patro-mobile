@@ -209,8 +209,8 @@ export default function OfflineDataScreen() {
           </Text>
           <Text className="mt-0.5 text-xs text-muted-foreground" style={nepaliTextStyle(12)}>
             {pick(
-              "मोबाइल डाटा बचत गर्न पहिलो पटक डाउनलोड हुँदा वाइफाइको पर्खनुहोस्।",
-              "Waits for Wi-Fi for the automatic background download, to save mobile data.",
+              "मोबाइल डाटा बचत गर्न पृष्ठभूमि डाउनलोड हुँदा वाइफाइको पर्खनुहोस्।",
+              "Waits for Wi-Fi before running background downloads, to save mobile data.",
             )}
           </Text>
         </View>
