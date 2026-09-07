@@ -92,6 +92,27 @@ export default function AccountScreen() {
             onPress={() => router.replace("/" as never)}
           />
         </View>
+
+        <Pressable
+          onPress={() => router.push("/account/offline-data" as never)}
+          className="mt-6 flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 active:opacity-80"
+        >
+          <View className="flex-1 flex-row items-center gap-3 pr-3">
+            <Ionicons name="download-outline" size={18} color={colors.secondary} />
+            <View className="flex-1">
+              <Text className="text-sm font-medium text-foreground" style={nepaliTextStyle(14)}>
+                {pick("अफलाइन डाटा", "Offline Data")}
+              </Text>
+              <Text className="mt-0.5 text-xs text-muted-foreground" style={nepaliTextStyle(12)}>
+                {pick(
+                  "लगइन बिना पनि पात्रो अफलाइन डाटा व्यवस्थापन गर्न सकिन्छ।",
+                  "Offline calendar data can be managed without logging in.",
+                )}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+        </Pressable>
       </AppShell>
     );
   }
@@ -233,6 +254,27 @@ export default function AccountScreen() {
           ))}
         </View>
       )}
+
+      <Pressable
+        onPress={() => router.push("/account/offline-data" as never)}
+        className="mt-8 flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 active:opacity-80"
+      >
+        <View className="flex-1 flex-row items-center gap-3 pr-3">
+          <Ionicons name="download-outline" size={18} color={colors.secondary} />
+          <View className="flex-1">
+            <Text className="text-sm font-medium text-foreground" style={nepaliTextStyle(14)}>
+              {pick("अफलाइन डाटा", "Offline Data")}
+            </Text>
+            <Text className="mt-0.5 text-xs text-muted-foreground" style={nepaliTextStyle(12)}>
+              {pick(
+                "इन्टरनेट बिना पात्रो हेर्न वर्षहरू व्यवस्थापन गर्नुहोस्।",
+                "Manage the calendar years downloaded for offline use.",
+              )}
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+      </Pressable>
 
       <View className="mt-10 border-t border-border pt-6">
         <Text className="text-base font-semibold text-destructive" style={nepaliTextStyle(16)}>
