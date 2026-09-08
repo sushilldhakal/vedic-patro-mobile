@@ -15,13 +15,15 @@ import { ErrorState } from "@/components/ui/States";
 import {
   apiKeys,
   fetchFestivals,
-  fetchMonthCalendar,
   fetchPanchanga,
   fetchSaitMonthAll,
   type CalendarDay,
   type Festival,
   type MonthBrowseEra,
 } from "@/lib/api";
+import { fetchMonthCalendarOffline } from "@/lib/offline/offline-month";
+import { OfflineUnavailableError } from "@/lib/offline/offline-store";
+import { OfflineDownloadPrompt } from "@/components/offline/OfflineDownloadPrompt";
 import {
   BS_SUPPORTED_END_YEAR,
   BS_SUPPORTED_START_YEAR,
@@ -125,18 +127,18 @@ export default function HomeScreen() {
     queries: [
       {
         queryKey: apiKeys.month(prevBm.year, prevBm.month, location.params, browseEra),
-        queryFn: () => fetchMonthCalendar(prevBm.year, prevBm.month, location.params, { era: browseEra }),
+        queryFn: () => fetchMonthCalendarOffline(prevBm.year, prevBm.month, location.params, { era: browseEra }),
         staleTime: 1000 * 60 * 60,
         enabled: canFetchPrev,
       },
       {
         queryKey: apiKeys.month(year, month, location.params, browseEra),
-        queryFn: () => fetchMonthCalendar(year, month, location.params, { era: browseEra }),
+        queryFn: () => fetchMonthCalendarOffline(year, month, location.params, { era: browseEra }),
         staleTime: 1000 * 60 * 60,
       },
       {
         queryKey: apiKeys.month(nextBm.year, nextBm.month, location.params, browseEra),
-        queryFn: () => fetchMonthCalendar(nextBm.year, nextBm.month, location.params, { era: browseEra }),
+        queryFn: () => fetchMonthCalendarOffline(nextBm.year, nextBm.month, location.params, { era: browseEra }),
         staleTime: 1000 * 60 * 60,
         enabled: canFetchNext,
       },
@@ -293,6 +295,8 @@ export default function HomeScreen() {
         onLocationChange={setLocation}
       />
 
+      <OfflineDownloadPrompt year={year} era={browseEra} />
+
       <Pressable
         onPress={() => router.push("/aakash-gochar")}
         className="mb-3 flex-row items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 active:opacity-80"
@@ -322,7 +326,14 @@ export default function HomeScreen() {
       ) : monthError ? (
         <View style={{ paddingHorizontal: contentInset }}>
           <ErrorState
-            message={pick("पात्रो लोड गर्न सकिएन।", "Could not load calendar.")}
+            message={
+              currentQ.error instanceof OfflineUnavailableError
+                ? pick(
+                    "तपाईं अफलाइन हुनुहुन्छ र यो पात्रो अझै डाउनलोड गरिएको छैन।",
+                    "You're offline and this calendar hasn't been downloaded yet.",
+                  )
+                : pick("पात्रो लोड गर्न सकिएन।", "Could not load calendar.")
+            }
             onRetry={() => currentQ.refetch()}
           />
         </View>
