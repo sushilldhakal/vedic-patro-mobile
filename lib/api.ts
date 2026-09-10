@@ -2288,12 +2288,19 @@ export interface BhavaReferenceNaadiSutra {
   grahas: string[];
 }
 
+export interface BhavaReferenceBhaveshEntry extends BilingualValue {
+  /** Present when this pair is sourced from the actual BPHS ch. 13 text;
+   * null for the handful of pairs that chapter doesn't cover. */
+  shloka: string | null;
+}
+
 export interface BhavaReferencePayload {
   version: string;
   grahaDrishti: Record<string, BhavaReferenceGrahaDrishti>;
   houseInfo: Record<string, BhavaReferenceHouseInfo>;
   rashiLord: Record<string, string>;
-  bhaveshPhala: Record<string, Record<string, BilingualValue>>;
+  bhaveshPhala: Record<string, Record<string, BhavaReferenceBhaveshEntry>>;
+  bhaveshPhalaSource: string;
   grahaKarakatva: Record<string, BhavaReferenceGrahaKarakatva>;
   grahaHouseSaravali: Record<string, Record<string, BhavaReferenceHouseSaravali>>;
   ratingLabel: Record<BhavaReferenceRating, BilingualValue>;
@@ -2308,7 +2315,7 @@ export interface BhavaReferencePayload {
 
 /** Bump on a content edit so the CDN mints a fresh object (endpoint is cached ~1 day). */
 export const BHAVA_REFERENCE_VERSION =
-  (extra.bhavaReferenceVersion as string) ?? "2";
+  (extra.bhavaReferenceVersion as string) ?? "3";
 
 /** Static graha/bhava reference content — same for every chart. Also folded
  * into `/kundali/detail` (as `bhavaReference`) for callers already fetching

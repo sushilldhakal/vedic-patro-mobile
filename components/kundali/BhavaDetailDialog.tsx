@@ -422,9 +422,16 @@ function BhavaDetailBody({
             </Text>
           )}
           {bhaveshEntry ? (
-            <Text className="mt-2 text-sm leading-relaxed" style={small}>
-              {pick(bhaveshEntry.ne, bhaveshEntry.en)}
-            </Text>
+            <>
+              {bhaveshEntry.shloka && (
+                <Text className="mt-2 text-sm italic leading-relaxed text-foreground/90" style={small}>
+                  {bhaveshEntry.shloka}
+                </Text>
+              )}
+              <Text className="mt-1.5 text-sm leading-relaxed" style={small}>
+                {pick(bhaveshEntry.ne, bhaveshEntry.en)}
+              </Text>
+            </>
           ) : (
             <Text className="mt-2 text-sm text-muted-foreground" style={small}>
               {pick(
@@ -434,7 +441,7 @@ function BhavaDetailBody({
             </Text>
           )}
           <Text className="mt-2 text-sm text-muted-foreground" style={small}>
-            {pick("स्रोत: बृहत्पाराशर होराशास्त्र, अध्याय २७", "Source: Brihat Parashara Hora Shastra, ch. 27")}
+            {pick(`स्रोत: ${reference.bhaveshPhalaSource}`, `Source: ${reference.bhaveshPhalaSource}`)}
           </Text>
         </Section>
 
