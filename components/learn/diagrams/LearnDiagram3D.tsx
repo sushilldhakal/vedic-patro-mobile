@@ -196,6 +196,7 @@ export function LearnDiagram3D({
                   left: label.x + (label.dx ?? 0),
                   top: label.y + (label.dy ?? 0),
                   color: label.color ?? DIAGRAM_LABEL_COLOR.body,
+                  opacity: label.color === DIAGRAM_LABEL_COLOR.dim ? 0.68 : 1,
                   fontSize: label.size ?? 10,
                   /* Centred on the anchor without measuring: the text box is
                      free to overflow its own zero-width origin, and it is
@@ -247,7 +248,10 @@ export function LearnDiagram3D({
                 />
                 <Text
                   className="text-[12px]"
-                  style={[nepaliTextStyle(9), { color: DIAGRAM_LABEL_COLOR.dim, fontSize: 9 }]}
+                  style={[
+                    nepaliTextStyle(9),
+                    { color: DIAGRAM_LABEL_COLOR.dim, fontSize: 9, opacity: 0.68 },
+                  ]}
                 >
                   {item.label}
                 </Text>
@@ -284,7 +288,10 @@ export function LearnDiagram3D({
             <View className="rounded-full bg-black/45 px-3 py-1">
               <Text
                 className="text-[12px]"
-                style={[nepaliTextStyle(10), { color: DIAGRAM_LABEL_COLOR.dim, fontSize: 10 }]}
+                style={[
+                  nepaliTextStyle(10),
+                  { color: DIAGRAM_LABEL_COLOR.dim, fontSize: 10, opacity: 0.68 },
+                ]}
               >
                 {pick(
                   "एक औंलाले घुमाउनुहोस् · दुई औंलाले जुम",

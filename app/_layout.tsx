@@ -1,4 +1,5 @@
 import "../global.css";
+import "@/lib/quiet-native-gl-logs";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform, StyleSheet, View } from "react-native";

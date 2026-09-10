@@ -5,6 +5,9 @@ import { Text } from "@/components/ui/Text";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { LEARN_DIAGRAMS, type DiagramId } from "@/lib/learn/learn-diagrams";
+import { LearnTable } from "@/components/learn/LearnTable";
+
+export { LearnTable };
 
 export function LearnSection({
   kicker,
@@ -93,57 +96,6 @@ export function LearnFormulaRow({
           </Text>
         </View>
       ))}
-    </View>
-  );
-}
-
-/** Reference/data table — headers + rows of already-resolved cell content. */
-export function LearnTable({
-  caption,
-  headers,
-  rows,
-}: {
-  caption?: ReactNode;
-  headers: ReactNode[];
-  rows: ReactNode[][];
-}) {
-  return (
-    <View className="gap-1.5">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="overflow-hidden rounded-xl border border-border">
-          <View className="flex-row bg-muted/40">
-            {headers.map((h, i) => (
-              <View key={i} className="min-w-[104px] px-3 py-2">
-                <Text
-                  className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
-                  style={nepaliTextStyle(10)}
-                >
-                  {h}
-                </Text>
-              </View>
-            ))}
-          </View>
-          {rows.map((row, ri) => (
-            <View
-              key={ri}
-              className={`flex-row ${ri % 2 === 1 ? "bg-muted/15" : ""} border-t border-border`}
-            >
-              {row.map((cell, ci) => (
-                <View key={ci} className="min-w-[104px] px-3 py-2">
-                  <Text className="text-sm text-foreground" style={nepaliTextStyle(13)}>
-                    {cell}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-      {caption ? (
-        <Text className="text-xs text-muted-foreground" style={nepaliTextStyle(11)}>
-          {caption}
-        </Text>
-      ) : null}
     </View>
   );
 }

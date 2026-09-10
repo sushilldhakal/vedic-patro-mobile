@@ -7,7 +7,7 @@
  */
 import { View } from "react-native";
 import { Text } from "@/components/ui/Text";
-import { LearnTable } from "@/components/learn/LearnProse";
+import { LearnTable } from "@/components/learn/LearnTable";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { WHEEL_RASHIS, RASHI_LORDS, RASHI_ELEM, PADA_AKSHAR } from "@/lib/wheel-data";

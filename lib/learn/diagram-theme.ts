@@ -50,7 +50,9 @@ export const RASHI_RING_COLORS = [
 /** Overlay label colours — these sit on the dark canvas, never on the card. */
 export const DIAGRAM_LABEL_COLOR = {
   body: "#f1f5f9",
-  dim: "rgba(226, 232, 240, 0.68)",
+  /* Solid hex: THREE.Color ignores CSS alpha and warns on rgba(). Overlay text
+     that should read softer applies its own opacity. */
+  dim: "#e2e8f0",
   sun: DIAGRAM_COLOR.sun,
   earth: "#93c5fd",
   moon: "#e2e8f0",

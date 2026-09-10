@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { BhavaHouse } from "@/lib/bhava";
 import { drishtiTargetHouses } from "@/lib/bhava";
 import { GrahaStatusMarksSvg } from "@/components/graha/GrahaStatusMarksSvg";
@@ -12,7 +13,7 @@ import {
 } from "@/lib/kundali/north-indian-layout";
 import { useLocale } from "@/lib/i18n";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
-import { GRAHA_DRISHTI, drishtiBadgeText } from "@/lib/kundali/graha-drishti";
+import { bhavaReferenceKeys, fetchBhavaReference, type BhavaReferencePayload } from "@/lib/api";
 import { BhavaDetailDialog } from "@/components/kundali/BhavaDetailDialog";
 
 const PLANET_ABBR_NE: Record<string, string> = {
@@ -51,16 +52,37 @@ function formatHouseList(houses: number[], lang: "ne" | "en", digits: (v: number
   return lang === "en" ? `${rest} and ${last}` : `${rest} र ${last}`;
 }
 
-function DrishtiPanel({ selected, onClose }: { selected: Selected; onClose: () => void }) {
+/** "क्रूर (छाया) दृष्टि" / "Malefic (Shadow) Aspect" — pure display logic over
+ * the fetched isMalefic/isChaya flags, not itself interpretive content. */
+function drishtiBadgeText(grahaKey: string, ref: BhavaReferencePayload, lang: "ne" | "en"): string {
+  const info = ref.grahaDrishti[grahaKey];
+  if (!info) return "";
+  if (lang === "en") {
+    const nature = info.isMalefic ? "Malefic" : "Benefic";
+    return info.isChaya ? `${nature} (Shadow) Aspect` : `${nature} Aspect`;
+  }
+  const nature = info.isMalefic ? "क्रूर" : "सौम्य";
+  return info.isChaya ? `${nature} (छाया) दृष्टि` : `${nature} दृष्टि`;
+}
+
+function DrishtiPanel({
+  selected,
+  reference,
+  onClose,
+}: {
+  selected: Selected;
+  reference: BhavaReferencePayload;
+  onClose: () => void;
+}) {
   const { pick, digits, lang } = useLocale();
   const grahaKey = selected.key as GrahaKey;
-  const info = GRAHA_DRISHTI[grahaKey];
+  const info = reference.grahaDrishti[grahaKey];
   if (!info) return null;
 
   const targets = drishtiTargetHouses(selected.key, selected.house);
   const houseList = formatHouseList(targets, lang, digits);
   const name = GRAHA_NAME[grahaKey] ? pick(GRAHA_NAME[grahaKey].ne, GRAHA_NAME[grahaKey].en) : grahaKey;
-  const badge = drishtiBadgeText(grahaKey, lang);
+  const badge = drishtiBadgeText(grahaKey, reference, lang);
   const badgeCls = info.isMalefic
     ? "bg-destructive/10 text-destructive border-destructive/20"
     : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
@@ -99,6 +121,13 @@ export function D1Chart({ houses }: Props) {
   const showLegend = useMemo(() => bhavaHousesHaveStatusMarks(houses), [houses]);
   const [selected, setSelected] = useState<Selected | null>(null);
   const [openHouse, setOpenHouse] = useState<number | null>(null);
+
+  const referenceQ = useQuery({
+    queryKey: bhavaReferenceKeys.all,
+    queryFn: fetchBhavaReference,
+    staleTime: Infinity,
+  });
+  const reference = referenceQ.data;
 
   const targetHouses = useMemo(
     () => (selected ? new Set(drishtiTargetHouses(selected.key, selected.house)) : null),
@@ -176,7 +205,7 @@ export function D1Chart({ houses }: Props) {
                   PLANET_ABBR_EN[planet.key] ?? planet.labelNe.slice(0, 2),
                 );
                 const isSelected = selected?.key === planet.key && selected.house === houseNum;
-                const isClickable = Boolean(GRAHA_DRISHTI[planet.key as GrahaKey]);
+                const isClickable = Boolean(reference?.grahaDrishti[planet.key]);
                 return (
                   <g
                     key={planet.key}
@@ -241,8 +270,15 @@ export function D1Chart({ houses }: Props) {
           })}
       </svg>
       {showLegend ? <GrahaStatusLegend className="mt-2 w-full" /> : null}
-      {selected && <DrishtiPanel selected={selected} onClose={() => setSelected(null)} />}
-      <BhavaDetailDialog houses={houses} houseNumber={openHouse} onClose={() => setOpenHouse(null)} />
+      {selected && reference && (
+        <DrishtiPanel selected={selected} reference={reference} onClose={() => setSelected(null)} />
+      )}
+      <BhavaDetailDialog
+        houses={houses}
+        houseNumber={openHouse}
+        reference={reference}
+        onClose={() => setOpenHouse(null)}
+      />
     </div>
   );
 }

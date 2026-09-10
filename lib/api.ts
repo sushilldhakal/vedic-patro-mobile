@@ -2214,6 +2214,116 @@ export function fetchYogaReference(): Promise<YogaReferenceResponse> {
   );
 }
 
+// ── Bhava/graha static reference content (drishti, karakatva, Lal Kitab) ──
+// Chart-independent — same for every kundali. Lives server-side as the
+// single source of truth (see nepali-holiday-api's engine/vedic/
+// bhava_reference.py); this app used to duplicate it as local .ts files.
+
+export interface BhavaReferenceGrahaDrishti {
+  isMalefic: boolean;
+  /** राहु/केतु — shadow points rather than physical bodies. */
+  isChaya: boolean;
+  summaryNe: string;
+  summaryEn: string;
+}
+
+export interface BhavaReferenceHouseInfo {
+  themeNe: string;
+  themeEn: string;
+  summaryNe: string;
+  summaryEn: string;
+  medicalNe: string;
+  medicalEn: string;
+  beneficEffectNe: string;
+  beneficEffectEn: string;
+  maleficEffectNe: string;
+  maleficEffectEn: string;
+}
+
+export interface BhavaReferenceGrahaKarakatva {
+  shloka: string;
+  shlokaSourceNe: string;
+  shlokaSourceEn: string;
+  subjectsNe: string;
+  subjectsEn: string;
+  significanceNe: string;
+  significanceEn: string;
+}
+
+export type BhavaReferenceRating = "uttam" | "shubh" | "mishrit" | "kamjor";
+
+export interface BhavaReferenceHouseSaravali {
+  house: number;
+  /** Only present on entries sourced from the newer full 12-house table. */
+  houseTheme?: string;
+  shloka: string;
+  shlokaSourceNe: string;
+  shlokaSourceEn: string;
+  meaningNe: string;
+  meaningEn: string;
+  explanationNe: string;
+  explanationEn: string;
+  rating: BhavaReferenceRating;
+}
+
+/** 2- or 3-graha yuti (conjunction) result — shown when a house has that many occupants. */
+export interface BhavaReferenceYuti {
+  grahas: string[];
+  yogaNameNe?: string | null;
+  yogaNameEn?: string | null;
+  textNe: string;
+  textEn: string;
+}
+
+export interface BhavaReferenceNaadiSutra {
+  number: number;
+  part: string;
+  titleNe: string;
+  titleEn: string;
+  categoryNe: string;
+  categoryEn: string;
+  bodyNe: string;
+  bodyEn: string;
+  /** Every graha this sutra mentions — a house's occupant(s) match against this. */
+  grahas: string[];
+}
+
+export interface BhavaReferencePayload {
+  version: string;
+  grahaDrishti: Record<string, BhavaReferenceGrahaDrishti>;
+  houseInfo: Record<string, BhavaReferenceHouseInfo>;
+  rashiLord: Record<string, string>;
+  bhaveshPhala: Record<string, Record<string, BilingualValue>>;
+  grahaKarakatva: Record<string, BhavaReferenceGrahaKarakatva>;
+  grahaHouseSaravali: Record<string, Record<string, BhavaReferenceHouseSaravali>>;
+  ratingLabel: Record<BhavaReferenceRating, BilingualValue>;
+  lalKitabHouse: Record<string, Record<string, BilingualValue>>;
+  lalKitabFixedLord: Record<string, string[]>;
+  grahaYuti2: Record<string, BhavaReferenceYuti>;
+  grahaYuti3: Record<string, BhavaReferenceYuti>;
+  grahaYutiGeneralRule: BilingualValue;
+  naadiSutras: BhavaReferenceNaadiSutra[];
+  naadiSutraSource: string;
+}
+
+/** Bump on a content edit so the CDN mints a fresh object (endpoint is cached ~1 day). */
+export const BHAVA_REFERENCE_VERSION =
+  (extra.bhavaReferenceVersion as string) ?? "2";
+
+/** Static graha/bhava reference content — same for every chart. Also folded
+ * into `/kundali/detail` (as `bhavaReference`) for callers already fetching
+ * the full chart; this standalone route is for callers that aren't (e.g. the
+ * panchanga transit D1 chart). */
+export function fetchBhavaReference(): Promise<BhavaReferencePayload> {
+  return get<BhavaReferencePayload>(
+    `/kundali/reference/bhava?v=${BHAVA_REFERENCE_VERSION}`,
+  );
+}
+
+export const bhavaReferenceKeys = {
+  all: ["bhava-reference"] as const,
+};
+
 export interface BilingualValue {
   ne: string;
   en: string;
@@ -2369,6 +2479,7 @@ export interface KundaliDetailResponse {
   ayanamsha: string;
   location?: Record<string, unknown>;
   birth_instant: string;
+  bhavaReference?: BhavaReferencePayload;
 }
 
 export const kundaliDetailKeys = {
