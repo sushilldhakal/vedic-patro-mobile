@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetModal } from "@/components/ui/BottomSheetModal";
+import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { useLocale } from "@/lib/i18n";
 import { useThemeColors } from "@/lib/theme-context";
@@ -135,7 +136,7 @@ function BhavaDetailBody({
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
         {/* भाव फलादेश */}
         <Section title={pick(`भाव ${digits(house.house)} — ${info.themeNe}`, `House ${digits(house.house)} — ${info.themeEn}`)}>
           <View className="mb-2 flex-row flex-wrap items-center gap-x-2 gap-y-1">
@@ -284,6 +285,10 @@ function BhavaDetailBody({
           <NotAvailable pick={pick} />
         </Section>
       </ScrollView>
+
+      <View className="border-t border-border px-4 py-3">
+        <Button label={pick("बन्द गर्नुहोस्", "Close")} variant="outline" onPress={onClose} />
+      </View>
     </>
   );
 }
