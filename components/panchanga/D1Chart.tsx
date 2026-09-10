@@ -121,8 +121,8 @@ function DrishtiPanel({
 
   // The panel names the aspect by its classical offset (Jupiter is always
   // "described" as casting its 5th/7th/9th aspect, regardless of which
-  // absolute house that lands on in this chart) — the arrows drawn on the
-  // chart still point at the resolved absolute houses via drishtiTargetHouses.
+  // absolute house that lands on in this chart) — the arrows below still
+  // point at the resolved absolute houses via drishtiTargetHouses.
   const offsets = aspectHousesFor(selected.key);
   const houseList = formatHouseList(offsets, lang, digits);
   const name = GRAHA_NAME[grahaKey] ? pick(GRAHA_NAME[grahaKey].ne, GRAHA_NAME[grahaKey].en) : grahaKey;
