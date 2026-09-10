@@ -6,14 +6,10 @@
  * gives one place to swap an implementation.
  *
  * Mirrors web's `src/lib/learn/learn-diagrams.tsx` registry 1:1 by key, so
- * article data files (which reference these ids) type-check unchanged. Most
- * entries here currently point at `DiagramPlaceholder` — see the per-id
- * status list below — and get swapped for real native 3D scenes as they're
- * built (mobile/dhakal-patro-mobile Learn port, Phase 3).
+ * article data files (which reference these ids) type-check unchanged.
  */
 
 import type { ComponentType } from "react";
-import { DiagramPlaceholder } from "@/components/learn/diagrams/DiagramPlaceholder";
 import { HoraTodayDiagram } from "@/components/learn/diagrams/HoraTodayDiagram";
 import { EarthRotationDiagram } from "@/components/learn/diagrams/EarthRotationDiagram";
 import { SunRayAngleDiagram } from "@/components/learn/diagrams/SunRayAngleDiagram";

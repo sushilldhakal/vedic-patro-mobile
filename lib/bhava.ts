@@ -88,14 +88,21 @@ const SPECIAL_ASPECT_HOUSES: Record<string, number[]> = {
   ketu: [5, 7, 9],
 };
 
-function aspectHousesFor(key: string): number[] {
+export function aspectHousesFor(key: string): number[] {
   return SPECIAL_ASPECT_HOUSES[key] ?? [7];
+}
+
+/** Houses a planet in `fromHouse` casts its graha-drishti onto. */
+export function drishtiTargetHouses(key: string, fromHouse: number): number[] {
+  return aspectHousesFor(key)
+    .map((distance) => ((fromHouse - 1 + distance - 1) % 12) + 1)
+    .sort((a, b) => a - b);
 }
 
 export type HouseBadgeKind = "Q" | "T";
 
 /** Kendra (Q) / trikona (T) marker for a house number. */
-function houseBadge(house: number): HouseBadgeKind | undefined {
+export function houseBadge(house: number): HouseBadgeKind | undefined {
   if ([1, 4, 7, 10].includes(house)) return "Q";
   if ([1, 5, 9].includes(house)) return "T";
   return undefined;

@@ -2,19 +2,17 @@ import { useTranslation } from "@/lib/i18n";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  CalendarDays,
-  Clock,
-  FastForward,
-  Fullscreen,
-  Minimize2,
-  Pause,
-  Play,
-  Rewind,
-  RotateCcw,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import CalendarDays from "lucide-react/dist/esm/icons/calendar-days";
+import Clock from "lucide-react/dist/esm/icons/clock";
+import FastForward from "lucide-react/dist/esm/icons/fast-forward";
+import Fullscreen from "lucide-react/dist/esm/icons/fullscreen";
+import Minimize2 from "lucide-react/dist/esm/icons/minimize-2";
+import Pause from "lucide-react/dist/esm/icons/pause";
+import Play from "lucide-react/dist/esm/icons/play";
+import Rewind from "lucide-react/dist/esm/icons/rewind";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import ZoomIn from "lucide-react/dist/esm/icons/zoom-in";
+import ZoomOut from "lucide-react/dist/esm/icons/zoom-out";
 import type { PanchangaDay } from "@/lib/api";
 import { fetchPanchangaAtTime, panchangaKeys } from "@/lib/api";
 import { getPanchangaDetail } from "@/lib/panchanga-format.web";

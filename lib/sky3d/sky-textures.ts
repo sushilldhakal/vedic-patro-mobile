@@ -21,7 +21,7 @@ const MODULES = {
   jupiter: require("@/assets/sky3d/jupiter.jpg"),
   saturn: require("@/assets/sky3d/saturn.jpg"),
   saturnring: require("@/assets/sky3d/saturnring.jpg"),
-  milkyway: require("@/assets/sky3d/milkyway.png"),
+  milkyway: require("@/assets/sky3d/milkyway.jpg"),
 } as const;
 
 export type SkyTextureKey = keyof typeof MODULES;
@@ -47,6 +47,6 @@ function source(mod: number): unknown {
   return Platform.OS === "web" ? Asset.fromModule(mod).uri : mod;
 }
 
-export const EARTH_TOON_SOURCE = source(require("@/assets/graha/earth-orig.png"));
-export const MILKY_WAY_SOURCE = source(require("@/assets/sky3d/milkyway.png"));
+export const EARTH_TOON_SOURCE = source(require("@/assets/graha/earth-orig.jpg"));
+export const MILKY_WAY_SOURCE = source(require("@/assets/sky3d/milkyway.jpg"));
 export const KATHMANDU_GROUND_SOURCE = source(require("@/assets/sky3d/kathmandu-ground.png"));

@@ -214,7 +214,8 @@
           "android": {
             "buildArchs": ["armeabi-v7a", "arm64-v8a"],
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-dontwarn com.google.mlkit.**\n-dontwarn com.google.android.gms.internal.mlkit_**\n-dontwarn androidx.camera.mlkit.**"
           }
         }
       ],
@@ -251,7 +252,8 @@
         {
           "cameraPermission": "Vedic Patro uses the camera only in Aakash Gochar to show the live sky behind the sky map. We do not take photos, record video, or upload camera data. You can use the sky map without the camera.",
           "microphonePermission": false,
-          "recordAudioAndroid": false
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
         }
       ]
     ],
