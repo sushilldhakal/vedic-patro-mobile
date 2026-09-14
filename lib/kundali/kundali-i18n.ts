@@ -57,6 +57,7 @@ export const KUNDALI_I18N = {
   dasha_running_now: ["चलिरहेको दशा", "Running dasha"],
   dasha_total: ["कुल", "Total"],
   dasha_left: ["बाँकी", "Left"],
+  dasha_full_timeline: ["पूरा समयरेखा", "Full timeline"],
   mahadasha_at_birth: ["जन्मकालीन महादशा", "Mahadasha at birth"],
   dasha_balance: ["बाँकी अवधि", "Balance"],
   dasha_unavailable: ["दशा विवरण उपलब्ध छैन।", "Dasha details are not available."],

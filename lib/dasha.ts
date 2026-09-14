@@ -66,7 +66,7 @@ export interface DashaSpan {
 
 const YEAR_DAYS = 365.2425;
 export const DASHA_YEAR_MS = YEAR_DAYS * 86400000;
-const MONTH_DAYS = 30.4369;
+const MONTH_DAYS = YEAR_DAYS / 12;
 const YOGA_MS = 86400000 / 27;
 
 export interface DashaDurationParts {
@@ -111,15 +111,15 @@ export function formatDashaDuration(ms: number, lang: "ne" | "en"): string {
     lang === "en"
       ? { y: "y", m: "m", d: "d", h: "h", sep: " " }
       : { y: " वर्ष", m: " महिना", d: " दिन", h: " घण्टा", sep: " " };
-  if (days >= 360) {
+  if (days >= YEAR_DAYS) {
     const years = ms / DASHA_YEAR_MS;
     const y = Math.floor(years);
     const m = Math.floor((years - y) * 12);
     return m > 0 ? `${y}${unit.y}${unit.sep}${m}${unit.m}` : `${y}${unit.y}`;
   }
   if (days >= 60) {
-    const m = Math.floor(days / 30.44);
-    const d = Math.round(days - m * 30.44);
+    const m = Math.floor(days / MONTH_DAYS);
+    const d = Math.round(days - m * MONTH_DAYS);
     return d > 0 ? `${m}${unit.m}${unit.sep}${d}${unit.d}` : `${m}${unit.m}`;
   }
   if (days >= 2) return `${Math.round(days)}${unit.d}`;

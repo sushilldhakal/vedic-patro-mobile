@@ -7,6 +7,11 @@ export const KUNDALI_SECTIONS = [
   { id: "kundali-graha", i18nKey: "nav_graha_details" as const },
   { id: "kundali-yoga", i18nKey: "nav_yoga" as const },
   { id: "kundali-dasha", i18nKey: "nav_dasha" as const },
+  {
+    id: "kundali-shanti",
+    i18nKey: "nav_shanti_vidhi" as const,
+    parentId: "kundali-dasha" as const,
+  },
   { id: "kundali-shadbala", i18nKey: "nav_shadbala" as const },
   {
     id: "kundali-bhava-bala",
@@ -23,7 +28,6 @@ export const KUNDALI_SECTIONS = [
     i18nKey: "nav_vimshopaka" as const,
     parentId: "kundali-shadbala" as const,
   },
-  { id: "kundali-shanti", i18nKey: "nav_shanti_vidhi" as const },
   { id: "kundali-report", i18nKey: "nav_analysis" as const },
 ] as const;
 
