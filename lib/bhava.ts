@@ -109,7 +109,7 @@ export function houseBadge(house: number): HouseBadgeKind | undefined {
 }
 
 export function formatHouseBadge(badge: HouseBadgeKind, lang: "en" | "ne"): string {
-  if (lang === "ne") return badge === "Q" ? "के" : "त्रि";
+  if (lang === "ne") return badge === "Q" ? "केन्द्र" : "कोण";
   return badge;
 }
 
