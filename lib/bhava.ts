@@ -99,12 +99,29 @@ export function drishtiTargetHouses(key: string, fromHouse: number): number[] {
     .sort((a, b) => a - b);
 }
 
+const KENDRA_HOUSES = new Set([1, 4, 7, 10]);
+const TRIKONA_HOUSES = new Set([1, 5, 9]);
+const DUSTHANA_HOUSES = new Set([6, 8, 12]);
+const UPACHAYA_HOUSES = new Set([3, 6, 10, 11]);
+
+/** Classical house-type tags that can stack (house 1 is kendra + trikona). */
+export type HouseClass = "kendra" | "trikona" | "dusthana" | "upachaya";
+
+export function houseClasses(house: number): HouseClass[] {
+  const out: HouseClass[] = [];
+  if (KENDRA_HOUSES.has(house)) out.push("kendra");
+  if (TRIKONA_HOUSES.has(house)) out.push("trikona");
+  if (DUSTHANA_HOUSES.has(house)) out.push("dusthana");
+  if (UPACHAYA_HOUSES.has(house)) out.push("upachaya");
+  return out;
+}
+
 export type HouseBadgeKind = "Q" | "T";
 
 /** Kendra (Q) / trikona (T) marker for a house number. */
 export function houseBadge(house: number): HouseBadgeKind | undefined {
-  if ([1, 4, 7, 10].includes(house)) return "Q";
-  if ([1, 5, 9].includes(house)) return "T";
+  if (KENDRA_HOUSES.has(house)) return "Q";
+  if (TRIKONA_HOUSES.has(house)) return "T";
   return undefined;
 }
 

@@ -134,7 +134,12 @@ export function KundaliDetailView({
       {show("kundali-bhava-bala") ? (
         <KundaliSection title={pick("भाव बल", "Bhava bala")} icon="stats-chart-outline">
           {detail.bhavaBala ? (
-            <BhavaBalaCard data={detail.bhavaBala} compactHeader />
+            <BhavaBalaCard
+              data={detail.bhavaBala}
+              compactHeader
+              vargaCharts={detail.vargaCharts}
+              combustion={detail.combustion}
+            />
           ) : (
             <Text className="py-8 text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
               {pick("यो खण्ड उपलब्ध छैन।", "This section is not available.")}

@@ -3,6 +3,7 @@ import { Pressable, View, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { ShadbalaChart } from "@/components/kundali/ShadbalaChart";
 import {
   TableHeader,
   TableHeaderCell,
@@ -21,6 +22,7 @@ import type {
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { kundaliLabel } from "@/lib/kundali/kundali-i18n";
+import { KALA_SUBS, STHANA_SUBS, orderShadbalaPlanets, yuddhaVirupasForPlanet } from "@/lib/kundali/shadbala-display";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
 import { colorWithAlpha } from "@/lib/theme";
@@ -51,28 +53,6 @@ const STATUS_COLORS: Record<ShadbalaStatus, string> = {
   Weak: "#dc2626",
 };
 
-const PLANET_ORDER = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn"];
-
-const STHANA_SUBS: { key: string; ne: string; en: string }[] = [
-  { key: "uchcha", ne: "उच्च", en: "Uchcha" },
-  { key: "saptavargaja", ne: "सप्त वर्गीय", en: "Sapta Vargiya" },
-  { key: "oja_yugma", ne: "ओज युग्म", en: "Oja Yugma" },
-  { key: "kendradi", ne: "केन्द्रादि", en: "Kendradi" },
-  { key: "drekkana", ne: "द्रेक्काण", en: "Drekkana" },
-];
-
-const KALA_SUBS: { key: string; ne: string; en: string }[] = [
-  { key: "nathonnatha", ne: "नता उन्नत", en: "Nata Unnata" },
-  { key: "paksha", ne: "पक्ष", en: "Paksha" },
-  { key: "tribhaga", ne: "त्रि भाग", en: "Tri Bhaga" },
-  { key: "varshadhipati", ne: "वर्षाधिपति", en: "Varshadhipati" },
-  { key: "masadhipati", ne: "मासाधिपति", en: "Masadhipati" },
-  { key: "varadhipati", ne: "वाराधिपति", en: "Varadhipati" },
-  { key: "horadhipati", ne: "होराधिपति", en: "Horadhipati" },
-  { key: "ayana", ne: "अयन", en: "Ayana" },
-  { key: "yuddha", ne: "युद्ध", en: "Yuddha" },
-];
-
 const LABEL_COL = 132;
 const PLANET_COL = 88;
 const TABLE_STRETCH = true;
@@ -101,12 +81,6 @@ function fmt(value: number | undefined, digits: (v: string | number) => string, 
   const abs = Math.abs(value).toFixed(places);
   const signed = value < 0 ? `−${abs}` : abs;
   return digits(signed);
-}
-
-function yuddhaVirupasForPlanet(planet: ShadbalaPlanet, yuddha: YuddhaData): number {
-  const api = planet.sub_balas?.kala?.yuddha;
-  if (api != null && api !== 0) return api;
-  return yuddha.byPlanet[planet.key] ?? 0;
 }
 
 function StatusBadge({ status }: { status: ShadbalaStatus }) {
@@ -261,6 +235,7 @@ export function ShadbalaCard({
   const [contentWidth, setContentWidth] = useState(0);
   const [openSthana, setOpenSthana] = useState(false);
   const [openKala, setOpenKala] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string>("sun");
 
   const effectiveWidth = contentWidth || windowWidth;
   const glanceCols = useMemo(() => glanceColumnCount(effectiveWidth), [effectiveWidth]);
@@ -271,13 +246,7 @@ export function ShadbalaCard({
 
   const { planets, summary } = data;
 
-  const ordered = useMemo(
-    () =>
-      PLANET_ORDER.map((key) => planets.find((p) => p.key === key)).filter(
-        (p): p is ShadbalaPlanet => p != null,
-      ),
-    [planets],
-  );
+  const ordered = useMemo(() => orderShadbalaPlanets(planets), [planets]);
 
   const rankByKey = useMemo(
     () =>
@@ -403,6 +372,8 @@ export function ShadbalaCard({
           </GlanceTile>
         </View>
       </View>
+
+      <ShadbalaChart planets={ordered} selectedKey={selectedKey} onSelect={setSelectedKey} yuddha={yuddha} />
 
       <View>
         <Text className="mb-2 text-sm font-semibold text-foreground" style={nepaliTextStyle(13)}>
