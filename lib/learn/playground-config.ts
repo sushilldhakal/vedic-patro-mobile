@@ -17,6 +17,7 @@
  */
 
 import type { CameraState, SimParams, SimToggles } from "@/components/learn/playground/DaySimScene";
+import type { TrackId } from "./chapter-tracks";
 
 /**
  * What the play button animates.
@@ -42,6 +43,17 @@ export interface PlaygroundConfig {
   layers?: Partial<SimToggles>;
   params?: Partial<SimParams>;
   camera?: Partial<CameraState>;
+  /**
+   * Which guided track this topic runs, if any.
+   *
+   * The scene is the same one either way — a track only adds the player chrome
+   * and takes the keyframes over. `"calendar"` is the long syllabus: the
+   * ported day chapters, then वार · महिना · वर्ष · the belts · ध्रुव तारा,
+   * ending in free explore. `"day"` is the faithful port on its own.
+   *
+   * @see {@link ./chapter-tracks}
+   */
+  guided?: TrackId;
 }
 
 const DEG = Math.PI / 180;
@@ -195,6 +207,10 @@ export const MODE_CAMERA: Record<PlaygroundMode, CameraState> = {
  */
 export const PLAYGROUND_BY_SLUG: Record<string, PlaygroundConfig> = {
   /* ── the day itself ──────────────────────────────────────────────── */
+  /* The ported lab on its own, for the topic that is only about the day. */
+  "what-is-a-day": { mode: "day", guided: "day" },
+  /* The syllabus page: one scene, the day through ध्रुव तारा. */
+  "earth-rotation-day": { mode: "day", guided: "calendar" },
   "how-we-calculate": { mode: "day" },
   /* होरा divides the day into twenty-four graha hours, so the topic's own
      subject is the rotation the three arcs measure. */
