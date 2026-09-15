@@ -69,6 +69,7 @@ const welcome: Chapter = {
 
 const stellar: Chapter = {
   id: "stellar",
+  audioAliases: ["stellar-days"],
   titleKey: "stellar",
   partKey: "part_day",
   defaults: base({
@@ -160,6 +161,7 @@ const solar: Chapter = {
 
 const elliptic: Chapter = {
   id: "elliptic-orbit",
+  audioAliases: ["eccentric-orbit"],
   titleKey: "elliptic",
   partKey: "part_day",
   defaults: base({

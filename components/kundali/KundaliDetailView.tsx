@@ -16,6 +16,7 @@ import {
   YogaList,
 } from "@/components/kundali/KundaliSections";
 import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
+import { KundaliSubTabs } from "@/components/kundali/KundaliSubTabs";
 import { KundaliReport } from "@/components/kundali/KundaliReport";
 import type { KundaliDetailResponse, LocationParams } from "@/lib/api";
 import type { InstantQuery } from "@/lib/instant-query";
@@ -55,6 +56,12 @@ export function KundaliDetailView({
   const d1Rows = detail.vargaCharts.entries["1"] ?? [];
   const show = (id: KundaliSectionId) => section === id;
   const dashaSystem = dashaSystemFromSection(section) ?? "vimshottari";
+  const balaTabItems: { id: KundaliSectionId; label: string }[] = [
+    { id: "kundali-shadbala", label: pick("षड्बल", "Shadbala") },
+    { id: "kundali-bhava-bala", label: pick("भाव बल", "Bhava bala") },
+    { id: "kundali-ashtakavarga", label: pick("अष्टकवर्ग", "Ashtakavarga") },
+    { id: "kundali-vimshopaka", label: pick("विंशोपक बल", "Vimshopaka") },
+  ];
   const presentRefIds = useMemo(() => buildPresentYogaRefIds(detail.yogas), [detail.yogas]);
   const hasPresentYogas = detail.yogas.some((y) => y.present);
 
@@ -132,6 +139,9 @@ export function KundaliDetailView({
           subtitle={pick("ग्रह बल — रूपमा", "Planetary strength in rupas")}
           icon="barbell-outline"
         >
+          {onNavigate ? (
+            <KundaliSubTabs items={balaTabItems} activeId="kundali-shadbala" onSelect={onNavigate} />
+          ) : null}
           <ShadbalaCard
             data={detail.shadbala}
             yuddha={detail.yuddha}
@@ -143,6 +153,9 @@ export function KundaliDetailView({
 
       {show("kundali-bhava-bala") ? (
         <KundaliSection title={pick("भाव बल", "Bhava bala")} icon="stats-chart-outline">
+          {onNavigate ? (
+            <KundaliSubTabs items={balaTabItems} activeId="kundali-bhava-bala" onSelect={onNavigate} />
+          ) : null}
           {detail.bhavaBala ? (
             <BhavaBalaCard
               data={detail.bhavaBala}
@@ -160,6 +173,9 @@ export function KundaliDetailView({
 
       {show("kundali-ashtakavarga") ? (
         <KundaliSection title={pick("अष्टकवर्ग", "Ashtakavarga")} icon="apps-outline">
+          {onNavigate ? (
+            <KundaliSubTabs items={balaTabItems} activeId="kundali-ashtakavarga" onSelect={onNavigate} />
+          ) : null}
           {detail.ashtakavarga ? (
             <AshtakavargaCard data={detail.ashtakavarga} compactHeader />
           ) : (
@@ -176,6 +192,11 @@ export function KundaliDetailView({
           icon="grid-outline"
           edgeToEdgeContent
         >
+          {onNavigate ? (
+            <View className="px-3">
+              <KundaliSubTabs items={balaTabItems} activeId="kundali-vimshopaka" onSelect={onNavigate} />
+            </View>
+          ) : null}
           {detail.vimshopaka && detail.vimshopaka.classifications.length > 0 ? (
             <VimshopakaCard data={detail.vimshopaka} compactHeader />
           ) : (

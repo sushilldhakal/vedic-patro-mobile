@@ -221,6 +221,14 @@
       ],
       "expo-font",
       "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "enableBackgroundPlayback": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-status-bar",
       "expo-apple-authentication",
       [

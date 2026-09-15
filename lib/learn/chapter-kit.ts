@@ -19,6 +19,7 @@ import type {
   PlaygroundGlobe,
   SimToggles,
 } from "@/components/learn/playground/DaySimScene";
+import { LEGAL_SITE } from "@/lib/legal-copy";
 import type { Keyframe } from "./chapter-player";
 
 /**
@@ -65,17 +66,42 @@ export type ChapterSimState = {
 } & SimToggles;
 
 export type Chapter = {
-  /** Unique within its track. */
+  /** Unique within its track. Also the voiceover's filename — see {@link chapterAudioSources}. */
   id: string;
   /** Chapter-label key — see `@/lib/learn/chapter-labels`. */
   titleKey: string;
   /** Chapter-label key for the part this chapter belongs to. */
   partKey?: string;
+  /**
+   * Extra basenames to look for, after the chapter's own id.
+   *
+   * The ported chapters carry the names the original Minute Labs lab publishes
+   * its tracks under (`stellar-days`, `eccentric-orbit`), so a recording taken
+   * from there is found without being renamed first.
+   */
+  audioAliases?: string[];
   /** Free explore — no keyframe takeover, no snap-back. Every track ends on one. */
   free?: boolean;
   defaults: ChapterSimState;
   frames: Keyframe<ChapterSimState>[];
 };
+
+/**
+ * Where a chapter's narration is looked for, in order.
+ *
+ * Mirrors web's `chapterAudioSources`: `<lang>/<track>/<chapter>.mp3` first,
+ * falling back to the shared (non-language) folder, `.ogg` tried after each
+ * `.mp3`. Resolved against the web app's own origin — this app doesn't bundle
+ * the recordings, it streams them from the same place web serves them from.
+ * A chapter with no recording there simply runs on its own timer; see
+ * `use-chapter-track.ts`.
+ */
+export function chapterAudioSources(track: string, chapter: Chapter, lang: string): string[] {
+  const root = `${LEGAL_SITE}/learn/audio`;
+  const names = [chapter.id, ...(chapter.audioAliases ?? [])];
+  const paths = names.flatMap((name) => [`${root}/${lang}/${track}/${name}`, `${root}/${track}/${name}`]);
+  return paths.flatMap((n) => [`${n}.mp3`, `${n}.ogg`]);
+}
 
 export const PI2 = Math.PI * 2;
 export const DEG = Math.PI / 180;

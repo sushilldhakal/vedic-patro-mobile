@@ -75,6 +75,7 @@ import {
   type PlaygroundConfig,
 } from "@/lib/learn/playground-config";
 import { useChapterTrack } from "@/lib/learn/use-chapter-track";
+import { mixMeddle, type Meddle } from "@/lib/learn/chapter-player";
 import {
   cameraFromChapter,
   togglesFromChapter,
@@ -194,6 +195,17 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
     daysPerSecond: config.guided ? 0.35 : initial.speed * SPEED_MULTIPLIERS[DEFAULT_SPEED_RUNG]!,
   });
   const camera = useRef<CameraState>({ ...initial.camera });
+  /**
+   * A reader's manual drag/pinch/zoom-button grab on the camera, while a
+   * chapter's keyframes are also driving it.
+   *
+   * Without this, a touch during a guided beat lasted one frame before the
+   * next keyframe sample snapped the view straight back — the tour fighting
+   * the reader for the wheel. Frozen while held, it eases back to the
+   * guided path over `MEDDLE_RELAX_DELAY_MS` + `MEDDLE_RELAX_DURATION_MS`
+   * after release — see `chapter-player.ts`'s `mixMeddle`.
+   */
+  const cameraMeddle = useRef<Meddle<CameraState> | null>(null);
   const clockText = useRef({ sidereal: "", solar: "", mean: "" });
 
   const [playing, setPlaying] = useState(false);
@@ -307,6 +319,25 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
 
       if (!welcome && !handsOff) {
         clock.current.day = guidedDay + handsOffOffset.current;
+      }
+
+      const cm = cameraMeddle.current;
+      if (cm && !welcome && !handsOff) {
+        if (cm.frozen || cm.releasedAt === null) {
+          camera.current.yaw = cm.value.yaw;
+          camera.current.pitch = cm.value.pitch;
+          camera.current.distance = cm.value.distance;
+        } else {
+          const now = performance.now();
+          const yaw = mixMeddle(now, s.cameraYaw, { ...cm, value: cm.value.yaw }, true);
+          const pitch = mixMeddle(now, s.cameraPitch, { ...cm, value: cm.value.pitch });
+          const dist = mixMeddle(now, s.cameraDistance, { ...cm, value: cm.value.distance });
+          camera.current.yaw = yaw.value;
+          camera.current.pitch = pitch.value;
+          camera.current.distance = dist.value;
+          if (yaw.done && pitch.done && dist.done) cameraMeddle.current = null;
+        }
+      } else if (!welcome && !handsOff && !cm) {
         camera.current.yaw = s.cameraYaw;
         camera.current.pitch = s.cameraPitch;
         camera.current.distance = s.cameraDistance;
@@ -322,6 +353,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   const tourChapterRef = useRef<Chapter | null>(null);
   tourChapterRef.current = tour?.chapter ?? null;
   useEffect(() => {
+    cameraMeddle.current = null;
     handsOffOffset.current = 0;
     wasHandsOff.current = false;
     const ch = tourChapterRef.current;
@@ -524,6 +556,26 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
 
   /* ── gestures ─────────────────────────────────────────────────────── */
   const gestureStart = useRef({ yaw: 0, pitch: 0, distance: 0, pinch: 0 });
+
+  /**
+   * Freeze the camera meddle at its current value — a grab has started.
+   * A no-op during free explore: there the camera already fully belongs to
+   * the reader, with no keyframes to ease back to.
+   */
+  const grabCamera = useCallback(() => {
+    if (tourFreeRef.current) return;
+    cameraMeddle.current = { frozen: true, releasedAt: null, value: { ...camera.current } };
+  }, []);
+  /** Let go — starts the hold-then-ease-back timer in `mixMeddle`. */
+  const releaseCamera = useCallback(() => {
+    if (tourFreeRef.current) return;
+    const slot = cameraMeddle.current;
+    if (!slot) return;
+    slot.frozen = false;
+    slot.releasedAt = performance.now();
+    slot.value = { ...camera.current };
+  }, []);
+
   const responder = useMemo(
     () =>
       PanResponder.create({
@@ -531,6 +583,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         onMoveShouldSetPanResponder: (_e, g) => Math.hypot(g.dx, g.dy) > 2,
         onPanResponderGrant: () => {
           gestureStart.current = { ...camera.current, pinch: 0 };
+          grabCamera();
         },
         onPanResponderMove: (e, g) => {
           const touches = e.nativeEvent.touches;
@@ -546,26 +599,45 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
             camera.current.distance = clampDistance(
               gestureStart.current.distance * (gestureStart.current.pinch / spread),
             );
+            if (cameraMeddle.current) {
+              cameraMeddle.current.frozen = true;
+              cameraMeddle.current.value = { ...camera.current };
+            }
             return;
           }
           /* Drag the system, not the camera — pull right and the far side swings
              right, which means the camera itself travels the other way. */
           camera.current.yaw = gestureStart.current.yaw - g.dx * 0.006;
           camera.current.pitch = clampPitch(gestureStart.current.pitch + g.dy * 0.005);
+          if (cameraMeddle.current) {
+            cameraMeddle.current.frozen = true;
+            cameraMeddle.current.value = { ...camera.current };
+          }
         },
+        onPanResponderRelease: releaseCamera,
+        onPanResponderTerminate: releaseCamera,
       }),
-    [],
+    [grabCamera, releaseCamera],
   );
 
-  const zoomBy = useCallback((factor: number) => {
-    camera.current.distance = clampDistance(camera.current.distance * factor);
-  }, []);
+  const zoomBy = useCallback(
+    (factor: number) => {
+      camera.current.distance = clampDistance(camera.current.distance * factor);
+      /* A tap, not a hold — grab and release in the same beat so the same
+         hold-then-ease-back timing as a drag kicks in immediately. */
+      grabCamera();
+      releaseCamera();
+    },
+    [grabCamera, releaseCamera],
+  );
 
   const resetView = useCallback(() => {
     camera.current.yaw = initial.camera.yaw;
     camera.current.pitch = initial.camera.pitch;
     camera.current.distance = initial.camera.distance;
-  }, [initial]);
+    grabCamera();
+    releaseCamera();
+  }, [initial, grabCamera, releaseCamera]);
 
   const canvasHeight = fullscreen ? windowHeight : CARD_HEIGHT;
   const overlayTop = fullscreen ? Math.max(insets.top, 24) + 12 : 10;
