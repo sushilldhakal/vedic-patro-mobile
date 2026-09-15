@@ -112,8 +112,9 @@ export function AuthDialog({
     try {
       await loginWithGoogle(idToken);
       close();
-    } catch {
-      setError(pick("गुगल लग-इन असफल", "Google sign-in failed"));
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "";
+      setError(detail || pick("गुगल लग-इन असफल", "Google sign-in failed"));
     } finally {
       setBusy(false);
     }

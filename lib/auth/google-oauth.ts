@@ -16,16 +16,15 @@ export function reversedGoogleClientScheme(clientId: string | undefined): string
 }
 
 /**
- * Custom-scheme redirect Google receives on native dev/production builds.
- * Must be listed on the Web OAuth client (or match the iOS client's reversed scheme).
+ * Custom-scheme redirect Google receives on native builds.
+ *
+ * Use the app scheme (registered in Info.plist), not the reversed iOS client
+ * scheme. The ID token is requested with the *Web* client so production
+ * `POST /auth/google` can verify `aud` against GOOGLE_CLIENT_ID. The reversed
+ * iOS scheme mints a token the API rejects unless GOOGLE_IOS_CLIENT_ID is set.
  */
 export function getGoogleNativeRedirectUri(): string {
-  if (Platform.OS === "ios" && googleIosClientId) {
-    const reversed = reversedGoogleClientScheme(googleIosClientId);
-    if (reversed) return `${reversed}:/oauthredirect`;
-  }
-  // `vedicpatro` is registered in app.json; prefer it over the bundle id scheme.
-  return "vedicpatro:/oauthredirect";
+  return "vedicpatro://oauthredirect";
 }
 
 /** Redirect URI sent to Google — must be registered on the matching OAuth client. */
@@ -44,18 +43,22 @@ export function listGoogleWebClientRedirectUris(): string[] {
   uris.add("http://localhost:8081/oauthredirect");
   uris.add("http://localhost:19006/oauthredirect");
   uris.add("vedicpatro:/oauthredirect");
+  uris.add("vedicpatro://oauthredirect");
   const reversed = reversedGoogleClientScheme(googleIosClientId);
   if (reversed) uris.add(`${reversed}:/oauthredirect`);
   return [...uris].filter(Boolean).sort();
 }
 
-/** Pick the client ID Google expects for this platform. */
+/**
+ * Auth-session config. Native uses the Web client ID on purpose so the ID
+ * token audience matches the API. Do not pass iosClientId/androidClientId here
+ * — expo-auth-session would switch client and mint a token the API rejects.
+ */
 export function getGoogleClientIds() {
   return {
     clientId: googleWebClientId,
-    iosClientId: googleIosClientId,
-    androidClientId: googleAndroidClientId,
     redirectUri: getGoogleRedirectUri(),
+    selectAccount: true,
   };
 }
 
@@ -104,18 +107,10 @@ export function googleSignInSetupMessage(): string {
     );
   }
 
-  if (!googleIosClientId && !googleAndroidClientId && googleWebClientId) {
-    return (
-      `Using the Web OAuth client on ${Platform.OS}. Add these redirect URIs on that Web client:\n` +
-      `  • ${redirectChecklist}\n\n` +
-      `For production, also create a native OAuth client and set google${Platform.OS === "ios" ? "Ios" : "Android"}ClientId in app.json.`
-    );
-  }
-
   return (
-    `Google sign-in on ${Platform.OS} needs a native OAuth client.\n` +
-    `1. Google Cloud Console → Create OAuth client (${Platform.OS === "ios" ? "iOS, bundle com.vedicpatro.mobile" : "Android, package com.vedicpatro.mobile + SHA-1"})\n` +
-    `2. Set google${Platform.OS === "ios" ? "Ios" : "Android"}ClientId in app.json extra\n` +
-    `Redirect used by app: ${redirectUri}`
+    `Google redirect URI mismatch. In Google Cloud Console → Credentials → Web OAuth client ` +
+    `(…${googleWebClientId?.slice(-20) ?? "your-client"}), add:\n\n` +
+    `Authorized redirect URIs:\n  • ${redirectChecklist}\n\n` +
+    `This app is currently using: ${redirectUri}`
   );
 }

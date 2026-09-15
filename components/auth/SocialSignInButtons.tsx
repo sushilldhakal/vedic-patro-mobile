@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import { Text } from "@/components/ui/Text";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
+import { ResponseType } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as Facebook from "expo-auth-session/providers/facebook";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -38,8 +39,12 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onApple, onError, di
   const googleClientIds = getGoogleClientIds();
   const googleConfigured = isGoogleSignInConfiguredForPlatform();
 
-  const [googleRequest, googleResponse, googlePrompt] = Google.useIdTokenAuthRequest({
+  const [googleRequest, googleResponse, googlePrompt] = Google.useAuthRequest({
     ...googleClientIds,
+    // Native useIdTokenAuthRequest falls back to a code exchange against the
+    // iOS client. Force the implicit id_token so `aud` is the Web client the
+    // API already verifies.
+    responseType: ResponseType.IdToken,
   });
 
   const [fbRequest, fbResponse, fbPrompt] = Facebook.useAuthRequest({
@@ -55,8 +60,9 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onApple, onError, di
   useEffect(() => {
     if (!__DEV__ || !googleSignInEnabled) return;
     console.info("[Google OAuth] redirect URI:", googleClientIds.redirectUri);
+    console.info("[Google OAuth] client ID:", googleClientIds.clientId);
     console.info("[Google OAuth] platform:", Platform.OS);
-  }, [googleClientIds.redirectUri]);
+  }, [googleClientIds.redirectUri, googleClientIds.clientId]);
 
   useEffect(() => {
     if (!googleResponse) return;
@@ -66,11 +72,12 @@ export function SocialSignInButtons({ onGoogle, onFacebook, onApple, onError, di
       if (idToken) onGoogle(idToken);
       else onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
     } else if (googleResponse.type === "error") {
-      const err = String(googleResponse.error ?? "");
-      if (/redirect_uri_mismatch/i.test(err)) {
+      const err = String(googleResponse.error ?? googleResponse.errorCode ?? "");
+      console.warn("[Google OAuth] error:", err, googleResponse.params);
+      if (/redirect_uri_mismatch/i.test(err) || /invalid_request/i.test(err)) {
         onError?.(googleSignInSetupMessage());
       } else {
-        onError?.(pick("गुगल लग-इन असफल", "Google sign-in failed"));
+        onError?.(err || pick("गुगल लग-इन असफल", "Google sign-in failed"));
       }
     }
     if (googleResponse.type !== "success") setBusy(null);

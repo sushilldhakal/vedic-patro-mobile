@@ -20,6 +20,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vedicpatro.mobile",
+      "appleTeamId": "H6AS5X74R2",
       "usesAppleSignIn": true,
       "associatedDomains": [
         "applinks:www.vedicpatro.com",
