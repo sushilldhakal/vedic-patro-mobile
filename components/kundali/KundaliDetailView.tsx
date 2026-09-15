@@ -20,7 +20,11 @@ import { KundaliReport } from "@/components/kundali/KundaliReport";
 import type { KundaliDetailResponse, LocationParams } from "@/lib/api";
 import type { InstantQuery } from "@/lib/instant-query";
 import type { AyanamshaMode } from "@/lib/ayanamsha";
-import type { KundaliSectionId } from "@/lib/kundali/kundali-section-nav";
+import {
+  dashaSectionId,
+  dashaSystemFromSection,
+  type KundaliSectionId,
+} from "@/lib/kundali/kundali-section-nav";
 import { useLocale } from "@/lib/i18n";
 import { buildPresentYogaRefIds } from "@/lib/kundali/yoga-reference-map";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -33,6 +37,8 @@ type Props = {
   birthMoment?: InstantQuery | null;
   birthLocation?: LocationParams;
   reportDisabled?: boolean;
+  /** Jump to another section — wires DashaSystemPanel's own tabs into the nav. */
+  onNavigate?: (id: KundaliSectionId) => void;
 };
 
 export function KundaliDetailView({
@@ -43,10 +49,12 @@ export function KundaliDetailView({
   birthMoment,
   birthLocation,
   reportDisabled,
+  onNavigate,
 }: Props) {
   const { pick } = useLocale();
   const d1Rows = detail.vargaCharts.entries["1"] ?? [];
   const show = (id: KundaliSectionId) => section === id;
+  const dashaSystem = dashaSystemFromSection(section) ?? "vimshottari";
   const presentRefIds = useMemo(() => buildPresentYogaRefIds(detail.yogas), [detail.yogas]);
   const hasPresentYogas = detail.yogas.some((y) => y.present);
 
@@ -104,7 +112,7 @@ export function KundaliDetailView({
         </KundaliSection>
       ) : null}
 
-      {show("kundali-dasha") &&
+      {dashaSystemFromSection(section) != null &&
       (detail.dasha || detail.tribhagiDasha || detail.yoginiDasha) ? (
         <KundaliSection title={pick("दशा", "Dasha")} subtitle={pick("दशा प्रणाली", "Dasha systems")} icon="time-outline">
           <DashaSystemPanel
@@ -112,6 +120,8 @@ export function KundaliDetailView({
             tribhagi={detail.tribhagiDasha}
             yogini={detail.yoginiDasha}
             timeZone={timeZone ?? detail.panchanga.location?.timezone ?? "Asia/Kathmandu"}
+            active={dashaSystem}
+            onActiveChange={(system) => onNavigate?.(dashaSectionId(system))}
           />
         </KundaliSection>
       ) : null}

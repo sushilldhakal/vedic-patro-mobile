@@ -225,6 +225,7 @@ export default function KundaliDetailScreen() {
           birthMoment={moment}
           birthLocation={chart?.location.params}
           reportDisabled={false}
+          onNavigate={setSection}
         />
       </View>
     );

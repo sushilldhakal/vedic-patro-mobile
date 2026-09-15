@@ -62,6 +62,8 @@ export const KUNDALI_I18N = {
   dasha_balance: ["बाँकी अवधि", "Balance"],
   dasha_unavailable: ["दशा विवरण उपलब्ध छैन।", "Dasha details are not available."],
   nav_dasha: ["दशा", "Dasha"],
+  dasha_tribhagi: ["त्रिभागि", "Tribhagi"],
+  dasha_yogini: ["योगिनी", "Yogini"],
   nav_shadbala: ["षड्बल", "Shadbala"],
   shadbala_planetary_strength_virupas: ["षड्बल — ग्रह शक्ति (विरुप)", "Shadbala — Planetary Strength (Virupas)"],
   strongest_planet: ["सबैभन्दा बलियो ग्रह", "Strongest planet"],
