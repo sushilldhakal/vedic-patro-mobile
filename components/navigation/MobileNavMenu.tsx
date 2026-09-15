@@ -32,7 +32,7 @@ export function MobileNavMenu({
 
   return (
     <View className="gap-1 pb-2 pt-2">
-      <DrawerNavSection title={pick("मुख्य", "Main")}>
+      <DrawerNavSection first title={pick("मुख्य", "Main")}>
         {DRAWER_MAIN_LINKS.map(renderItem)}
       </DrawerNavSection>
       {sections.map((section) => (

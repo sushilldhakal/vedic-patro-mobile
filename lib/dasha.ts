@@ -64,7 +64,8 @@ export interface DashaSpan {
   end: Date;
 }
 
-const YEAR_DAYS = 365.2425;
+/** Savana year used by the dasha engine (12 × 30 days). */
+const YEAR_DAYS = 360;
 export const DASHA_YEAR_MS = YEAR_DAYS * 86400000;
 const MONTH_DAYS = YEAR_DAYS / 12;
 const YOGA_MS = 86400000 / 27;

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/Text";
 import { KundaliBirthPanchangaCard } from "@/components/kundali/KundaliBirthPanchangaCard";
 import { DashaSystemPanel } from "@/components/kundali/DashaSystemPanel";
@@ -16,23 +16,29 @@ import {
   YogaList,
 } from "@/components/kundali/KundaliSections";
 import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
-import { KundaliSubTabs } from "@/components/kundali/KundaliSubTabs";
 import { KundaliReport } from "@/components/kundali/KundaliReport";
 import type { KundaliDetailResponse, LocationParams } from "@/lib/api";
 import type { InstantQuery } from "@/lib/instant-query";
 import type { AyanamshaMode } from "@/lib/ayanamsha";
 import {
+  BALA_TAB_SECTIONS,
+  contentSectionId,
   dashaSectionId,
   dashaSystemFromSection,
+  type KundaliContentSectionId,
   type KundaliSectionId,
 } from "@/lib/kundali/kundali-section-nav";
 import { useLocale } from "@/lib/i18n";
+import { kundaliLabel } from "@/lib/kundali/kundali-i18n";
+import { useThemeColors } from "@/lib/theme-context";
+import { cn } from "@/lib/utils";
 import { buildPresentYogaRefIds } from "@/lib/kundali/yoga-reference-map";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 
 type Props = {
   detail: KundaliDetailResponse;
   section: KundaliSectionId;
+  onSectionChange?: (id: KundaliSectionId) => void;
   ayanamshaMode: AyanamshaMode;
   timeZone?: string;
   birthMoment?: InstantQuery | null;
@@ -45,6 +51,7 @@ type Props = {
 export function KundaliDetailView({
   detail,
   section,
+  onSectionChange,
   ayanamshaMode,
   timeZone,
   birthMoment,
@@ -52,16 +59,38 @@ export function KundaliDetailView({
   reportDisabled,
   onNavigate,
 }: Props) {
-  const { pick } = useLocale();
+  const { lang, pick } = useLocale();
+  const colors = useThemeColors();
   const d1Rows = detail.vargaCharts.entries["1"] ?? [];
-  const show = (id: KundaliSectionId) => section === id;
+  const go = onSectionChange ?? onNavigate;
+  const show = (id: KundaliContentSectionId) => contentSectionId(section) === id;
   const dashaSystem = dashaSystemFromSection(section) ?? "vimshottari";
-  const balaTabItems: { id: KundaliSectionId; label: string }[] = [
-    { id: "kundali-shadbala", label: pick("षड्बल", "Shadbala") },
-    { id: "kundali-bhava-bala", label: pick("भाव बल", "Bhava bala") },
-    { id: "kundali-ashtakavarga", label: pick("अष्टकवर्ग", "Ashtakavarga") },
-    { id: "kundali-vimshopaka", label: pick("विंशोपक बल", "Vimshopaka") },
-  ];
+  const balaTabs = (
+    <View className="mb-3 flex-row flex-wrap gap-1 rounded-xl border border-border/70 bg-muted/20 p-1">
+      {BALA_TAB_SECTIONS.map((tab) => {
+        const selected = section === tab.id;
+        return (
+          <Pressable
+            key={tab.id}
+            onPress={() => go?.(tab.id)}
+            className={cn("rounded-lg px-3 py-1.5")}
+            style={{
+              backgroundColor: selected ? colors.card : "transparent",
+              borderWidth: selected ? 1 : 0,
+              borderColor: selected ? colors.border : "transparent",
+            }}
+          >
+            <Text
+              className={cn("text-sm font-semibold", selected ? "text-foreground" : "text-muted-foreground")}
+              style={nepaliTextStyle(13)}
+            >
+              {kundaliLabel(tab.i18nKey, lang)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
   const presentRefIds = useMemo(() => buildPresentYogaRefIds(detail.yogas), [detail.yogas]);
   const hasPresentYogas = detail.yogas.some((y) => y.present);
 
@@ -119,7 +148,7 @@ export function KundaliDetailView({
         </KundaliSection>
       ) : null}
 
-      {dashaSystemFromSection(section) != null &&
+      {show("kundali-dasha") &&
       (detail.dasha || detail.tribhagiDasha || detail.yoginiDasha) ? (
         <KundaliSection title={pick("दशा", "Dasha")} subtitle={pick("दशा प्रणाली", "Dasha systems")} icon="time-outline">
           <DashaSystemPanel
@@ -128,7 +157,7 @@ export function KundaliDetailView({
             yogini={detail.yoginiDasha}
             timeZone={timeZone ?? detail.panchanga.location?.timezone ?? "Asia/Kathmandu"}
             active={dashaSystem}
-            onActiveChange={(system) => onNavigate?.(dashaSectionId(system))}
+            onActiveChange={(system) => go?.(dashaSectionId(system))}
           />
         </KundaliSection>
       ) : null}
@@ -139,9 +168,7 @@ export function KundaliDetailView({
           subtitle={pick("ग्रह बल — रूपमा", "Planetary strength in rupas")}
           icon="barbell-outline"
         >
-          {onNavigate ? (
-            <KundaliSubTabs items={balaTabItems} activeId="kundali-shadbala" onSelect={onNavigate} />
-          ) : null}
+          {balaTabs}
           <ShadbalaCard
             data={detail.shadbala}
             yuddha={detail.yuddha}
@@ -153,9 +180,7 @@ export function KundaliDetailView({
 
       {show("kundali-bhava-bala") ? (
         <KundaliSection title={pick("भाव बल", "Bhava bala")} icon="stats-chart-outline">
-          {onNavigate ? (
-            <KundaliSubTabs items={balaTabItems} activeId="kundali-bhava-bala" onSelect={onNavigate} />
-          ) : null}
+          {balaTabs}
           {detail.bhavaBala ? (
             <BhavaBalaCard
               data={detail.bhavaBala}
@@ -173,9 +198,7 @@ export function KundaliDetailView({
 
       {show("kundali-ashtakavarga") ? (
         <KundaliSection title={pick("अष्टकवर्ग", "Ashtakavarga")} icon="apps-outline">
-          {onNavigate ? (
-            <KundaliSubTabs items={balaTabItems} activeId="kundali-ashtakavarga" onSelect={onNavigate} />
-          ) : null}
+          {balaTabs}
           {detail.ashtakavarga ? (
             <AshtakavargaCard data={detail.ashtakavarga} compactHeader />
           ) : (
@@ -192,11 +215,7 @@ export function KundaliDetailView({
           icon="grid-outline"
           edgeToEdgeContent
         >
-          {onNavigate ? (
-            <View className="px-3">
-              <KundaliSubTabs items={balaTabItems} activeId="kundali-vimshopaka" onSelect={onNavigate} />
-            </View>
-          ) : null}
+          {balaTabs}
           {detail.vimshopaka && detail.vimshopaka.classifications.length > 0 ? (
             <VimshopakaCard data={detail.vimshopaka} compactHeader />
           ) : (

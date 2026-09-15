@@ -20,18 +20,13 @@ const patroItems: DrawerNavItem[] = [
   { id: "holidays", href: "/holidays", labelNe: "बिदा तथा पर्व", labelEn: "Holidays", icon: resolveDrawerIcon("patro", "holidays") },
   { id: "converter", href: "/converter", labelNe: "रूपान्तरण", labelEn: "Converter", icon: resolveDrawerIcon("patro", "converter") },
   { id: "suryakranti", href: "/suryakranti", labelNe: "सूर्यक्रान्ति", labelEn: "Sun times", icon: resolveDrawerIcon("patro", "suryakranti") },
-  { id: "panchanga-year", href: "/panchanga/year", labelNe: "वार्षिक पञ्चाङ्ग", labelEn: "Year wheel", icon: resolveDrawerIcon("patro", "panchanga-year") },
-  { id: "dainikkranti", href: "/dainikkranti", labelNe: "दैनिक क्रान्ति", labelEn: "Daily transit", icon: resolveDrawerIcon("patro", "dainikkranti") },
   { id: "panchak-patro", href: "/panchak-patro", labelNe: "पञ्चक पात्रो", labelEn: "Panchak", icon: resolveDrawerIcon("patro", "panchak-patro") },
   { id: "ritu", href: "/ritu", labelNe: "ऋतु", labelEn: "Seasons", icon: resolveDrawerIcon("patro", "ritu") },
 ];
 
 const jyotishItems: DrawerNavItem[] = [
-  { id: "rashifal", href: "/rashifal", labelNe: "राशिफल", labelEn: "Rashifal", icon: resolveDrawerIcon("jyotish", "rashifal") },
   { id: "avakahada", href: "/panchanga/avakahada-chakra", labelNe: "अवकहडा चक्र", labelEn: "Avakahada", icon: resolveDrawerIcon("jyotish", "avakahada") },
   { id: "abhijit", href: "/abhijit-muhurta", labelNe: "अभिजित् मुहूर्त", labelEn: "Abhijit", icon: resolveDrawerIcon("jyotish", "abhijit") },
-  { id: "kundali", href: "/kundali", labelNe: "जन्मकुण्डली", labelEn: "Birth chart", icon: resolveDrawerIcon("jyotish", "kundali") },
-  { id: "kundali-milan", href: "/jyotish/kundali-milan", labelNe: "कुण्डली मिलान", labelEn: "Chart matching", icon: resolveDrawerIcon("jyotish", "kundali-milan") },
 ];
 
 const grahaItems: DrawerNavItem[] = [
@@ -80,6 +75,11 @@ export function getMobileDrawerSections(): DrawerNavSection[] {
 export const DRAWER_MAIN_LINKS: DrawerNavItem[] = [
   { id: "home", href: "/", labelNe: "गृह", labelEn: "Home", icon: resolveDrawerIcon("main", "home") },
   { id: "panchanga", href: "/panchanga", labelNe: "सूर्य पञ्चाङ्ग", labelEn: "Panchanga", icon: resolveDrawerIcon("main", "panchanga") },
+  { id: "kundali", href: "/kundali", labelNe: "जन्मकुण्डली निर्माण", labelEn: "Birth chart builder", icon: resolveDrawerIcon("jyotish", "kundali") },
+  { id: "dainikkranti", href: "/dainikkranti", labelNe: "दैनिक क्रान्ति", labelEn: "Daily transit", icon: resolveDrawerIcon("patro", "dainikkranti") },
+  { id: "kundali-milan", href: "/jyotish/kundali-milan", labelNe: "कुण्डली मिलान", labelEn: "Chart matching", icon: resolveDrawerIcon("jyotish", "kundali-milan") },
+  { id: "rashifal", href: "/rashifal", labelNe: "राशिफल", labelEn: "Rashifal", icon: resolveDrawerIcon("jyotish", "rashifal") },
+  { id: "panchanga-year", href: "/panchanga/year", labelNe: "वार्षिक पञ्चाङ्ग चक्र", labelEn: "Annual almanac wheel", icon: resolveDrawerIcon("patro", "panchanga-year") },
   { id: "vastu", href: "/vastu", labelNe: "वास्तु", labelEn: "Vastu", icon: resolveDrawerIcon("main", "vastu") },
   { id: "learn", href: "/learn", labelNe: "सिकाइ", labelEn: "Learn", icon: resolveDrawerIcon("main", "learn") },
   { id: "shanti", href: "/shanti-vidhi", labelNe: "शान्ति विधि", labelEn: "Shanti vidhi", icon: resolveDrawerIcon("main", "shanti") },

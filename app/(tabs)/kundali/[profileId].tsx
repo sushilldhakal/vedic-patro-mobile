@@ -220,6 +220,7 @@ export default function KundaliDetailScreen() {
         <KundaliDetailView
           detail={detail}
           section={section}
+          onSectionChange={setSection}
           ayanamshaMode={ayanamshaMode}
           timeZone={profile?.timezone ?? undefined}
           birthMoment={moment}
