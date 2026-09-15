@@ -6,7 +6,7 @@ import { GrahaStatusMarksSvg } from "@/components/graha/GrahaStatusMarksSvg";
 import { GrahaStatusLegend } from "@/components/graha/GrahaStatusLegend";
 import { Text } from "@/components/ui/Text";
 import type { BhavaHouse } from "@/lib/bhava";
-import { drishtiTargetHouses } from "@/lib/bhava";
+import { aspectHousesFor, drishtiTargetHouses } from "@/lib/bhava";
 import { bhavaHousesHaveStatusMarks } from "@/lib/graha-status";
 import {
   NI_HOUSE_POLYGONS,
@@ -119,8 +119,12 @@ function DrishtiPanel({
   const info = reference.grahaDrishti[grahaKey];
   if (!info) return null;
 
-  const targets = drishtiTargetHouses(selected.key, selected.house);
-  const houseList = formatHouseList(targets, lang, digits);
+  // The panel names the aspect by its classical offset (Jupiter is always
+  // "described" as casting its 5th/7th/9th aspect, regardless of which
+  // absolute house that lands on in this chart) — the arrows drawn on the
+  // chart still point at the resolved absolute houses via drishtiTargetHouses.
+  const offsets = aspectHousesFor(selected.key);
+  const houseList = formatHouseList(offsets, lang, digits);
   const name = GRAHA_NAME[grahaKey] ? pick(GRAHA_NAME[grahaKey].ne, GRAHA_NAME[grahaKey].en) : grahaKey;
   const badge = drishtiBadgeText(grahaKey, reference, lang);
 

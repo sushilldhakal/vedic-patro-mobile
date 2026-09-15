@@ -74,6 +74,18 @@ import {
   SPEED_MULTIPLIERS,
   type PlaygroundConfig,
 } from "@/lib/learn/playground-config";
+import { useChapterTrack } from "@/lib/learn/use-chapter-track";
+import { mixMeddle, type Meddle } from "@/lib/learn/chapter-player";
+import {
+  cameraFromChapter,
+  togglesFromChapter,
+  type Chapter,
+  type ChapterSimState,
+} from "@/lib/learn/chapter-kit";
+import { trackFor } from "@/lib/learn/chapter-tracks";
+import { DayChapterBar, DayChapterWelcome } from "@/components/learn/playground/DayChapterPlayer";
+import { ChapterOverlay } from "@/components/learn/playground/ChapterOverlay";
+import { ChapterStill, ChapterTip } from "@/components/learn/playground/ChapterStill";
 import EotGraph from "@/components/learn/playground/EotGraph";
 import PerfMeter, { type PerfSample } from "@/components/learn/playground/PerfMeter";
 import type { PlaygroundLabel } from "@/components/learn/playground/playground-labels";
@@ -155,14 +167,45 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   const ne = lang !== "en";
   const num = (v: number | string) => (ne ? toNepaliDigits(String(v)) : String(v));
 
-  const initial = useMemo(() => resolvePlayground(config), [config]);
+  const track = useMemo(() => trackFor(config.guided), [config.guided]);
+  const tour = useChapterTrack(track);
+  const freePlay = Boolean(tour?.chapter.free);
+  const lesson = Boolean(tour) && !freePlay;
+
+  const initial = useMemo(() => {
+    const resolved = resolvePlayground(config);
+    const opening = track?.chapters[0];
+    if (!opening) return resolved;
+    const welcome = opening.defaults;
+    return {
+      ...resolved,
+      toggles: togglesFromChapter(welcome),
+      params: {
+        daysPerYear: welcome.solarDaysPerYear + 1,
+        eccentricity: welcome.eccentricity,
+        tilt: welcome.tiltDeg * DEG,
+      },
+      camera: cameraFromChapter(welcome),
+    };
+  }, [config, track]);
 
   const clock = useRef<SimClock>({
     day: 0,
-    playing: false,
-    daysPerSecond: initial.speed * SPEED_MULTIPLIERS[DEFAULT_SPEED_RUNG]!,
+    playing: Boolean(config.guided),
+    daysPerSecond: config.guided ? 0.35 : initial.speed * SPEED_MULTIPLIERS[DEFAULT_SPEED_RUNG]!,
   });
   const camera = useRef<CameraState>({ ...initial.camera });
+  /**
+   * A reader's manual drag/pinch/zoom-button grab on the camera, while a
+   * chapter's keyframes are also driving it.
+   *
+   * Without this, a touch during a guided beat lasted one frame before the
+   * next keyframe sample snapped the view straight back — the tour fighting
+   * the reader for the wheel. Frozen while held, it eases back to the
+   * guided path over `MEDDLE_RELAX_DELAY_MS` + `MEDDLE_RELAX_DURATION_MS`
+   * after release — see `chapter-player.ts`'s `mixMeddle`.
+   */
+  const cameraMeddle = useRef<Meddle<CameraState> | null>(null);
   const clockText = useRef({ sidereal: "", solar: "", mean: "" });
 
   const [playing, setPlaying] = useState(false);
@@ -176,6 +219,10 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [sheet, setSheet] = useState<"controls" | "focus" | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
+  /** A Learn diagram raised over the scene by the running chapter, by id. */
+  const [overlay, setOverlay] = useState("");
+  /** A still picture the running chapter is holding up, as a web-app path. */
+  const [still, setStill] = useState("");
   /* Off by default and reachable only from the controls sheet — see PerfMeter
      for why it is not gated on `__DEV__`. */
   const [perfOpen, setPerfOpen] = useState(false);
@@ -198,6 +245,8 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   const [cameraTarget, setCameraTarget] = useState<CameraTarget>("meanSun");
   const [cameraFollow, setCameraFollow] = useState(false);
   const [toggles, setToggles] = useState<SimToggles>(initial.toggles);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
 
   /* The canvas is torn down and rebuilt when it moves into the modal, so the
      labels from the old one would otherwise hang over the new frame. */
@@ -207,11 +256,167 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
   }, [fullscreen]);
 
   useEffect(() => {
+    if (config.guided && !freePlay) return;
     clock.current.playing = playing;
-  }, [playing]);
+  }, [playing, config.guided, freePlay]);
+
+  /**
+   * The pace of one rotation, at the 1× rung.
+   *
+   * {@link MODE_SPEED} is tuned per mode against that mode's own year: the day
+   * mode's 0.2 turns a second is a year in forty-five seconds *because its
+   * year is nine turns long*. A guided track moves between years — the ported
+   * chapters run an eight-day one, the calendar chapters the real 365 — so a
+   * fixed rate is a crawl in the second half. Scaling by how long this
+   * chapter's year actually is keeps an orbit taking about the same
+   * wall-clock time throughout, and leaves the ported chapters at exactly
+   * their old rate.
+   */
+  const basePace = config.guided
+    ? (initial.speed * (solarDaysPerYear + 1)) / initial.params.daysPerYear
+    : initial.speed;
+  const basePaceRef = useRef(basePace);
+  basePaceRef.current = basePace;
+
   useEffect(() => {
-    clock.current.daysPerSecond = initial.speed * SPEED_MULTIPLIERS[speed]!;
-  }, [speed, initial.speed]);
+    if (config.guided && !freePlay) return;
+    clock.current.daysPerSecond = basePace * SPEED_MULTIPLIERS[speed]!;
+  }, [speed, basePace, config.guided, freePlay]);
+
+  /* Guided tour: camera + orbit every frame, layers on the React tick. */
+  const setTourFrame = tour?.setOnFrame;
+  const tourWelcomeRef = useRef(true);
+  const tourFreeRef = useRef(false);
+  const playingStateRef = useRef(false);
+  const handsOffOffset = useRef(0);
+  const wasHandsOff = useRef(false);
+  tourWelcomeRef.current = Boolean(tour?.showWelcome);
+  tourFreeRef.current = freePlay;
+  playingStateRef.current = playing;
+  useEffect(() => {
+    if (!setTourFrame) return;
+    setTourFrame((s: ChapterSimState) => {
+      if (tourFreeRef.current) return;
+      const dpy = s.solarDaysPerYear + 1;
+      const guidedDay = s.orbitalPosition * dpy;
+      const welcome = tourWelcomeRef.current;
+      const handsOff = s.handsOff;
+
+      if (welcome || handsOff) {
+        clock.current.playing = welcome ? true : playingStateRef.current;
+        clock.current.daysPerSecond = welcome
+          ? 0.35
+          : basePaceRef.current * SPEED_MULTIPLIERS[speedRef.current]!;
+        handsOffOffset.current = clock.current.day - guidedDay;
+        wasHandsOff.current = true;
+      } else {
+        if (wasHandsOff.current) {
+          handsOffOffset.current = clock.current.day - guidedDay;
+          wasHandsOff.current = false;
+        }
+        clock.current.playing = false;
+      }
+
+      if (!welcome && !handsOff) {
+        clock.current.day = guidedDay + handsOffOffset.current;
+      }
+
+      const cm = cameraMeddle.current;
+      if (cm && !welcome && !handsOff) {
+        if (cm.frozen || cm.releasedAt === null) {
+          camera.current.yaw = cm.value.yaw;
+          camera.current.pitch = cm.value.pitch;
+          camera.current.distance = cm.value.distance;
+        } else {
+          const now = performance.now();
+          const yaw = mixMeddle(now, s.cameraYaw, { ...cm, value: cm.value.yaw }, true);
+          const pitch = mixMeddle(now, s.cameraPitch, { ...cm, value: cm.value.pitch });
+          const dist = mixMeddle(now, s.cameraDistance, { ...cm, value: cm.value.distance });
+          camera.current.yaw = yaw.value;
+          camera.current.pitch = pitch.value;
+          camera.current.distance = dist.value;
+          if (yaw.done && pitch.done && dist.done) cameraMeddle.current = null;
+        }
+      } else if (!welcome && !handsOff && !cm) {
+        camera.current.yaw = s.cameraYaw;
+        camera.current.pitch = s.cameraPitch;
+        camera.current.distance = s.cameraDistance;
+      }
+    });
+  }, [setTourFrame]);
+
+  const tourState = tour?.state;
+  const tourChapterId = tour?.chapter.id;
+  /* The chapter object itself, for the reset below. Held in a ref so the
+     reset stays keyed on the *id* — it must run when the chapter changes and
+     not on every sampled frame. */
+  const tourChapterRef = useRef<Chapter | null>(null);
+  tourChapterRef.current = tour?.chapter ?? null;
+  useEffect(() => {
+    cameraMeddle.current = null;
+    handsOffOffset.current = 0;
+    wasHandsOff.current = false;
+    const ch = tourChapterRef.current;
+    if (!ch) return;
+    const s = ch.defaults;
+    camera.current = cameraFromChapter(s);
+    clock.current.day = s.orbitalPosition * (s.solarDaysPerYear + 1);
+    if (!ch.free) return;
+    setSolarDaysPerYear(s.solarDaysPerYear);
+    setEccentricity(s.eccentricity);
+    setTiltDeg(s.tiltDeg);
+    setCameraTarget(s.cameraTarget);
+    setCameraFollow(s.cameraFollow);
+    setGraphOpen(false);
+    setOverlay("");
+    setStill("");
+    setToggles(togglesFromChapter(s));
+    setPreset(s.planet === "earth" ? "" : s.planet);
+    clock.current.playing = false;
+    setPlaying(false);
+  }, [tourChapterId]);
+
+  useEffect(() => {
+    if (!tourState || tour?.chapter.free) return;
+    /* Hands-off: the chapter has given the panel back. Keep writing graph /
+       overlay-driven UI from `tour.state` elsewhere, but do not stomp focus,
+       filters or sliders. */
+    if (tourState.handsOff) return;
+    setSolarDaysPerYear(tourState.solarDaysPerYear);
+    setEccentricity(tourState.eccentricity);
+    setTiltDeg(tourState.tiltDeg);
+    setCameraTarget(tourState.cameraTarget);
+    setCameraFollow(tourState.cameraFollow);
+    setGraphOpen(tourState.graphOpen);
+    setOverlay(tourState.overlay);
+    setStill(tourState.still);
+    setToggles(togglesFromChapter(tourState));
+    setPreset(tourState.planet === "earth" ? "" : tourState.planet);
+  }, [tourState, tour?.chapter.free]);
+
+  const tourHandsOff = Boolean(tourState?.handsOff);
+  /**
+   * What the chrome shows during a chapter.
+   *
+   * The ported Minute Labs chapters want a bare scene — the corner readout
+   * and the clock columns would be talking over the narration. The calendar
+   * chapters want the opposite: the point of watching the Sun cross a
+   * boundary is reading which महिना just began. So a chapter asks, and
+   * outside a chapter everything is on.
+   *
+   * The transport is a third question again. A year scrubber while keyframes
+   * are driving the orbit is a control that does nothing, so it waits for
+   * the chapter to hand the instruments back.
+   */
+  const showHud = !lesson || Boolean(tourState?.hud);
+  const showReadings = !lesson || Boolean(tourState?.readings);
+  const showTransport = !lesson || tourHandsOff;
+  const wasTourHandsOff = useRef(false);
+  useEffect(() => {
+    const on = Boolean(lesson && tourState?.handsOff);
+    if (on && !wasTourHandsOff.current) setPlaying(true);
+    wasTourHandsOff.current = on;
+  }, [lesson, tourState?.handsOff]);
 
   const onSample = useCallback((s: SceneSample) => {
     setSample(s);
@@ -351,6 +556,26 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
 
   /* ── gestures ─────────────────────────────────────────────────────── */
   const gestureStart = useRef({ yaw: 0, pitch: 0, distance: 0, pinch: 0 });
+
+  /**
+   * Freeze the camera meddle at its current value — a grab has started.
+   * A no-op during free explore: there the camera already fully belongs to
+   * the reader, with no keyframes to ease back to.
+   */
+  const grabCamera = useCallback(() => {
+    if (tourFreeRef.current) return;
+    cameraMeddle.current = { frozen: true, releasedAt: null, value: { ...camera.current } };
+  }, []);
+  /** Let go — starts the hold-then-ease-back timer in `mixMeddle`. */
+  const releaseCamera = useCallback(() => {
+    if (tourFreeRef.current) return;
+    const slot = cameraMeddle.current;
+    if (!slot) return;
+    slot.frozen = false;
+    slot.releasedAt = performance.now();
+    slot.value = { ...camera.current };
+  }, []);
+
   const responder = useMemo(
     () =>
       PanResponder.create({
@@ -358,6 +583,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         onMoveShouldSetPanResponder: (_e, g) => Math.hypot(g.dx, g.dy) > 2,
         onPanResponderGrant: () => {
           gestureStart.current = { ...camera.current, pinch: 0 };
+          grabCamera();
         },
         onPanResponderMove: (e, g) => {
           const touches = e.nativeEvent.touches;
@@ -373,26 +599,45 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
             camera.current.distance = clampDistance(
               gestureStart.current.distance * (gestureStart.current.pinch / spread),
             );
+            if (cameraMeddle.current) {
+              cameraMeddle.current.frozen = true;
+              cameraMeddle.current.value = { ...camera.current };
+            }
             return;
           }
           /* Drag the system, not the camera — pull right and the far side swings
              right, which means the camera itself travels the other way. */
           camera.current.yaw = gestureStart.current.yaw - g.dx * 0.006;
           camera.current.pitch = clampPitch(gestureStart.current.pitch + g.dy * 0.005);
+          if (cameraMeddle.current) {
+            cameraMeddle.current.frozen = true;
+            cameraMeddle.current.value = { ...camera.current };
+          }
         },
+        onPanResponderRelease: releaseCamera,
+        onPanResponderTerminate: releaseCamera,
       }),
-    [],
+    [grabCamera, releaseCamera],
   );
 
-  const zoomBy = useCallback((factor: number) => {
-    camera.current.distance = clampDistance(camera.current.distance * factor);
-  }, []);
+  const zoomBy = useCallback(
+    (factor: number) => {
+      camera.current.distance = clampDistance(camera.current.distance * factor);
+      /* A tap, not a hold — grab and release in the same beat so the same
+         hold-then-ease-back timing as a drag kicks in immediately. */
+      grabCamera();
+      releaseCamera();
+    },
+    [grabCamera, releaseCamera],
+  );
 
   const resetView = useCallback(() => {
     camera.current.yaw = initial.camera.yaw;
     camera.current.pitch = initial.camera.pitch;
     camera.current.distance = initial.camera.distance;
-  }, [initial]);
+    grabCamera();
+    releaseCamera();
+  }, [initial, grabCamera, releaseCamera]);
 
   const canvasHeight = fullscreen ? windowHeight : CARD_HEIGHT;
   const overlayTop = fullscreen ? Math.max(insets.top, 24) + 12 : 10;
@@ -784,6 +1029,8 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
           </View>
         ) : null}
 
+        {tour ? <DayChapterWelcome player={tour} /> : null}
+
         {/* Latin digits and a fixed-width feel on purpose: this is an
             instrument, not a reading, and a number that changes script with the
             app's language is harder to compare against a note in a doc. */}
@@ -804,36 +1051,39 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
           </View>
         ) : null}
 
-        {/* सूर्यको राशि, its बिक्रम month, and the equation of time. */}
-        <View
-          pointerEvents="none"
-          className="absolute left-2.5 rounded-lg bg-black/50 px-2.5 py-1.5"
-          style={{ top: overlayTop }}
-        >
-          <Text
-            className="text-[12px] font-bold uppercase tracking-wide"
-            style={[nepaliTextStyle(9), { color: "rgba(255,255,255,0.5)", fontSize: 9 }]}
+        {/* सूर्यको राशि, its बिक्रम month, and the equation of time. Off during
+            a lesson unless the running chapter asks for it — see `showHud`. */}
+        {showHud ? (
+          <View
+            pointerEvents="none"
+            className="absolute left-2.5 rounded-lg bg-black/50 px-2.5 py-1.5"
+            style={{ top: overlayTop }}
           >
-            {pick("सूर्य राशि · महिना", "Sun's rashi · month")}
-          </Text>
-          <Text
-            className="text-[13px] font-bold"
-            style={[nepaliTextStyle(13), { color: "#ffffff", fontSize: 13 }]}
-          >
-            {`${rashiNames[rashi]} · ${monthNames[rashi]}`}
-          </Text>
-          <Text
-            className="text-[13px] font-bold"
-            style={[nepaliTextStyle(13), { color: TONE.solar, fontSize: 13 }]}
-          >
-            {`${eotMinutes >= 0 ? "+" : "−"}${num(Math.abs(eotMinutes).toFixed(1))} ${pick(
-              "मिनेट",
-              "min",
-            )}`}
-          </Text>
-        </View>
+            <Text
+              className="text-[12px] font-bold uppercase tracking-wide"
+              style={[nepaliTextStyle(9), { color: "rgba(255,255,255,0.5)", fontSize: 9 }]}
+            >
+              {pick("सूर्य राशि · महिना", "Sun's rashi · month")}
+            </Text>
+            <Text
+              className="text-[13px] font-bold"
+              style={[nepaliTextStyle(13), { color: "#ffffff", fontSize: 13 }]}
+            >
+              {`${rashiNames[rashi]} · ${monthNames[rashi]}`}
+            </Text>
+            <Text
+              className="text-[13px] font-bold"
+              style={[nepaliTextStyle(13), { color: TONE.solar, fontSize: 13 }]}
+            >
+              {`${eotMinutes >= 0 ? "+" : "−"}${num(Math.abs(eotMinutes).toFixed(1))} ${pick(
+                "मिनेट",
+                "min",
+              )}`}
+            </Text>
+          </View>
+        ) : null}
 
-        {flash !== null ? (
+        {showHud && flash !== null ? (
           <View
             pointerEvents="none"
             className="absolute inset-x-0 items-center"
@@ -909,6 +1159,17 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
         </View>
       ) : null}
 
+      {/* Under the corner readout, opposite the diagram panel — the three can
+          all be up at once without stacking. */}
+      {still ? (
+        <ChapterStill key={still} src={still} captionKey={tourState?.stillKey || undefined} onClose={() => setStill("")} />
+      ) : null}
+
+      {tourState?.tip ? <ChapterTip key={tourState.tip} tipKey={tourState.tip} /> : null}
+
+      {/* Opposite corner from the graph, so a chapter can raise both. */}
+      {overlay ? <ChapterOverlay id={overlay} onClose={() => setOverlay("")} /> : null}
+
       {sheet === "controls" ? controlsSheet : null}
       {sheet === "focus" ? focusSheet : null}
       </View>
@@ -926,46 +1187,58 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
             : { backgroundColor: "rgba(4, 7, 13, 0.92)" }
         }
       >
+        {tour ? (
+          <DayChapterBar
+            player={tour}
+            orbitPlaying={freePlay ? playing : undefined}
+            onOrbitToggle={freePlay ? () => setPlaying((v) => !v) : undefined}
+          />
+        ) : null}
+
         {filterChips}
 
-        <View className="flex-row items-center gap-2">
-          <Pressable
-            onPress={() => setPlaying((v) => !v)}
-            accessibilityRole="button"
-            accessibilityLabel={playing ? pick("रोक्नुहोस्", "Pause") : pick("चलाउनुहोस्", "Play")}
-            className="h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-white/10"
-          >
-            <Ionicons name={playing ? "pause" : "play"} size={16} color="#f1f5f9" />
-          </Pressable>
-          <Slider
-            style={{ flex: 1, height: 34 }}
-            value={day}
-            minimumValue={0}
-            maximumValue={daysPerYear}
-            onValueChange={(v) => {
-              clock.current.day = v;
-              setPlaying(false);
-            }}
-            minimumTrackTintColor="#f4c542"
-            maximumTrackTintColor="rgba(148, 163, 184, 0.45)"
-            thumbTintColor="#f4c542"
-            accessibilityLabel={pick("वर्षभरि सार्नुहोस्", "Scrub through the year")}
-          />
-          <Pressable
-            onPress={() => setDetailsOpen((v) => !v)}
-            accessibilityRole="button"
-            accessibilityLabel={
-              detailsOpen ? pick("लुकाउनुहोस्", "Hide readings") : pick("देखाउनुहोस्", "Show readings")
-            }
-            className="h-8 w-8 items-center justify-center rounded-full border border-white/20"
-          >
-            <Ionicons
-              name={detailsOpen ? "chevron-down" : "chevron-up"}
-              size={14}
-              color="rgba(255,255,255,0.75)"
+        {showTransport ? (
+          <View className="flex-row items-center gap-2">
+            {tour ? null : (
+              <Pressable
+                onPress={() => setPlaying((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={playing ? pick("रोक्नुहोस्", "Pause") : pick("चलाउनुहोस्", "Play")}
+                className="h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-white/10"
+              >
+                <Ionicons name={playing ? "pause" : "play"} size={16} color="#f1f5f9" />
+              </Pressable>
+            )}
+            <Slider
+              style={{ flex: 1, height: 34 }}
+              value={day}
+              minimumValue={0}
+              maximumValue={daysPerYear}
+              onValueChange={(v) => {
+                clock.current.day = v;
+                setPlaying(false);
+              }}
+              minimumTrackTintColor="#f4c542"
+              maximumTrackTintColor="rgba(148, 163, 184, 0.45)"
+              thumbTintColor="#f4c542"
+              accessibilityLabel={pick("वर्षभरि सार्नुहोस्", "Scrub through the year")}
             />
-          </Pressable>
-        </View>
+            <Pressable
+              onPress={() => setDetailsOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                detailsOpen ? pick("लुकाउनुहोस्", "Hide readings") : pick("देखाउनुहोस्", "Show readings")
+              }
+              className="h-8 w-8 items-center justify-center rounded-full border border-white/20"
+            >
+              <Ionicons
+                name={detailsOpen ? "chevron-down" : "chevron-up"}
+                size={14}
+                color="rgba(255,255,255,0.75)"
+              />
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* The three clock faces alone do not carry the point at speed: a year
             mode runs twelve rotations a second, so each face lands on a new
@@ -975,7 +1248,7 @@ export function DayPlayground({ config, title }: DayPlaygroundProps) {
             by year's end it is exactly the numbers the article is about: 24h for
             the sidereal clock (the extra turn), ±16 min for the true Sun (the
             equation of time). */}
-        {detailsOpen ? (
+        {showReadings && detailsOpen ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}

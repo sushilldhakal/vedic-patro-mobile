@@ -16,11 +16,16 @@ import {
   YogaList,
 } from "@/components/kundali/KundaliSections";
 import { ShantiVidhiPanel } from "@/components/kundali/ShantiVidhiPanel";
+import { KundaliSubTabs } from "@/components/kundali/KundaliSubTabs";
 import { KundaliReport } from "@/components/kundali/KundaliReport";
 import type { KundaliDetailResponse, LocationParams } from "@/lib/api";
 import type { InstantQuery } from "@/lib/instant-query";
 import type { AyanamshaMode } from "@/lib/ayanamsha";
-import type { KundaliSectionId } from "@/lib/kundali/kundali-section-nav";
+import {
+  dashaSectionId,
+  dashaSystemFromSection,
+  type KundaliSectionId,
+} from "@/lib/kundali/kundali-section-nav";
 import { useLocale } from "@/lib/i18n";
 import { buildPresentYogaRefIds } from "@/lib/kundali/yoga-reference-map";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -33,6 +38,8 @@ type Props = {
   birthMoment?: InstantQuery | null;
   birthLocation?: LocationParams;
   reportDisabled?: boolean;
+  /** Jump to another section — wires DashaSystemPanel's own tabs into the nav. */
+  onNavigate?: (id: KundaliSectionId) => void;
 };
 
 export function KundaliDetailView({
@@ -43,10 +50,18 @@ export function KundaliDetailView({
   birthMoment,
   birthLocation,
   reportDisabled,
+  onNavigate,
 }: Props) {
   const { pick } = useLocale();
   const d1Rows = detail.vargaCharts.entries["1"] ?? [];
   const show = (id: KundaliSectionId) => section === id;
+  const dashaSystem = dashaSystemFromSection(section) ?? "vimshottari";
+  const balaTabItems: { id: KundaliSectionId; label: string }[] = [
+    { id: "kundali-shadbala", label: pick("षड्बल", "Shadbala") },
+    { id: "kundali-bhava-bala", label: pick("भाव बल", "Bhava bala") },
+    { id: "kundali-ashtakavarga", label: pick("अष्टकवर्ग", "Ashtakavarga") },
+    { id: "kundali-vimshopaka", label: pick("विंशोपक बल", "Vimshopaka") },
+  ];
   const presentRefIds = useMemo(() => buildPresentYogaRefIds(detail.yogas), [detail.yogas]);
   const hasPresentYogas = detail.yogas.some((y) => y.present);
 
@@ -104,7 +119,7 @@ export function KundaliDetailView({
         </KundaliSection>
       ) : null}
 
-      {show("kundali-dasha") &&
+      {dashaSystemFromSection(section) != null &&
       (detail.dasha || detail.tribhagiDasha || detail.yoginiDasha) ? (
         <KundaliSection title={pick("दशा", "Dasha")} subtitle={pick("दशा प्रणाली", "Dasha systems")} icon="time-outline">
           <DashaSystemPanel
@@ -112,6 +127,8 @@ export function KundaliDetailView({
             tribhagi={detail.tribhagiDasha}
             yogini={detail.yoginiDasha}
             timeZone={timeZone ?? detail.panchanga.location?.timezone ?? "Asia/Kathmandu"}
+            active={dashaSystem}
+            onActiveChange={(system) => onNavigate?.(dashaSectionId(system))}
           />
         </KundaliSection>
       ) : null}
@@ -122,6 +139,9 @@ export function KundaliDetailView({
           subtitle={pick("ग्रह बल — रूपमा", "Planetary strength in rupas")}
           icon="barbell-outline"
         >
+          {onNavigate ? (
+            <KundaliSubTabs items={balaTabItems} activeId="kundali-shadbala" onSelect={onNavigate} />
+          ) : null}
           <ShadbalaCard
             data={detail.shadbala}
             yuddha={detail.yuddha}
@@ -133,8 +153,16 @@ export function KundaliDetailView({
 
       {show("kundali-bhava-bala") ? (
         <KundaliSection title={pick("भाव बल", "Bhava bala")} icon="stats-chart-outline">
+          {onNavigate ? (
+            <KundaliSubTabs items={balaTabItems} activeId="kundali-bhava-bala" onSelect={onNavigate} />
+          ) : null}
           {detail.bhavaBala ? (
-            <BhavaBalaCard data={detail.bhavaBala} compactHeader />
+            <BhavaBalaCard
+              data={detail.bhavaBala}
+              compactHeader
+              vargaCharts={detail.vargaCharts}
+              combustion={detail.combustion}
+            />
           ) : (
             <Text className="py-8 text-center text-sm text-muted-foreground" style={nepaliTextStyle(14)}>
               {pick("यो खण्ड उपलब्ध छैन।", "This section is not available.")}
@@ -145,6 +173,9 @@ export function KundaliDetailView({
 
       {show("kundali-ashtakavarga") ? (
         <KundaliSection title={pick("अष्टकवर्ग", "Ashtakavarga")} icon="apps-outline">
+          {onNavigate ? (
+            <KundaliSubTabs items={balaTabItems} activeId="kundali-ashtakavarga" onSelect={onNavigate} />
+          ) : null}
           {detail.ashtakavarga ? (
             <AshtakavargaCard data={detail.ashtakavarga} compactHeader />
           ) : (
@@ -161,6 +192,11 @@ export function KundaliDetailView({
           icon="grid-outline"
           edgeToEdgeContent
         >
+          {onNavigate ? (
+            <View className="px-3">
+              <KundaliSubTabs items={balaTabItems} activeId="kundali-vimshopaka" onSelect={onNavigate} />
+            </View>
+          ) : null}
           {detail.vimshopaka && detail.vimshopaka.classifications.length > 0 ? (
             <VimshopakaCard data={detail.vimshopaka} compactHeader />
           ) : (

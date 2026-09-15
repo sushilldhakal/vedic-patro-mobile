@@ -3,6 +3,7 @@ import { Pressable, View, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
+import { ShadbalaChart } from "@/components/kundali/ShadbalaChart";
 import {
   TableHeader,
   TableHeaderCell,
@@ -21,6 +22,7 @@ import type {
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { kundaliLabel } from "@/lib/kundali/kundali-i18n";
+import { KALA_SUBS, STHANA_SUBS, orderShadbalaPlanets, yuddhaVirupasForPlanet } from "@/lib/kundali/shadbala-display";
 import { nepaliTextStyle } from "@/lib/nepali-text";
 import { useBreakpoint } from "@/lib/responsive";
 import { colorWithAlpha } from "@/lib/theme";
@@ -51,28 +53,6 @@ const STATUS_COLORS: Record<ShadbalaStatus, string> = {
   Weak: "#dc2626",
 };
 
-const PLANET_ORDER = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn"];
-
-const STHANA_SUBS: { key: string; ne: string; en: string }[] = [
-  { key: "uchcha", ne: "उच्च", en: "Uchcha" },
-  { key: "saptavargaja", ne: "सप्त वर्गीय", en: "Sapta Vargiya" },
-  { key: "oja_yugma", ne: "ओज युग्म", en: "Oja Yugma" },
-  { key: "kendradi", ne: "केन्द्रादि", en: "Kendradi" },
-  { key: "drekkana", ne: "द्रेक्काण", en: "Drekkana" },
-];
-
-const KALA_SUBS: { key: string; ne: string; en: string }[] = [
-  { key: "nathonnatha", ne: "नता उन्नत", en: "Nata Unnata" },
-  { key: "paksha", ne: "पक्ष", en: "Paksha" },
-  { key: "tribhaga", ne: "त्रि भाग", en: "Tri Bhaga" },
-  { key: "varshadhipati", ne: "वर्षाधिपति", en: "Varshadhipati" },
-  { key: "masadhipati", ne: "मासाधिपति", en: "Masadhipati" },
-  { key: "varadhipati", ne: "वाराधिपति", en: "Varadhipati" },
-  { key: "horadhipati", ne: "होराधिपति", en: "Horadhipati" },
-  { key: "ayana", ne: "अयन", en: "Ayana" },
-  { key: "yuddha", ne: "युद्ध", en: "Yuddha" },
-];
-
 const LABEL_COL = 132;
 const PLANET_COL = 88;
 const TABLE_STRETCH = true;
@@ -101,12 +81,6 @@ function fmt(value: number | undefined, digits: (v: string | number) => string, 
   const abs = Math.abs(value).toFixed(places);
   const signed = value < 0 ? `−${abs}` : abs;
   return digits(signed);
-}
-
-function yuddhaVirupasForPlanet(planet: ShadbalaPlanet, yuddha: YuddhaData): number {
-  const api = planet.sub_balas?.kala?.yuddha;
-  if (api != null && api !== 0) return api;
-  return yuddha.byPlanet[planet.key] ?? 0;
 }
 
 function StatusBadge({ status }: { status: ShadbalaStatus }) {
@@ -163,6 +137,7 @@ function MatrixRow({
   onToggle,
   sub,
   rowIndex,
+  selectedKey,
 }: {
   label: string;
   planets: ShadbalaPlanet[];
@@ -173,6 +148,7 @@ function MatrixRow({
   onToggle?: () => void;
   sub?: boolean;
   rowIndex: number;
+  selectedKey?: string;
 }) {
   const colors = useThemeColors();
 
@@ -223,6 +199,7 @@ function MatrixRow({
             ...tableColumnLayout(TABLE_STRETCH, PLANET_COL),
             paddingHorizontal: 6,
             paddingVertical: 6,
+            backgroundColor: selectedKey === p.key ? colorWithAlpha(colors.primary, 0.1) : undefined,
           }}
           className="items-end justify-center"
         >
@@ -261,6 +238,7 @@ export function ShadbalaCard({
   const [contentWidth, setContentWidth] = useState(0);
   const [openSthana, setOpenSthana] = useState(false);
   const [openKala, setOpenKala] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string>("sun");
 
   const effectiveWidth = contentWidth || windowWidth;
   const glanceCols = useMemo(() => glanceColumnCount(effectiveWidth), [effectiveWidth]);
@@ -271,13 +249,7 @@ export function ShadbalaCard({
 
   const { planets, summary } = data;
 
-  const ordered = useMemo(
-    () =>
-      PLANET_ORDER.map((key) => planets.find((p) => p.key === key)).filter(
-        (p): p is ShadbalaPlanet => p != null,
-      ),
-    [planets],
-  );
+  const ordered = useMemo(() => orderShadbalaPlanets(planets), [planets]);
 
   const rankByKey = useMemo(
     () =>
@@ -404,6 +376,8 @@ export function ShadbalaCard({
         </View>
       </View>
 
+      <ShadbalaChart planets={ordered} selectedKey={selectedKey} onSelect={setSelectedKey} yuddha={yuddha} />
+
       <View>
         <Text className="mb-2 text-sm font-semibold text-foreground" style={nepaliTextStyle(13)}>
           {kundaliLabel("shadbala_table", lang)}
@@ -427,6 +401,8 @@ export function ShadbalaCard({
                   flex={PLANET_COL}
                   minWidth={Math.round(PLANET_COL * 0.72)}
                   compact
+                  onPress={() => setSelectedKey(p.key)}
+                  className={p.key === selectedKey ? "bg-primary/10" : undefined}
                 >
                   <View className="w-full flex-row items-center justify-end gap-1">
                     <GrahaPlanetIcon graha={p.key as GrahaKey} size={18} />
@@ -442,6 +418,7 @@ export function ShadbalaCard({
               rowIndex={matrixRowIndex++}
               label={rowLabel("सापेक्ष क्रम", "Relative Rank")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => digits(String(rankByKey.get(p.key) ?? "—"))}
               bold
             />
@@ -449,6 +426,7 @@ export function ShadbalaCard({
               rowIndex={matrixRowIndex++}
               label={rowLabel("स्थान", "Sthana")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.breakdown.sthana, digits)}
               expandable={hasSubs}
               open={openSthana}
@@ -461,6 +439,7 @@ export function ShadbalaCard({
                     rowIndex={matrixRowIndex++}
                     label={pick(row.ne, row.en)}
                     planets={ordered}
+                    selectedKey={selectedKey}
                     value={(p) => fmt(p.sub_balas?.sthana?.[row.key], digits)}
                     sub
                   />
@@ -470,12 +449,14 @@ export function ShadbalaCard({
               rowIndex={matrixRowIndex++}
               label={rowLabel("दिशा", "Disha")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.breakdown.dig, digits)}
             />
             <MatrixRow
               rowIndex={matrixRowIndex++}
               label={rowLabel("काल", "Kala")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.breakdown.kala, digits)}
               expandable={hasSubs}
               open={openKala}
@@ -488,6 +469,7 @@ export function ShadbalaCard({
                     rowIndex={matrixRowIndex++}
                     label={pick(row.ne, row.en)}
                     planets={ordered}
+                    selectedKey={selectedKey}
                     value={(p) =>
                       row.key === "yuddha" && yuddha
                         ? fmt(yuddhaVirupasForPlanet(p, yuddha), digits)
@@ -501,24 +483,28 @@ export function ShadbalaCard({
               rowIndex={matrixRowIndex++}
               label={rowLabel("चेष्टा", "Chesta")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.breakdown.cheshta, digits)}
             />
             <MatrixRow
               rowIndex={matrixRowIndex++}
               label={rowLabel("नैसर्गिक", "Naisargika")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.breakdown.naisargika, digits)}
             />
             <MatrixRow
               rowIndex={matrixRowIndex++}
               label={rowLabel("दृष्टि", "Drishti")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.breakdown.drik, digits)}
             />
             <MatrixRow
               rowIndex={matrixRowIndex++}
               label={rowLabel("कुल पिण्ड", "Total Pinda")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.total_virupas, digits)}
               bold
             />
@@ -526,18 +512,21 @@ export function ShadbalaCard({
               rowIndex={matrixRowIndex++}
               label={rowLabel("रूप", "Rupas")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.rupas, digits)}
             />
             <MatrixRow
               rowIndex={matrixRowIndex++}
               label={rowLabel("न्यूनतम आवश्यक", "Min. Require")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.required / 60, digits)}
             />
             <MatrixRow
               rowIndex={matrixRowIndex++}
               label={rowLabel("शक्ति अनुपात", "Strength Ratio")}
               planets={ordered}
+              selectedKey={selectedKey}
               value={(p) => fmt(p.ratio, digits, 4)}
               bold
             />
@@ -546,6 +535,7 @@ export function ShadbalaCard({
                 rowIndex={matrixRowIndex++}
                 label={rowLabel("भाव (% मा)", "Bhava (in %)")}
                 planets={ordered}
+                selectedKey={selectedKey}
                 value={(p) => {
                   const pct = bhavaBala.rulershipPercent[p.key];
                   return pct != null ? `${digits(pct.toFixed(1))}%` : "—";
@@ -559,12 +549,14 @@ export function ShadbalaCard({
                   rowIndex={matrixRowIndex++}
                   label={rowLabel("इष्ट फल", "Ishta Phala")}
                   planets={ordered}
+                  selectedKey={selectedKey}
                   value={(p) => fmt(p.ishta_phala, digits)}
                 />
                 <MatrixRow
                   rowIndex={matrixRowIndex++}
                   label={rowLabel("कष्ट फल", "Kashta Phala")}
                   planets={ordered}
+                  selectedKey={selectedKey}
                   value={(p) => fmt(p.kashta_phala, digits)}
                 />
               </>
@@ -589,6 +581,7 @@ export function ShadbalaCard({
                     ...tableColumnLayout(TABLE_STRETCH, PLANET_COL),
                     paddingHorizontal: 6,
                     paddingVertical: 6,
+                    backgroundColor: p.key === selectedKey ? colorWithAlpha(colors.primary, 0.1) : undefined,
                   }}
                   className="items-end justify-center"
                 >

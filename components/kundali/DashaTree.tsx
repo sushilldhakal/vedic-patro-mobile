@@ -95,6 +95,39 @@ function displayLordName(span: SpanWithChildren, lang: "ne" | "en", system: Dash
   return lang === "en" ? DASHA_LORD_EN[lord] ?? span.lordNe : DASHA_LORD_NE[lord] ?? span.lordNe;
 }
 
+function isRunning(span: SpanWithChildren | undefined, now: number): boolean {
+  return span != null && span.start.getTime() <= now && now < span.end.getTime();
+}
+
+function findRunning(spans: SpanWithChildren[] | undefined, now: number): SpanWithChildren | undefined {
+  return spans?.find((s) => isRunning(s, now));
+}
+
+/** Every period at one level under `parent` — fetched only when the API
+ * didn't already embed them (pratyantar and deeper come from a lazy
+ * /kundali/dasha/expand call, cached by React Query once fetched). A fixed
+ * 4-call chain (see `DashaTree`) keeps every render calling the same number
+ * of hooks regardless of how deep this chart's `maxLevel` goes — React's
+ * rules of hooks forbid a variable-length loop of `useQuery`. */
+function useLevelChildren(
+  parent: SpanWithChildren | undefined,
+  system: DashaSystem,
+  parentLevel: number,
+  maxLevel: number,
+): SpanWithChildren[] | undefined {
+  const enabled = parent != null && parentLevel < maxLevel && parent.childNodes == null;
+  const startIso = parent?.start.toISOString() ?? "";
+  const endIso = parent?.end.toISOString() ?? "";
+  const q = useQuery({
+    queryKey: dashaExpandKeys.span(parent?.lord ?? "", startIso, endIso, system),
+    queryFn: () => fetchDashaChildren(parent!.lord, startIso, endIso, system),
+    enabled,
+    staleTime: Infinity,
+  });
+  if (parent == null || parentLevel >= maxLevel) return undefined;
+  return (parent.childNodes ?? q.data?.children)?.map(toSpan);
+}
+
 function DashaLordIcon({
   lord,
   system,
@@ -378,6 +411,143 @@ function DashaNode({
   );
 }
 
+function ChainStackRow({
+  span,
+  level,
+  system,
+  lang,
+  pick,
+  digits,
+  timeZone,
+  now,
+  isLast,
+  colors,
+}: {
+  span: SpanWithChildren;
+  level: number;
+  system: DashaSystem;
+  lang: "ne" | "en";
+  pick: (ne: string, en: string) => string;
+  digits: (v: string | number) => string;
+  timeZone?: string;
+  now: number;
+  isLast: boolean;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  const running = isRunning(span, now);
+
+  return (
+    <View className="px-4 py-3">
+      <View className="flex-row flex-wrap items-center gap-2">
+        <DashaLordIcon lord={span.lord} system={system} size={26} />
+        <Text className="flex-1 text-base font-bold text-foreground" style={nepaliTextStyle(15)}>
+          {displayLordName(span, lang, system)}
+          <Text className="font-normal text-muted-foreground"> — {pick(LEVEL_LABELS[level]!.ne, LEVEL_LABELS[level]!.en)}</Text>
+        </Text>
+        {running && (
+          <View
+            style={{ backgroundColor: colorWithAlpha(colors.secondary, 0.15) }}
+            className="shrink-0 rounded-full px-2 py-0.5"
+          >
+            <Text style={{ color: colors.secondary }} className="text-xs font-bold">
+              {pick("चलिरहेको", "Running")}
+            </Text>
+          </View>
+        )}
+      </View>
+      <View className="mt-1.5 gap-1 pl-1">
+        <View className="flex-row items-center gap-1.5">
+          <Ionicons name="arrow-forward" size={14} color={colors.mutedForeground} />
+          <Text className="text-sm text-foreground/80" style={nepaliTextStyle(13)}>
+            {formatDashaMoment(span.start, lang, timeZone, digits)}
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-1.5">
+          <Ionicons name="arrow-forward" size={14} color={colors.foreground} />
+          <Text className="text-sm text-foreground/80" style={nepaliTextStyle(13)}>
+            {formatDashaMoment(span.end, lang, timeZone, digits)}
+          </Text>
+        </View>
+      </View>
+      <View className="mt-1.5 flex-row flex-wrap gap-x-5 gap-y-1 pl-1">
+        <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+          {pick("कुल", "Total")} —{" "}
+          <Text className="font-semibold text-foreground">
+            {digits(formatDashaDuration(span.end.getTime() - span.start.getTime(), lang))}
+          </Text>
+        </Text>
+        {running && (
+          <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
+            {pick("बाँकी", "Left")} —{" "}
+            <Text className="font-semibold text-foreground">
+              {digits(formatDashaDuration(span.end.getTime() - now, lang))}
+            </Text>
+          </Text>
+        )}
+      </View>
+      <SpanProgress start={span.start} end={span.end} now={now} running={running} secondary={colors.secondary} />
+      {isLast ? <DashaDurationGrid start={span.start} end={span.end} lang={lang} digits={digits} /> : null}
+    </View>
+  );
+}
+
+/**
+ * The full active chain — Mahadasha down to whatever level is known — as one
+ * unified stack, each level a plain row connected by a down-arrow. Nothing
+ * here is collapsed or click-gated: every level's begin/end/total/left is
+ * visible the instant the page loads, so "what's running right now" needs
+ * no expanding and no scrolling to find.
+ */
+function ChainStack({
+  path,
+  system,
+  now,
+  timeZone,
+  lang,
+  pick,
+  digits,
+  colors,
+}: {
+  path: SpanWithChildren[];
+  system: DashaSystem;
+  now: number;
+  timeZone?: string;
+  lang: "ne" | "en";
+  pick: (ne: string, en: string) => string;
+  digits: (v: string | number) => string;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  if (path.length === 0) return null;
+  return (
+    <View
+      className="overflow-hidden rounded-xl border"
+      style={{ borderColor: colorWithAlpha(colors.border, 0.7), backgroundColor: colorWithAlpha(colors.muted, 0.4) }}
+    >
+      {path.map((span, i) => (
+        <View key={`${span.lord}-${i}`} style={i > 0 ? { borderTopWidth: 1, borderTopColor: colorWithAlpha(colors.border, 0.5) } : undefined}>
+          {i > 0 && (
+            <View className="items-center py-0.5">
+              <Ionicons name="arrow-down" size={16} color={colors.mutedForeground} />
+            </View>
+          )}
+          <ChainStackRow
+            span={span}
+            level={i}
+            system={system}
+            lang={lang}
+            pick={pick}
+            digits={digits}
+            timeZone={timeZone}
+            now={now}
+            isLast={i === path.length - 1}
+            colors={colors}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export type DashaTreeProps = {
   tree: DashaTreeNode[];
   timeZone?: string;
@@ -398,22 +568,59 @@ export function DashaTree({
   const [now] = useState(() => Date.now());
   const mahadashas = useMemo(() => tree.map(toSpan), [tree]);
 
-  const running = mahadashas.find((m) => m.start.getTime() <= now && now < m.end.getTime());
+  const p0 = findRunning(mahadashas, now);
+  const list1 = useLevelChildren(p0, system, 0, maxLevel);
+  const p1 = findRunning(list1, now);
+  const list2 = useLevelChildren(p1, system, 1, maxLevel);
+  const p2 = findRunning(list2, now);
+  const list3 = useLevelChildren(p2, system, 2, maxLevel);
+  const p3 = findRunning(list3, now);
+  const list4 = useLevelChildren(p3, system, 3, maxLevel);
+  const p4 = findRunning(list4, now);
+
+  const knownPath = [p0, p1, p2, p3, p4].filter((s): s is SpanWithChildren => s != null);
 
   const timelineStart = mahadashas[0]?.start;
   const timelineEnd = mahadashas[mahadashas.length - 1]?.end;
   const yoginiCycle =
-    running && cycleYears
+    p0 && cycleYears
       ? Math.floor(
-          (running.start.getTime() - (timelineStart?.getTime() ?? running.start.getTime())) /
+          (p0.start.getTime() - (timelineStart?.getTime() ?? p0.start.getTime())) /
             (cycleYears * 365.2425 * 86400000),
         ) + 1
       : null;
 
   return (
     <View className="gap-5">
+      {knownPath.length > 0 && (
+        <View className="gap-2">
+          <View className="flex-row flex-wrap items-center justify-between gap-2">
+            <Text className="text-sm font-bold uppercase tracking-wide text-secondary" style={nepaliTextStyle(13)}>
+              {kundaliLabel("dasha_running_now", lang)}
+            </Text>
+            {yoginiCycle ? (
+              <View className="rounded-full border border-border/60 bg-card px-2 py-0.5">
+                <Text className="text-xs font-semibold text-foreground" style={nepaliTextStyle(12)}>
+                  {pick(`चक्र: ${digits(yoginiCycle)}`, `Cycle: ${digits(yoginiCycle)}`)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <ChainStack
+            path={knownPath}
+            system={system}
+            now={now}
+            timeZone={timeZone}
+            lang={lang}
+            pick={pick}
+            digits={digits}
+            colors={colors}
+          />
+        </View>
+      )}
+
       {timelineStart && timelineEnd ? (
-        <View className="gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+        <View className="flex-row flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
           <View className="flex-row flex-wrap items-center gap-x-1">
             <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" style={nepaliTextStyle(11)}>
               {kundaliLabel("dasha_from", lang)}
@@ -433,101 +640,27 @@ export function DashaTree({
         </View>
       ) : null}
 
-      {running ? (
-        <View
-          className="overflow-hidden rounded-xl border px-4 py-3"
-          style={{
-            borderColor: colorWithAlpha(colors.secondary, 0.3),
-            backgroundColor: colorWithAlpha(colors.secondary, 0.06),
-          }}
+      <View>
+        <Text
+          className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          style={nepaliTextStyle(12)}
         >
-          <View
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 4,
-              backgroundColor: colors.secondary,
-            }}
-          />
-          <View className="flex-row flex-wrap items-center justify-between gap-2 pl-2">
-            <View className="flex-row flex-wrap items-center gap-2">
-              <DashaLordIcon lord={running.lord} system={system} size={20} />
-              <Text className="text-sm font-bold text-foreground" style={nepaliTextStyle(14)}>
-                {displayLordName(running, lang, system)}
-                <Text className="font-normal"> · </Text>
-                {kundaliLabel("dasha_maha", lang)}
-              </Text>
-            </View>
-            <View className="flex-row flex-wrap items-center gap-2">
-              {yoginiCycle ? (
-                <View className="rounded-full border border-border/60 bg-card px-2 py-0.5">
-                  <Text className="text-xs font-semibold text-foreground" style={nepaliTextStyle(12)}>
-                    {pick(`चक्र: ${digits(yoginiCycle)}`, `Cycle: ${digits(yoginiCycle)}`)}
-                  </Text>
-                </View>
-              ) : null}
-              <View
-                style={{ backgroundColor: colorWithAlpha(colors.secondary, 0.15) }}
-                className="rounded-full px-2 py-0.5"
-              >
-                <Text style={{ color: colors.secondary }} className="text-xs font-bold">
-                  {kundaliLabel("dasha_running_now", lang)}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <View className="mt-1.5 gap-0.5 pl-2">
-            <MomentLine
-              label={kundaliLabel("dasha_begin", lang)}
-              value={formatDashaMoment(running.start, lang, timeZone, digits)}
-            />
-            <MomentLine
-              label={kundaliLabel("dasha_end", lang)}
-              value={formatDashaMoment(running.end, lang, timeZone, digits)}
-            />
-          </View>
-          <DashaDurationGrid start={running.start} end={running.end} lang={lang} digits={digits} />
-          <View className="mt-2 flex-row flex-wrap gap-x-5 gap-y-1 pl-2">
-            <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
-              {kundaliLabel("dasha_total", lang)} —{" "}
-              <Text className="font-semibold text-foreground">
-                {digits(formatDashaDuration(running.end.getTime() - running.start.getTime(), lang))}
-              </Text>
-            </Text>
-            <Text className="text-sm text-muted-foreground" style={nepaliTextStyle(13)}>
-              {kundaliLabel("dasha_left", lang)} —{" "}
-              <Text className="font-semibold text-foreground">
-                {digits(formatDashaDuration(running.end.getTime() - now, lang))}
-              </Text>
-            </Text>
-          </View>
-          <View className="pl-2">
-            <SpanProgress
-              start={running.start}
-              end={running.end}
+          {kundaliLabel("dasha_full_timeline", lang)}
+        </Text>
+        <View className="pl-3">
+          {mahadashas.map((span, i) => (
+            <DashaNode
+              key={`${span.lord}-${span.start.getTime()}-${i}`}
+              span={span}
+              level={0}
               now={now}
-              running
-              secondary={colors.secondary}
+              timeZone={timeZone}
+              isLast={i === mahadashas.length - 1}
+              system={system}
+              maxLevel={maxLevel}
             />
-          </View>
+          ))}
         </View>
-      ) : null}
-
-      <View className="pl-3">
-        {mahadashas.map((span, i) => (
-          <DashaNode
-            key={`${span.lord}-${span.start.getTime()}-${i}`}
-            span={span}
-            level={0}
-            now={now}
-            timeZone={timeZone}
-            isLast={i === mahadashas.length - 1}
-            system={system}
-            maxLevel={maxLevel}
-          />
-        ))}
       </View>
     </View>
   );

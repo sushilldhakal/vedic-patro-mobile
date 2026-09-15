@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { View, type ViewStyle } from "react-native";
+import { Pressable, View, type ViewStyle } from "react-native";
 import { Text } from "@/components/ui/Text";
 import { GrahaInline } from "@/components/kundali/KundaliGlyphLabels";
+import { BhavaBalaChart } from "@/components/kundali/BhavaBalaChart";
 import { DataTable, type Column } from "@/components/ui/DataTable";
-import type { BhavaBalaData, BhavaBalaHouse } from "@/lib/api";
+import type { BhavaBalaData, BhavaBalaHouse, VargaCharts } from "@/lib/api";
 import { GRAHA_NAME, type GrahaKey } from "@/lib/graha-details";
 import { useLocale } from "@/lib/i18n";
 import { kundaliLabel } from "@/lib/kundali/kundali-i18n";
@@ -75,11 +76,16 @@ function HouseSummary({ house, lang, digits }: { house: BhavaBalaHouse; lang: "n
 export function BhavaBalaCard({
   data,
   compactHeader = false,
+  vargaCharts,
+  combustion,
 }: {
   data: BhavaBalaData;
   compactHeader?: boolean;
+  vargaCharts?: VargaCharts;
+  combustion?: Record<string, boolean | null>;
 }) {
   const { lang, digits } = useLocale();
+  const [selectedHouse, setSelectedHouse] = useState(data.strongest.house);
   const { width: windowWidth } = useBreakpoint();
   const [contentWidth, setContentWidth] = useState(0);
   const effectiveWidth = contentWidth || windowWidth;
@@ -119,10 +125,13 @@ export function BhavaBalaCard({
 
   const rows = data.houses.map((h) => ({
     key: String(h.house),
+    highlight: selectedHouse === h.house,
     cells: [
-      <Text key="h" className="font-semibold text-foreground" style={nepaliTextStyle(11)} numberOfLines={1}>
-        {houseLabel(h.house)}
-      </Text>,
+      <Pressable key="h" onPress={() => setSelectedHouse(h.house)} className="active:opacity-70">
+        <Text className="font-semibold text-foreground" style={nepaliTextStyle(11)} numberOfLines={1}>
+          {houseLabel(h.house)}
+        </Text>
+      </Pressable>,
       <View key="l" className="items-end">
         <GrahaInline
           grahaKey={h.lordKey}
@@ -154,6 +163,14 @@ export function BhavaBalaCard({
         if (w > 0 && Math.abs(w - contentWidth) > 1) setContentWidth(w);
       }}
     >
+      <BhavaBalaChart
+        data={data}
+        selectedHouse={selectedHouse}
+        onSelectHouse={setSelectedHouse}
+        vargaCharts={vargaCharts}
+        combustion={combustion}
+      />
+
       {!compactHeader ? (
         <Text className="text-sm font-semibold uppercase tracking-wide text-foreground" style={nepaliTextStyle(13)}>
           {kundaliLabel("bhava_bala_house_strength_virupas", lang)}

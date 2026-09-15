@@ -29,18 +29,33 @@ type Props = {
   tribhagi: DashaTreeResponse | null | undefined;
   yogini: DashaTreeResponse | null | undefined;
   timeZone?: string;
+  /** Controlled tab — used when the kundali section nav names a dasha system. */
+  active?: DashaSystem;
+  onActiveChange?: (id: DashaSystem) => void;
 };
 
-export function DashaSystemPanel({ vimshottari, tribhagi, yogini, timeZone }: Props) {
+export function DashaSystemPanel({
+  vimshottari,
+  tribhagi,
+  yogini,
+  timeZone,
+  active: activeProp,
+  onActiveChange,
+}: Props) {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
   const { isTablet } = useBreakpoint();
   const tabs: DashaTab[] = [
     { id: "vimshottari", labelNe: "विंशोत्तरी", labelEn: "Vimshottari", data: vimshottari, maxLevel: 4 },
-    { id: "tribhagi", labelNe: "त्रिभागi", labelEn: "Tribhagi", data: tribhagi, maxLevel: 4 },
+    { id: "tribhagi", labelNe: "त्रिभागि", labelEn: "Tribhagi", data: tribhagi, maxLevel: 4 },
     { id: "yogini", labelNe: "योगिनी", labelEn: "Yogini", data: yogini, maxLevel: 1 },
   ];
-  const [active, setActive] = useState<DashaSystem>("vimshottari");
+  const [uncontrolled, setUncontrolled] = useState<DashaSystem>("vimshottari");
+  const active = activeProp ?? uncontrolled;
+  const setActive = (id: DashaSystem) => {
+    onActiveChange?.(id);
+    if (activeProp == null) setUncontrolled(id);
+  };
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0]!;
   const dasha = current.data;
 
