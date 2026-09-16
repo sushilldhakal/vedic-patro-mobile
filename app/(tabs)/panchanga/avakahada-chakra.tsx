@@ -11,20 +11,16 @@ import {
   type Gana,
 } from "@/lib/avakahada-data";
 import {
-  localizeDeity,
+  formatRashiSwami,
+  formatSanjnaMukha,
+  formatVarnaVashya,
+  formatYoniPair,
   localizeGana,
   localizeJati,
   localizeLord,
-  localizeMukha,
   localizeNadi,
   localizeNakshatra,
-  localizeRashis,
-  localizeSanjna,
   localizeVarga,
-  localizeVarna,
-  localizeVashya,
-  localizeYoni,
-  rowMetaFromCharans,
 } from "@/lib/avakahada-locale";
 import { useLocale } from "@/lib/i18n";
 import { nepaliTextStyle } from "@/lib/nepali-text";
@@ -59,45 +55,34 @@ interface Row {
   aksharas: string[];
   charanRashis: string[];
   aksharaText: string;
-  rashiText: string;
-  deity: string;
+  swami: string;
   jati: string;
-  sanjna: string;
-  mukha: string;
-  lord: string;
-  varna: string;
-  vashya: string;
-  yoni: string;
-  vairiYoni: string;
+  sanjnaMukha: string;
+  rashiSwami: string;
+  varnaVashya: string;
+  yoniVairi: string;
   gana: Gana;
   nadi: string;
 }
 
 function buildRows(lang: string): Row[] {
-  return AVAKAHADA.map((r) => {
-    const meta = rowMetaFromCharans(r.charanRashis);
-    return {
-      index: r.index,
-      ne: r.ne,
-      en: r.en,
-      label: localizeNakshatra(r, lang),
-      aksharas: r.aksharas,
-      charanRashis: r.charanRashis,
-      aksharaText: r.aksharas.join(" "),
-      rashiText: localizeRashis(r.rashis, lang),
-      deity: localizeDeity(r.deity, lang),
-      jati: localizeJati(r.jati, lang),
-      sanjna: localizeSanjna(r.sanjna, lang),
-      mukha: localizeMukha(r.mukha, lang),
-      lord: localizeLord(meta.lord, lang),
-      varna: localizeVarna(meta.varna, lang),
-      vashya: localizeVashya(meta.vashya, lang),
-      yoni: localizeYoni(r.yoni, lang),
-      vairiYoni: localizeYoni(r.vairiYoni, lang),
-      gana: r.gana,
-      nadi: localizeNadi(r.nadi, lang),
-    };
-  });
+  return AVAKAHADA.map((r) => ({
+    index: r.index,
+    ne: r.ne,
+    en: r.en,
+    label: localizeNakshatra(r, lang),
+    aksharas: r.aksharas,
+    charanRashis: r.charanRashis,
+    aksharaText: r.aksharas.join(" "),
+    swami: localizeLord(r.swami, lang),
+    jati: localizeJati(r.jati, lang),
+    sanjnaMukha: formatSanjnaMukha(r.sanjna, r.mukha, lang),
+    rashiSwami: formatRashiSwami(r.charanRashis, lang),
+    varnaVashya: formatVarnaVashya(r.charanRashis, lang),
+    yoniVairi: formatYoniPair(r.yoni, r.vairiYoni, lang),
+    gana: r.gana,
+    nadi: localizeNadi(r.nadi, lang),
+  }));
 }
 
 function matches(row: Row, query: string): boolean {
@@ -107,17 +92,13 @@ function matches(row: Row, query: string): boolean {
     row.ne,
     row.en,
     row.label,
-    row.deity,
+    row.swami,
     row.jati,
-    row.sanjna,
-    row.mukha,
+    row.sanjnaMukha,
     row.aksharaText,
-    row.rashiText,
-    row.lord,
-    row.varna,
-    row.vashya,
-    row.yoni,
-    row.vairiYoni,
+    row.rashiSwami,
+    row.varnaVashya,
+    row.yoniVairi,
     row.gana,
     localizeGana(row.gana, "en"),
     row.nadi,
@@ -129,16 +110,12 @@ function matches(row: Row, query: string): boolean {
 
 type SortKey =
   | "index"
-  | "deity"
+  | "swami"
   | "jati"
-  | "sanjna"
-  | "mukha"
-  | "rashiText"
-  | "lord"
-  | "varna"
-  | "vashya"
-  | "yoni"
-  | "vairiYoni"
+  | "sanjnaMukha"
+  | "rashiSwami"
+  | "varnaVashya"
+  | "yoniVairi"
   | "gana"
   | "nadi";
 
@@ -149,11 +126,10 @@ const COLUMNS: {
   width: number;
   sortable: boolean;
 }[] = [
-  { key: "index", ne: "नक्षत्र", en: "Nakshatra", width: 150, sortable: true },
-  { key: "deity", ne: "स्वामी", en: "Deity (Swami)", width: 108, sortable: true },
-  { key: "jati", ne: "जात", en: "Jati", width: 92, sortable: true },
-  { key: "sanjna", ne: "संज्ञा", en: "Sanjna", width: 92, sortable: true },
-  { key: "mukha", ne: "मुख", en: "Mukha", width: 92, sortable: true },
+  { key: "index", ne: "नक्षत्र", en: "Nakshatra", width: 168, sortable: true },
+  { key: "swami", ne: "स्वामी", en: "Swami", width: 84, sortable: true },
+  { key: "jati", ne: "जात", en: "Jati", width: 96, sortable: true },
+  { key: "sanjnaMukha", ne: "संज्ञा/मुख", en: "Sanjna / Mukha", width: 132, sortable: true },
   {
     key: "akshara",
     ne: "नामाक्षर (चरण १–४)",
@@ -161,12 +137,9 @@ const COLUMNS: {
     width: 168,
     sortable: false,
   },
-  { key: "rashiText", ne: "राशि", en: "Rashi", width: 118, sortable: true },
-  { key: "lord", ne: "राशि स्वामी", en: "Rashi lord", width: 118, sortable: true },
-  { key: "varna", ne: "वर्ण", en: "Varna", width: 100, sortable: true },
-  { key: "vashya", ne: "वश्य", en: "Vashya", width: 100, sortable: true },
-  { key: "yoni", ne: "योनि", en: "Yoni", width: 96, sortable: true },
-  { key: "vairiYoni", ne: "वैरि योनि", en: "Enemy yoni", width: 100, sortable: true },
+  { key: "rashiSwami", ne: "राशि / स्वामी", en: "Rashi / Lord", width: 196, sortable: true },
+  { key: "varnaVashya", ne: "राशि वर्ण/वश्य", en: "Rashi varna / vashya", width: 196, sortable: true },
+  { key: "yoniVairi", ne: "योनि / वैरी योनि", en: "Yoni / Enemy yoni", width: 148, sortable: true },
   { key: "gana", ne: "गण", en: "Gana", width: 84, sortable: true },
   { key: "nadi", ne: "नाडी", en: "Nadi", width: 84, sortable: true },
 ];
@@ -208,8 +181,8 @@ export default function AvakahadaScreen() {
     <AppShell
       title={pick("अवकहडा चक्र", "Avakahada Chakra")}
       subtitle={pick(
-        "२७ नक्षत्र, १०८ चरण — स्वामी, जात, संज्ञा, मुखा, नामाक्षर, राशि, वर्ण, वश्य, योनि, गण र नाडीको परम्परागत तालिका।",
-        "27 nakshatras, 108 charans — deity, jati, sanjna, mukha, name syllables, rashi, varna, vashya, yoni, gana and nadi.",
+        "२७ नक्षत्रका १० वटै स्तम्भ — स्वामी, जात, संज्ञा/मुख, नामाक्षर, राशि / स्वामी, राशि वर्ण/वश्य, योनि / वैरी योनि, गण र नाडी।",
+        "All 10 columns for the 27 nakshatras — swami, jati, sanjna/mukha, name syllables, rashi / lord, rashi varna/vashya, yoni / enemy yoni, gana and nadi.",
       )}
       headerRight={<Ionicons name="grid-outline" size={26} color={colors.secondary} />}
     >
@@ -287,11 +260,10 @@ export default function AvakahadaScreen() {
                     {digits(row.index)}. {row.label}
                   </Text>
                 </TableCell>
-                <TableCell width={COLUMNS[1].width}>{row.deity}</TableCell>
+                <TableCell width={COLUMNS[1].width}>{row.swami}</TableCell>
                 <TableCell width={COLUMNS[2].width}>{row.jati}</TableCell>
-                <TableCell width={COLUMNS[3].width}>{row.sanjna}</TableCell>
-                <TableCell width={COLUMNS[4].width}>{row.mukha}</TableCell>
-                <TableCell width={COLUMNS[5].width}>
+                <TableCell width={COLUMNS[3].width}>{row.sanjnaMukha}</TableCell>
+                <TableCell width={COLUMNS[4].width}>
                   <View className="flex-row flex-wrap gap-1">
                     {row.aksharas.map((a, i) => (
                       <View
@@ -305,13 +277,10 @@ export default function AvakahadaScreen() {
                     ))}
                   </View>
                 </TableCell>
-                <TableCell width={COLUMNS[6].width}>{row.rashiText}</TableCell>
-                <TableCell width={COLUMNS[7].width}>{row.lord}</TableCell>
-                <TableCell width={COLUMNS[8].width}>{row.varna}</TableCell>
-                <TableCell width={COLUMNS[9].width}>{row.vashya}</TableCell>
-                <TableCell width={COLUMNS[10].width}>{row.yoni}</TableCell>
-                <TableCell width={COLUMNS[11].width}>{row.vairiYoni}</TableCell>
-                <TableCell width={COLUMNS[12].width}>
+                <TableCell width={COLUMNS[5].width}>{row.rashiSwami}</TableCell>
+                <TableCell width={COLUMNS[6].width}>{row.varnaVashya}</TableCell>
+                <TableCell width={COLUMNS[7].width}>{row.yoniVairi}</TableCell>
+                <TableCell width={COLUMNS[8].width}>
                   <View
                     style={{ backgroundColor: ganaTone[row.gana].bg }}
                     className="self-start rounded-full px-2 py-0.5"
@@ -324,7 +293,7 @@ export default function AvakahadaScreen() {
                     </Text>
                   </View>
                 </TableCell>
-                <TableCell width={COLUMNS[13].width}>{row.nadi}</TableCell>
+                <TableCell width={COLUMNS[9].width}>{row.nadi}</TableCell>
               </TableRow>
             ))
           )}
