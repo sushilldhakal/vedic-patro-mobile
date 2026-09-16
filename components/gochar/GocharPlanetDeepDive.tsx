@@ -1,6 +1,4 @@
 import { Pressable, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { GrahaPlanetIcon } from "@/components/graha/GrahaPlanetIcon";
 import { Text } from "@/components/ui/Text";
 import type { GocharGraha } from "@/lib/api";
@@ -41,7 +39,6 @@ export function GocharPlanetDeepDive({
 }) {
   const { lang, pick, digits } = useLocale();
   const colors = useThemeColors();
-  const router = useRouter();
   const { width } = useBreakpoint();
 
   const g = gochar[selected];
@@ -186,19 +183,6 @@ export function GocharPlanetDeepDive({
             </View>
           </View>
         ) : null}
-
-        <Pressable
-          onPress={() => router.push("/panchanga/graha-sthiti" as never)}
-          className="mt-4 flex-row items-center gap-1.5 self-start"
-        >
-          <Text
-            style={{ color: colors.secondary, ...nepaliTextStyle(14) }}
-            className="text-sm font-semibold"
-          >
-            {pick("पूर्ण ग्रह स्पष्ट विवरण", "Open full graha sphuta table")}
-          </Text>
-          <Ionicons name="arrow-forward" size={15} color={colors.secondary} />
-        </Pressable>
       </View>
     </View>
   );

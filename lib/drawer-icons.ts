@@ -69,7 +69,6 @@ const TABLE: Record<string, DrawerIconName> = {
   choghadiya: "clock-3",
   hora: "clock-3",
   lagna: "sunrise",
-  "udaya-lagna": "sunrise",
   chandrabala: "moon-star",
   tarabala: "star",
   "panchaka-rahita": "calendar-clock",
@@ -79,7 +78,6 @@ const TABLE: Record<string, DrawerIconName> = {
 const GRAHA: Record<string, DrawerIconName> = {
   gochar: "route",
   "aakash-gochar": "orbit",
-  "graha-sthiti": "orbit",
   "graha-asta": "sunrise",
   "graha-vakri": "rotate-ccw",
   "chandra-grahan": "moon-star",

@@ -77,14 +77,6 @@ export const ELEMENT_META: ElementMeta[] = [
     blurbEn: "Lagna changes through the day",
   },
   {
-    id: "udaya-lagna",
-    kind: "table",
-    titleNe: "उदय लग्न",
-    titleEn: "Rising lagna",
-    blurbNe: "उदय लग्न क्रम",
-    blurbEn: "Ascendant lagna sequence",
-  },
-  {
     id: "chandrabala",
     kind: "table",
     titleNe: "चन्द्रबल",

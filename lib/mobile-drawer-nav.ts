@@ -32,7 +32,6 @@ const jyotishItems: DrawerNavItem[] = [
 const grahaItems: DrawerNavItem[] = [
   { id: "aakash-gochar", href: "/aakash-gochar", labelNe: "३D आकाश गोचर", labelEn: "3D sky gochar", icon: resolveDrawerIcon("graha", "aakash-gochar") },
   { id: "gochar", href: "/gochar", labelNe: "गोचर", labelEn: "Gochar", icon: resolveDrawerIcon("graha", "gochar") },
-  { id: "graha-sthiti", href: "/panchanga/graha-sthiti", labelNe: "ग्रह स्थिति", labelEn: "Graha sthiti", icon: resolveDrawerIcon("graha", "graha-sthiti") },
   { id: "graha-asta", href: "/panchanga/graha-asta", labelNe: "ग्रह अस्त", labelEn: "Heliacal set", icon: resolveDrawerIcon("graha", "graha-asta") },
   { id: "graha-vakri", href: "/panchanga/graha-vakri", labelNe: "ग्रह वक्री", labelEn: "Retrograde", icon: resolveDrawerIcon("graha", "graha-vakri") },
   { id: "chandra-grahan", href: "/panchanga/chandra-grahan", labelNe: "चन्द्र ग्रहण", labelEn: "Lunar eclipse", icon: resolveDrawerIcon("graha", "chandra-grahan") },

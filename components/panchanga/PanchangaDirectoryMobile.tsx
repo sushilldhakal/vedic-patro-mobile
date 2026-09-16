@@ -28,12 +28,6 @@ const GRAHA_LINKS: LinkItem[] = [
     icon: "git-branch-outline",
   },
   {
-    href: "/panchanga/graha-sthiti",
-    titleNe: "ग्रह स्थिति",
-    titleEn: "Graha sthiti",
-    icon: "planet-outline",
-  },
-  {
     href: "/panchanga/graha-asta",
     titleNe: "ग्रह अस्त",
     titleEn: "Heliacal set",

@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Redirect } from "expo-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -516,6 +516,10 @@ export default function ElementScreen() {
   });
 
   const elementClock = dateAd === todayAd ? defaultClockForTimezone(timezone) : undefined;
+
+  if (name === "udaya-lagna") {
+    return <Redirect href="/panchanga/element/lagna" />;
+  }
 
   if (!meta || !name) {
     return (
